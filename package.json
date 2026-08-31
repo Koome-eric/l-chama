@@ -1,0 +1,56 @@
+{
+  "name": "lchama-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "L Chama — standalone group savings & loan platform, spun out of Ludeva.",
+  "scripts": {
+    "dev": "next dev -p 9003",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "postinstall": "prisma generate",
+    "db:push": "prisma db push",
+    "db:seed": "prisma db seed"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@clerk/nextjs": "^6.36.10",
+    "@hookform/resolvers": "^4.1.3",
+    "@prisma/client": "^6.19.3",
+    "@radix-ui/react-dialog": "^1.1.6",
+    "@radix-ui/react-label": "^2.1.2",
+    "@radix-ui/react-select": "^2.1.6",
+    "@radix-ui/react-separator": "^1.1.1",
+    "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-tooltip": "^1.1.6",
+    "@radix-ui/react-tabs": "^1.1.3",
+    "@radix-ui/react-toast": "^1.2.6",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "framer-motion": "^11.15.0",
+    "lucide-react": "^0.475.0",
+    "next": "15.5.9",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1",
+    "react-hook-form": "^7.54.2",
+    "resend": "^6.9.3",
+    "tailwind-merge": "^3.0.1",
+    "tailwindcss-animate": "^1.0.7",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8",
+    "prisma": "^6.19.2",
+    "tailwindcss": "^3.4.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5"
+  }
+}

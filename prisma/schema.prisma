@@ -1,0 +1,421 @@
+// L Chama — standalone schema, spun out of Ludeva.
+// This app has its own database and its own Clerk project, so this User
+// model only carries what L Chama itself needs — no KYC, no investment,
+// no accountType fields from the original Ludeva schema.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  MEMBER
+  ADMIN
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+model User {
+  id      String  @id @default(cuid())
+  clerkId String  @unique
+  email   String? @unique
+  phone   String? @unique
+
+  fullName  String?
+  firstName String?
+  lastName  String?
+  idNumber  String?
+  gender    Gender?
+  country   String?
+  region    String?
+
+  role UserRole @default(MEMBER)
+
+  // Two distinct completion flags: a person can be phone-verified and
+  // even have finished their personal profile without yet having a
+  // chama (owner) or being on one (member) — onboardingCompleted only
+  // flips once they're attached to a team one way or another.
+  profileCompleted    Boolean @default(false)
+  onboardingCompleted Boolean @default(false)
+
+  ownedTeam      Team?           @relation("TeamOwner")
+  teamMembership TeamMembership? @relation("TeamMembershipUser")
+  sentInvites    TeamInvite[]    @relation("TeamInvitesSentBy")
+  decidedTeams   Team[]          @relation("TeamDecidedBy")
+
+  loanRequestsMade    LoanRequest[]   @relation("LoanRequester")
+  loanRequestsDecided LoanRequest[]   @relation("LoanDecidedBy")
+  loanGuarantees      LoanGuarantee[] @relation("LoanGuarantor")
+
+  campaignsCreated Campaign[] @relation("CampaignCreator")
+  donationsMade    Donation[] @relation("DonationDonor")
+  teamInvestmentsMade TeamInvestment[] @relation("TeamInvestmentInitiator")
+
+  notifications Notification[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user")
+}
+
+enum OrganisationApprovalStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+model Team {
+  id      String @id @default(cuid())
+  name    String
+  ownerId String @unique
+  owner   User   @relation("TeamOwner", fields: [ownerId], references: [id])
+
+  levelKey      String?
+  levelName     String?
+  monthlyAmount Float?
+  groupSize     Int?
+
+  // Organisation registration details, collected on the "Register
+  // Organisation" onboarding step and reviewed by an admin before the
+  // chama goes live.
+  businessRegNumber  String?
+  numberOfMembers    Int?
+  totalDirectors     Int?
+  physicalAddress    String?
+  additionalComments String?
+
+  approvalStatus OrganisationApprovalStatus @default(PENDING_APPROVAL)
+  submittedAt    DateTime                   @default(now())
+  decidedById    String?
+  decidedBy      User?                      @relation("TeamDecidedBy", fields: [decidedById], references: [id])
+  decidedAt      DateTime?
+  rejectionReason String?
+
+  members         TeamMembership[]
+  invites         TeamInvite[]
+  loanAccount     LoanAccount?
+  loanRequests    LoanRequest[]
+  investments     TeamInvestment[]
+  memberReports   MemberReport[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("team")
+}
+
+// ✅ Per-member custom permissions within a chama. The owner ("Admin")
+// implicitly has every permission regardless of these flags — they only
+// apply to invited members, and are set by the owner (or by another
+// member with canManagePermissions) either at invite time or afterward
+// from the Members tab. All default to a sensible baseline so a newly
+// invited member only gets what the inviter grants.
+model TeamMembership {
+  id     String @id @default(cuid())
+  teamId String
+  userId String @unique
+
+  team Team @relation(fields: [teamId], references: [id])
+  user User @relation("TeamMembershipUser", fields: [userId], references: [id])
+
+  canInvite            Boolean @default(false) // send new chama invites
+  canManagePermissions Boolean @default(false) // edit other members' roles/permissions
+  canRemoveMembers     Boolean @default(false) // remove members from the chama
+  canApproveLoans      Boolean @default(false) // approve/reject loan requests, record repayments
+  canInvestPooled      Boolean @default(false) // move pooled funds into an investment product
+  canViewPooledFunds   Boolean @default(true)  // view the loan account & investment balances
+  canManageReports     Boolean @default(false) // upload/sync Google Sheets performance data
+  canWithdraw          Boolean @default(false) // close out an investment back to the pooled fund
+
+  createdAt DateTime @default(now())
+
+  @@map("teammembership")
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
+model TeamInvite {
+  id     String @id @default(cuid())
+  teamId String
+  team   Team   @relation(fields: [teamId], references: [id])
+
+  email       String
+  token       String       @unique
+  status      InviteStatus @default(PENDING)
+  invitedById String
+  invitedBy   User         @relation("TeamInvitesSentBy", fields: [invitedById], references: [id])
+
+  // Permissions to grant on acceptance — mirrors TeamMembership flags, so
+  // the owner picks the member's role while sending the invite.
+  canInvite            Boolean @default(false)
+  canManagePermissions Boolean @default(false)
+  canRemoveMembers     Boolean @default(false)
+  canApproveLoans      Boolean @default(false)
+  canInvestPooled      Boolean @default(false)
+  canViewPooledFunds   Boolean @default(true)
+  canManageReports     Boolean @default(false)
+  canWithdraw          Boolean @default(false)
+
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("teaminvite")
+}
+
+model LoanAccount {
+  id     String @id @default(cuid())
+  teamId String @unique
+  team   Team   @relation(fields: [teamId], references: [id])
+
+  balance Float @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("loanaccount")
+}
+
+enum LoanRequestStatus {
+  PENDING_GUARANTORS
+  PENDING_ADMIN
+  REJECTED
+  ACTIVE
+  REPAID
+}
+
+model LoanRequest {
+  id     String @id @default(cuid())
+  teamId String
+  team   Team   @relation(fields: [teamId], references: [id])
+
+  requesterId String
+  requester   User   @relation("LoanRequester", fields: [requesterId], references: [id])
+
+  amount  Float
+  purpose String?
+  status  LoanRequestStatus @default(PENDING_GUARANTORS)
+
+  repaymentWeeks Int?
+
+  decidedById String?
+  decidedBy   User?     @relation("LoanDecidedBy", fields: [decidedById], references: [id])
+  decidedAt   DateTime?
+
+  guarantees LoanGuarantee[]
+  repayments LoanRepayment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("loanrequest")
+}
+
+model LoanGuarantee {
+  id            String      @id @default(cuid())
+  loanRequestId String
+  loanRequest   LoanRequest @relation(fields: [loanRequestId], references: [id])
+
+  guarantorId String
+  guarantor   User   @relation("LoanGuarantor", fields: [guarantorId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([loanRequestId, guarantorId])
+  @@map("loanguarantee")
+}
+
+model LoanRepayment {
+  id            String      @id @default(cuid())
+  loanRequestId String
+  loanRequest   LoanRequest @relation(fields: [loanRequestId], references: [id])
+
+  weekNumber Int
+  dueDate    DateTime
+  amount     Float
+  paid       Boolean   @default(false)
+  paidAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("loanrepayment")
+}
+
+model Notification {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  title   String
+  message String
+  read    Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@map("notification")
+}
+
+enum CampaignStatus {
+  ACTIVE
+  CLOSED
+}
+
+// Fundraising campaigns — separate from chama loans. Any onboarded
+// member can start one; it's visible platform-wide (not scoped to a
+// single chama) since these are community/charity causes, not
+// chama-internal loans. "verified" is set by an admin (see
+// isPlatformAdmin) and is purely a trust badge — it does not gate
+// whether the campaign accepts donations.
+model Campaign {
+  id          String  @id @default(cuid())
+  title       String
+  description String // short summary shown on the card
+  story       String // full story shown on the detail page
+  category    String
+  location    String
+
+  targetAmount   Float
+  raisedAmount   Float          @default(0)
+  backersCount   Int            @default(0)
+  beneficiaries  Int?
+  imageUrl       String?
+  verified       Boolean        @default(false)
+  status         CampaignStatus @default(ACTIVE)
+  deadline       DateTime
+
+  creatorId String
+  creator   User   @relation("CampaignCreator", fields: [creatorId], references: [id])
+
+  donations Donation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("campaign")
+}
+
+// ─────────────────────────────────────────────
+// Investment Products — the same catalog concept as Ludeva's
+// InvestmentProduct (MMF, stocks, bonds, fixed deposits). L Chama runs
+// its own database, so this is a local copy of the product catalog
+// (managed by an L Chama admin) rather than a live cross-app join —
+// see /admin's "Investment Products" tab. A chama invests pooled funds
+// from its loan account into one of these via TeamInvestment.
+// ─────────────────────────────────────────────
+enum FundType {
+  MMF
+  STOCK
+  BOND
+  FIXED_DEPOSIT
+}
+
+model InvestmentProduct {
+  id          String   @id @default(cuid())
+  name        String
+  type        FundType
+  description String?
+  roi         Float // annualized, %
+  duration    Int // months
+  minAmount   Float
+  maxAmount   Float?
+  isActive    Boolean  @default(true)
+
+  investments TeamInvestment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("investmentproduct")
+}
+
+enum TeamInvestmentStatus {
+  ACTIVE
+  COMPLETED
+}
+
+// A chama's pooled contribution into an InvestmentProduct. Investing
+// moves cash out of the chama's LoanAccount balance into the product;
+// closing it (canWithdraw) returns the principal to the loan account.
+model TeamInvestment {
+  id        String @id @default(cuid())
+  teamId    String
+  team      Team   @relation(fields: [teamId], references: [id])
+  productId String
+  product   InvestmentProduct @relation(fields: [productId], references: [id])
+
+  amount        Float
+  status        TeamInvestmentStatus @default(ACTIVE)
+  investedById  String
+  investedBy    User                 @relation("TeamInvestmentInitiator", fields: [investedById], references: [id])
+
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@map("teaminvestment")
+}
+
+// ─────────────────────────────────────────────
+// Member performance rows synced in from Google Sheets (same pipeline
+// idea as Ludeva's MemberReport — an Apps Script pushes rows to
+// /api/member-reports/sync, or an admin pastes a CSV export in the
+// admin "Member Reports" tab). teamId is resolved by matching
+// memberEmail to a user on that chama; rows that don't match anyone yet
+// are kept with teamId = null until an admin re-syncs.
+// ─────────────────────────────────────────────
+model MemberReport {
+  id     String @id @default(cuid())
+  teamId String?
+  team   Team?  @relation(fields: [teamId], references: [id])
+
+  memberEmail String
+  memberName  String?
+
+  date        String?
+  principal   String?
+  rate        String?
+  roi         String?
+  withdrawal  String?
+  closingBal  String?
+  periodLabel String?
+  notes       String?
+
+  uploadedAt DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("memberreport")
+}
+
+// Donations are manually recorded (like the loan account's manual
+// funding) rather than run through a real payment gateway — see the
+// README note on this. donorName/anonymous let a signed-in donor choose
+// how they're displayed on the campaign's donor list.
+model Donation {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+
+  donorId   String
+  donor     User    @relation("DonationDonor", fields: [donorId], references: [id])
+  anonymous Boolean @default(false)
+
+  amount  Float
+  message String?
+
+  createdAt DateTime @default(now())
+
+  @@map("donation")
+}

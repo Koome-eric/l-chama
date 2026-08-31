@@ -1,0 +1,169 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Neutral surface — cool slate rather than green-tinted grays, for a
+       crisper fintech look. Primary carries all the "money/trust" color. */
+    --background: 210 20% 98%;
+    --foreground: 222 30% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 30% 11%;
+
+    /* Brand color — matched to Ludeva's primary blue (#001030 navy dropped
+       in favor of Ludeva's actual brand hsl(220, 85%, 55%)) so L Chama
+       reads as the same brand family, not a different-colored sub-app. */
+    --primary: 220 85% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 25% 95%;
+    --secondary-foreground: 222 30% 15%;
+
+    --muted: 210 20% 95%;
+    --muted-foreground: 215 15% 45%;
+
+    --accent: 210 25% 95%;
+    --accent-foreground: 222 30% 15%;
+
+    /* Warm gold — reserved for money/campaign highlights (raised amounts,
+       progress bars, verified badges) so it reads as "value" against the
+       cooler primary/neutral palette. */
+    --gold: 38 92% 50%;
+    --gold-foreground: 26 40% 15%;
+
+    /* Chama Green — pulled from the L-Chama mark's own icon (the trio of
+       people), not a generic "success green." Reserved for trust states
+       that are specific to a chama: a loan fully guaranteed, a repayment
+       cleared, a member's role confirmed. Keeps "money moving" (gold)
+       visually distinct from "people vouching for people" (green). */
+    --chama-green: 160 55% 30%;
+    --chama-green-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 20% 90%;
+    --input: 214 20% 88%;
+    --ring: 220 85% 55%;
+    --radius: 1rem;
+  }
+
+  .dark {
+    --background: 222 32% 7%;
+    --foreground: 210 20% 96%;
+    --card: 222 28% 10%;
+    --card-foreground: 210 20% 96%;
+
+    /* Same Ludeva brand blue, matching Ludeva's own dark-mode primary
+       (hsl(217.2, 91.2%, 59.8%)) so both apps look identical in dark mode too. */
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 222 20% 15%;
+    --secondary-foreground: 210 20% 96%;
+
+    --muted: 222 20% 15%;
+    --muted-foreground: 215 15% 65%;
+
+    --accent: 222 20% 16%;
+    --accent-foreground: 210 20% 96%;
+
+    --gold: 38 92% 55%;
+    --gold-foreground: 26 40% 12%;
+
+    --chama-green: 160 50% 42%;
+    --chama-green-foreground: 0 0% 100%;
+
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 96%;
+
+    --border: 222 18% 18%;
+    --input: 222 18% 18%;
+    --ring: 217.2 91.2% 59.8%;
+  }
+
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  /* Subtle mesh-gradient wash used behind hero/stat sections for a modern
+     fintech feel without needing image assets. */
+  .bg-fintech-mesh {
+    background-image:
+      radial-gradient(circle at 15% 20%, hsl(var(--primary) / 0.14), transparent 45%),
+      radial-gradient(circle at 85% 10%, hsl(var(--gold) / 0.14), transparent 40%),
+      radial-gradient(circle at 50% 100%, hsl(var(--primary) / 0.08), transparent 50%);
+  }
+
+  .text-gold {
+    color: hsl(var(--gold));
+  }
+  .bg-gold {
+    background-color: hsl(var(--gold));
+  }
+  .bg-gold\/10 {
+    background-color: hsl(var(--gold) / 0.1);
+  }
+  .bg-gold\/15 {
+    background-color: hsl(var(--gold) / 0.15);
+  }
+  .border-gold\/30 {
+    border-color: hsl(var(--gold) / 0.3);
+  }
+
+  .text-chama {
+    color: hsl(var(--chama-green));
+  }
+  .bg-chama {
+    background-color: hsl(var(--chama-green));
+  }
+  .bg-chama\/10 {
+    background-color: hsl(var(--chama-green) / 0.1);
+  }
+  .border-chama\/30 {
+    border-color: hsl(var(--chama-green) / 0.3);
+  }
+
+  /* The signature dark "ledger" surface — a deep navy panel (not a
+     generic near-black) used once per page at most, for the hero band
+     and any headline stat strip, so it reads as a deliberate financial-
+     statement moment rather than a dark-mode toggle. */
+  .bg-ledger {
+    background-color: hsl(222 55% 10%);
+    background-image:
+      radial-gradient(circle at 20% 0%, hsl(var(--primary) / 0.35), transparent 55%),
+      radial-gradient(circle at 90% 100%, hsl(var(--gold) / 0.16), transparent 45%);
+    color: hsl(210 25% 96%);
+  }
+
+  /* Money and other ledger data get tabular monospace figures so digits
+     align like a real statement — applied to numbers only, never body
+     copy, so it stays a deliberate accent rather than a font swap. */
+  .font-figures {
+    font-family: var(--font-mono), monospace;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  .glass-card {
+    background: hsl(var(--card) / 0.6);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid hsl(var(--border) / 0.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
