@@ -52,17 +52,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No row had a valid "email".' }, { status: 400 });
   }
 
-  const emails: string[] = Array.from(
-    new Set(
-      cleaned
-        .map((r: { memberEmail: string | null }) => r.memberEmail)
-        .filter((email: string | null): email is string => typeof email === 'string')
-    )
-  );
+  const emails = [...new Set(cleaned.map((r: any) => r.memberEmail as string))] as string[];
   const users = await prisma.user.findMany({ where: { email: { in: emails } } });
   const userByEmail = new Map(
     users
-      .filter((u): u is typeof u & { email: string } => typeof u.email === 'string')
+      .filter((u): u is typeof u & { email: string } => !!u.email)
       .map((u) => [u.email.toLowerCase(), u])
   );
 

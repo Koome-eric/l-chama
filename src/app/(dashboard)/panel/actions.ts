@@ -44,13 +44,13 @@ export async function inviteChamaMember(email: string, permissions?: Partial<Cha
 
   const cleanEmail = email?.trim().toLowerCase();
   if (!cleanEmail || !cleanEmail.includes('@')) throw new Error('Enter a valid email address.');
-  if (user.email && cleanEmail === user.email.toLowerCase()) {
-    throw new Error("You can't invite yourself.");
-  }
+
+  const currentUserEmail = user.email?.trim().toLowerCase();
+  if (currentUserEmail && cleanEmail === currentUserEmail) throw new Error("You can't invite yourself.");
 
   const alreadyMember =
-    (ctx.team.owner.email && ctx.team.owner.email.toLowerCase() === cleanEmail) ||
-    ctx.team.members.some((m) => m.user.email && m.user.email.toLowerCase() === cleanEmail);
+    (ctx.team.owner.email?.trim().toLowerCase() ?? '') === cleanEmail ||
+    ctx.team.members.some((m) => (m.user.email?.trim().toLowerCase() ?? '') === cleanEmail);
   if (alreadyMember) throw new Error('This person is already on the chama.');
 
   const existingInvite = await prisma.teamInvite.findFirst({
@@ -255,7 +255,8 @@ export async function guaranteeLoanRequest(loanRequestId: string) {
 export async function decideLoanRequest(
   loanRequestId: string,
   decision: 'APPROVE' | 'REJECT',
-  repaymentWeeks?: number
+  repaymentWeeks?: number,
+  interestRate?: number
 ) {
   const user = await getCurrentDbUser();
   const ctx = await getChamaContext(user);
@@ -283,14 +284,17 @@ export async function decideLoanRequest(
   }
 
   const weeks = Math.max(1, Math.round(repaymentWeeks ?? 4));
+  // Chama loans start from 3% — the Team Leader can charge more, never less.
+  const rate = Math.max(3, interestRate ?? 3);
 
   const account = await prisma.loanAccount.findUnique({ where: { teamId: ctx.team.id } });
   if (!account || account.balance < request.amount) {
     throw new Error('The loan account does not have enough balance to cover this loan.');
   }
 
-  const installment = Math.floor((request.amount / weeks) * 100) / 100;
-  const lastInstallment = Math.round((request.amount - installment * (weeks - 1)) * 100) / 100;
+  const totalRepayable = Math.round(request.amount * (1 + rate / 100) * 100) / 100;
+  const installment = Math.floor((totalRepayable / weeks) * 100) / 100;
+  const lastInstallment = Math.round((totalRepayable - installment * (weeks - 1)) * 100) / 100;
 
   await prisma.$transaction([
     prisma.loanAccount.update({
@@ -304,6 +308,7 @@ export async function decideLoanRequest(
         decidedById: user.id,
         decidedAt: new Date(),
         repaymentWeeks: weeks,
+        interestRate: rate,
       },
     }),
     prisma.loanRepayment.createMany({
@@ -319,7 +324,7 @@ export async function decideLoanRequest(
   await notifyUser(
     request.requesterId,
     'Loan approved',
-    `Your loan request for KES ${request.amount.toLocaleString()} in ${ctx.team.name} was approved, repayable over ${weeks} week(s).`
+    `Your loan request for KES ${request.amount.toLocaleString()} in ${ctx.team.name} was approved at ${rate}% interest, repayable over ${weeks} week(s) — total repayable KES ${totalRepayable.toLocaleString()}.`
   );
 
   revalidatePath('/panel');
@@ -341,10 +346,19 @@ export async function markRepaymentPaid(repaymentId: string) {
   }
   if (repayment.paid) return { success: true };
 
-  await prisma.loanRepayment.update({
-    where: { id: repaymentId },
-    data: { paid: true, paidAt: new Date() },
-  });
+  await prisma.$transaction([
+    prisma.loanRepayment.update({
+      where: { id: repaymentId },
+      data: { paid: true, paidAt: new Date() },
+    }),
+    // Repayments (principal + interest) flow back into the pool, the
+    // same pot the next loan gets funded from.
+    prisma.loanAccount.upsert({
+      where: { teamId: ctx.team.id },
+      create: { teamId: ctx.team.id, balance: repayment.amount },
+      update: { balance: { increment: repayment.amount } },
+    }),
+  ]);
 
   const remaining = await prisma.loanRepayment.count({
     where: { loanRequestId: repayment.loanRequestId, paid: false },
@@ -355,6 +369,8 @@ export async function markRepaymentPaid(repaymentId: string) {
       data: { status: 'REPAID' },
     });
   }
+
+  await syncChamaToLudeva(ctx.team.id);
 
   revalidatePath('/panel');
   return { success: true };

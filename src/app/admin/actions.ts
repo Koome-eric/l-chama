@@ -107,6 +107,7 @@ export async function createInvestmentProduct(input: {
   type: 'MMF' | 'STOCK' | 'BOND' | 'FIXED_DEPOSIT';
   description?: string;
   roi: number;
+  roiMax?: number | null;
   duration: number;
   minAmount: number;
   maxAmount?: number | null;
@@ -120,6 +121,9 @@ export async function createInvestmentProduct(input: {
   if (input.maxAmount != null && input.maxAmount < input.minAmount) {
     throw new Error('Maximum amount must be greater than the minimum.');
   }
+  if (input.roiMax != null && input.roiMax < input.roi) {
+    throw new Error('Maximum rate must be greater than the minimum rate.');
+  }
 
   await prisma.investmentProduct.create({
     data: {
@@ -127,6 +131,7 @@ export async function createInvestmentProduct(input: {
       type: input.type,
       description: input.description?.trim() || null,
       roi: input.roi,
+      roiMax: input.roiMax ?? null,
       duration: input.duration,
       minAmount: input.minAmount,
       maxAmount: input.maxAmount ?? null,
@@ -145,6 +150,7 @@ export async function updateInvestmentProduct(
     type: 'MMF' | 'STOCK' | 'BOND' | 'FIXED_DEPOSIT';
     description?: string;
     roi: number;
+    roiMax?: number | null;
     duration: number;
     minAmount: number;
     maxAmount?: number | null;
@@ -158,6 +164,9 @@ export async function updateInvestmentProduct(
   if (input.maxAmount != null && input.maxAmount < input.minAmount) {
     throw new Error('Maximum amount must be greater than the minimum.');
   }
+  if (input.roiMax != null && input.roiMax < input.roi) {
+    throw new Error('Maximum rate must be greater than the minimum rate.');
+  }
 
   await prisma.investmentProduct.update({
     where: { id: productId },
@@ -166,6 +175,7 @@ export async function updateInvestmentProduct(
       type: input.type,
       description: input.description?.trim() || null,
       roi: input.roi,
+      roiMax: input.roiMax ?? null,
       duration: input.duration,
       minAmount: input.minAmount,
       maxAmount: input.maxAmount ?? null,
@@ -238,11 +248,11 @@ export async function syncMemberReportsCsv(csvText: string) {
   const rows = parseMemberReportCsv(csvText).filter((r) => r.memberEmail);
   if (rows.length === 0) throw new Error('No valid rows found in that CSV.');
 
-  const emails = [...new Set(rows.map((r) => r.memberEmail!).filter(Boolean))];
+  const emails = [...new Set(rows.map((r) => r.memberEmail!))];
   const users = await prisma.user.findMany({ where: { email: { in: emails } } });
   const userByEmail = new Map(
     users
-      .filter((u): u is typeof u & { email: string } => typeof u.email === 'string')
+      .filter((u): u is typeof u & { email: string } => !!u.email)
       .map((u) => [u.email.toLowerCase(), u])
   );
 

@@ -19,11 +19,6 @@ export const metadata: Metadata = {
   title: "L-CHAMA — Save Together, Borrow Together",
   description:
     "Start a chama, invite your members, and manage a shared loan account guaranteed by your own people.",
-  icons: {
-    icon: "/lchama-logo-v3.png",
-    shortcut: "/lchama-logo-v3.png",
-    apple: "/lchama-logo-v3.png",
-  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

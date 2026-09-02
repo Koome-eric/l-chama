@@ -26,14 +26,14 @@ export default async function ChamaInvitePage({
         ) : invite.status === 'ACCEPTED' ? (
           <InvalidInvite reason="This invite has already been accepted. Sign in to access your chama." showSignIn />
         ) : invite.status === 'REVOKED' ? (
-          <InvalidInvite reason="This invite has been revoked by the chama owner." />
+          <InvalidInvite reason="This invite has been revoked by the Team Leader." />
         ) : invite.status === 'EXPIRED' || invite.expiresAt < new Date() ? (
-          <InvalidInvite reason="This invite has expired. Ask the chama owner to send you a new one." />
+          <InvalidInvite reason="This invite has expired. Ask the Team Leader to send you a new one." />
         ) : (
           <ChamaInviteAcceptClient
             token={token}
             teamName={invite.team.name}
-            invitedByName={invite.invitedBy.fullName || invite.invitedBy.email || 'A chama member'}
+            invitedByName={invite.invitedBy.fullName || invite.invitedBy.email || 'Team leader'}
             email={invite.email}
           />
         )}

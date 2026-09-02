@@ -10,7 +10,7 @@ export default async function DepositPage() {
       icon={ArrowDownToLine}
       title="Deposit"
       description="Top up your chama's loan account."
-      note="M-Pesa and card deposits are on the way — for now, an owner can adjust the loan account balance from the Contribute tab."
+      note="M-Pesa and card deposits are on the way — for now, a Team Leader can adjust the loan account balance from the Contribute tab."
     />
   );
 }

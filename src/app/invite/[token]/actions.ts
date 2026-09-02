@@ -17,12 +17,12 @@ export async function acceptChamaInvite(token: string) {
   if (!invite) throw new Error('This invite link is invalid.');
 
   if (invite.status === 'ACCEPTED') throw new Error('This invite has already been accepted.');
-  if (invite.status === 'REVOKED') throw new Error('This invite has been revoked by the chama owner.');
+  if (invite.status === 'REVOKED') throw new Error('This invite has been revoked by the Team Leader.');
   if (invite.status === 'EXPIRED' || invite.expiresAt < new Date()) {
     if (invite.status !== 'EXPIRED') {
       await prisma.teamInvite.update({ where: { id: invite.id }, data: { status: 'EXPIRED' } });
     }
-    throw new Error('This invite has expired. Ask the chama owner to send a new one.');
+    throw new Error('This invite has expired. Ask the Team Leader to send a new one.');
   }
 
   const clerkEmail =

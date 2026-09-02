@@ -234,7 +234,7 @@ export function TeamMembersSection({
         <CardHeader>
           <CardTitle className="text-lg">Members</CardTitle>
           <CardDescription>
-            The owner always has full access. Everyone else's access is set per member — tap
+            The Team Leader always has full access. Everyone else's access is set per member — tap
             {' '}<Settings2 className="inline h-3.5 w-3.5" />{' '}to view or change what someone can do.
           </CardDescription>
         </CardHeader>
@@ -251,9 +251,9 @@ export function TeamMembersSection({
             <TableBody>
               <TableRow>
                 <TableCell className="font-medium">{team.owner.fullName || '—'}</TableCell>
-                <TableCell>{team.owner.email || '—'}</TableCell>
+                <TableCell>{team.owner.email}</TableCell>
                 <TableCell>
-                  <Badge className="gap-1"><ShieldCheck className="h-3 w-3" /> Owner</Badge>
+                  <Badge className="gap-1"><ShieldCheck className="h-3 w-3" /> Team Leader</Badge>
                 </TableCell>
                 {(canRemove || canManagePermissions) && <TableCell />}
               </TableRow>
@@ -263,7 +263,7 @@ export function TeamMembersSection({
                     {m.fullName || '—'}
                     {m.userId === currentUserId && <span className="text-muted-foreground"> (you)</span>}
                   </TableCell>
-                  <TableCell>{m.email || '—'}</TableCell>
+                  <TableCell>{m.email}</TableCell>
                   <TableCell>
                     <Badge variant="secondary">{roleSummary(m)}</Badge>
                   </TableCell>

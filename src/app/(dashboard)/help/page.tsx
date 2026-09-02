@@ -12,15 +12,15 @@ const FAQS: Array<{ q: string; a: string }> = [
   },
   {
     q: 'How does the loan account work?',
-    a: 'The owner funds a shared loan account. Any member can request a loan against it; two fellow members must guarantee the request before the owner approves it.',
+    a: 'The Team Leader funds a shared loan account. Any member can request a loan against it; two fellow members must guarantee the request before the Team Leader approves it.',
   },
   {
     q: 'How are loan repayments tracked?',
-    a: 'Once a loan is approved, a weekly repayment schedule is generated automatically. The owner marks each week as paid from the Loan Requests tab.',
+    a: 'Once a loan is approved, a weekly repayment schedule is generated automatically. The Team Leader marks each week as paid from the Loan Requests tab.',
   },
   {
     q: 'Who can remove a member or edit the chama?',
-    a: 'Only the chama owner. Every other member has full visibility but cannot edit membership or chama details.',
+    a: 'Only the Team Leader. Every other member has full visibility but cannot edit membership or chama details.',
   },
 ];
 
@@ -37,7 +37,7 @@ export default function HelpPage() {
           <CardTitle className="flex items-center gap-2">
             <HelpCircle className="h-5 w-5 text-primary" /> Frequently asked questions
           </CardTitle>
-          <CardDescription>Still stuck? Reach out to your chama owner or platform admin.</CardDescription>
+          <CardDescription>Still stuck? Reach out to your Team Leader or platform admin.</CardDescription>
         </CardHeader>
         <CardContent className="divide-y">
           {FAQS.map((item) => (

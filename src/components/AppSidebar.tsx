@@ -56,10 +56,24 @@ const bottomItems = [
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
-export function AppSidebar({ children }: { children: React.ReactNode }) {
+export function AppSidebar({
+  children,
+  hasLastRespectCover = false,
+}: {
+  children: React.ReactNode;
+  hasLastRespectCover?: boolean;
+}) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const currentTab = searchParams.get('tab');
+
+  const items = hasLastRespectCover
+    ? [
+        ...menuItems.slice(0, 4),
+        { href: '/last-respect', label: 'Last Respect Cover', icon: HeartHandshake },
+        ...menuItems.slice(4),
+      ]
+    : menuItems;
 
   const isActive = (item: { href: string; match?: string }) => {
     const [itemPath, itemQuery] = item.href.split('?');
@@ -111,7 +125,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
         </SidebarHeader>
 
         <SidebarContent className="flex flex-col justify-between">
-          <SidebarMenu>{menuItems.map(renderItem)}</SidebarMenu>
+          <SidebarMenu>{items.map(renderItem)}</SidebarMenu>
           <SidebarMenu>{bottomItems.map(renderItem)}</SidebarMenu>
         </SidebarContent>
       </Sidebar>

@@ -12,13 +12,13 @@ export default async function TeamPage() {
     owner: {
       id: ctx.team.owner.id,
       fullName: ctx.team.owner.fullName,
-      email: ctx.team.owner.email,
+      email: ctx.team.owner.email ?? 'Unknown email',
     },
     members: ctx.team.members.map((m: (typeof ctx.team.members)[number]) => ({
       membershipId: m.id,
       userId: m.userId,
       fullName: m.user.fullName,
-      email: m.user.email,
+      email: m.user.email ?? 'Unknown email',
       canInvite: m.canInvite,
       canManagePermissions: m.canManagePermissions,
       canRemoveMembers: m.canRemoveMembers,

@@ -35,6 +35,7 @@ type Product = {
   type: 'MMF' | 'STOCK' | 'BOND' | 'FIXED_DEPOSIT';
   description: string | null;
   roi: number;
+  roiMax: number | null;
   duration: number;
   minAmount: number;
   maxAmount: number | null;
@@ -156,7 +157,7 @@ export function InvestClient({ data }: { data: Data }) {
                   {p.description && <CardDescription>{p.description}</CardDescription>}
                 </CardHeader>
                 <CardContent className="space-y-1 text-sm font-figures">
-                  <p><span className="font-sans text-muted-foreground">ROI:</span> <span className="font-semibold text-primary">{p.roi}% p.a.</span></p>
+                  <p><span className="font-sans text-muted-foreground">ROI:</span> <span className="font-semibold text-primary">{p.roiMax ? `${p.roi}–${p.roiMax}` : p.roi}% p.a.</span></p>
                   <p><span className="font-sans text-muted-foreground">Term:</span> {p.duration} month{p.duration === 1 ? '' : 's'}</p>
                   <p>
                     <span className="font-sans text-muted-foreground">Range:</span> {formatKES(p.minAmount)}
@@ -215,8 +216,7 @@ export function InvestClient({ data }: { data: Data }) {
                   <div>
                     <p className="font-medium">{i.productName} <span className="text-muted-foreground text-sm">({TYPE_LABEL[i.productType]})</span></p>
                     <p className="text-sm text-muted-foreground">
-                      {formatKES(i.amount)} · invested by {i.investedByName ?? 'Unknown member'} on{' '}
-                      {new Date(i.createdAt).toLocaleDateString()}
+                      {formatKES(i.amount)} · invested by {i.investedByName ?? 'Unknown member'} on {new Date(i.createdAt).toLocaleDateString()}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">

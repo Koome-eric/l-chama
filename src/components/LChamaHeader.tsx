@@ -13,7 +13,7 @@ export default function LChamaHeader() {
       <div className="container mx-auto flex items-center justify-between px-4 lg:px-6 py-3">
         <Link href="/" className="flex items-center">
           <Image
-            src="/lchama-logo-v3.png"
+            src="/lchama-logo.png"
             alt="L-Chama by Ludeva"
             width={155}
             height={77}

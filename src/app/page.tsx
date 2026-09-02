@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { auth } from '@clerk/nextjs/server';
-import { ArrowRight, ShieldCheck, HandCoins, Users2, CalendarClock, HeartHandshake } from 'lucide-react';
+import { ArrowRight, ShieldCheck, HandCoins, Users2, CalendarClock, HeartHandshake, Globe, TrendingUp, Percent } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { getChamaContext } from '@/lib/chama';
 import LChamaHeader from '@/components/LChamaHeader';
@@ -16,7 +16,7 @@ const FEATURES = [
   {
     icon: Users2,
     title: 'One chama, one dashboard',
-    body: 'Every member sees the same team account — who is in, what has been paid, and where things stand. Only the chama owner can edit details or add members.',
+    body: 'Every member sees the same team account — who is in, what has been paid, and where things stand. Only the Team Leader can edit details or add members.',
   },
   {
     icon: HandCoins,
@@ -26,12 +26,32 @@ const FEATURES = [
   {
     icon: ShieldCheck,
     title: 'Guaranteed loan requests',
-    body: 'Any member can request a loan. It needs two fellow members to guarantee it before the chama owner reviews and approves.',
+    body: 'Any member can request a loan. It needs two fellow members to guarantee it before the Team Leader reviews and approves.',
   },
   {
     icon: CalendarClock,
     title: 'Weekly repayments',
     body: 'Approved loans come with a clear weekly repayment schedule, visible to the borrower and tracked automatically.',
+  },
+  {
+    icon: Globe,
+    title: 'Kenya-diaspora chamas welcome',
+    body: 'Running your chama from abroad? L Chama supports diaspora groups the same way — one dashboard, wherever your members are.',
+  },
+  {
+    icon: HeartHandshake,
+    title: 'Last Respect Cover',
+    body: "An optional bereavement fund your chama contributes to together, so no member's family carries a loss alone.",
+  },
+  {
+    icon: TrendingUp,
+    title: 'Linked to Ludeva MMF',
+    body: "Put your chama's pooled fund into Ludeva's Money Market Fund and earn 9–13% p.a. — the same MMF Ludeva's individual members use.",
+  },
+  {
+    icon: Percent,
+    title: 'Loans from 3%',
+    body: "Chama loans start from as little as 3% interest, set by your Team Leader — never lower, so the pool always grows.",
   },
 ];
 
@@ -89,7 +109,7 @@ export default async function LandingPage() {
                   <HeroRevealItem>
                     <p className="mt-4 text-lg sm:text-xl text-muted-foreground">
                       Start a chama, invite your members, and manage a shared loan account —
-                      guaranteed by your own people, approved by your chama owner.
+                      guaranteed by your own people, approved by your Team Leader.
                     </p>
                   </HeroRevealItem>
                   <HeroRevealItem className="mt-8 flex flex-wrap items-center gap-4">
@@ -152,7 +172,7 @@ export default async function LandingPage() {
             <h2 className="text-3xl font-bold font-headline text-center mb-12">
               Built for how a chama actually runs
             </h2>
-            <div className="grid sm:grid-cols-2 gap-6">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {FEATURES.map((f) => (
                 <Card
                   key={f.title}

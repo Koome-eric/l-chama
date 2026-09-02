@@ -52,6 +52,12 @@ type TeamRow = {
   approvalStatus: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
   submittedAt: string;
   rejectionReason: string | null;
+  isDiaspora: boolean;
+  objectives: string[];
+  membersRunningSME: number | null;
+  membersEmployed: number | null;
+  hasLastRespectCover: boolean;
+  lastRespectContribution: number | null;
 };
 
 type CampaignRow = {
@@ -74,6 +80,7 @@ type ProductRow = {
   type: ProductType;
   description: string | null;
   roi: number;
+  roiMax: number | null;
   duration: number;
   minAmount: number;
   maxAmount: number | null;
@@ -100,6 +107,14 @@ const TYPE_LABEL: Record<ProductType, string> = {
   STOCK: 'Stocks',
   BOND: 'Bonds',
   FIXED_DEPOSIT: 'Fixed Deposit',
+};
+
+const OBJECTIVE_LABELS: Record<string, string> = {
+  BUY_ASSETS: 'Saving to buy assets',
+  GET_A_LOAN: 'Saving to get a loan',
+  GET_INTEREST: 'Saving to get interest',
+  SCHOOL_FEES: 'Saving for school fees',
+  DECEMBER_HOLIDAY: 'Saving for December holiday',
 };
 
 const STATUS_VARIANT: Record<TeamRow['approvalStatus'], 'default' | 'secondary' | 'destructive'> = {
@@ -188,9 +203,12 @@ function OrganisationsAdminSection({ teams }: { teams: TeamRow[] }) {
             <CardHeader>
               <div className="flex items-start justify-between">
                 <div>
-                  <CardTitle className="text-lg">{t.name}</CardTitle>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    {t.name}
+                    {t.isDiaspora && <Badge variant="secondary">Diaspora Chama</Badge>}
+                  </CardTitle>
                   <CardDescription>
-                    Owner: {t.ownerName} {t.ownerEmail ? `· ${t.ownerEmail}` : ''} {t.ownerPhone ? `· ${t.ownerPhone}` : ''}
+                    Team Leader: {t.ownerName} {t.ownerEmail ? `· ${t.ownerEmail}` : ''} {t.ownerPhone ? `· ${t.ownerPhone}` : ''}
                   </CardDescription>
                 </div>
                 <Badge variant={STATUS_VARIANT[t.approvalStatus]}>Pending</Badge>
@@ -203,6 +221,26 @@ function OrganisationsAdminSection({ teams }: { teams: TeamRow[] }) {
                 <div><dt className="text-muted-foreground">Members</dt><dd>{t.numberOfMembers ?? '—'}</dd></div>
                 <div><dt className="text-muted-foreground">Directors</dt><dd>{t.totalDirectors ?? '—'}</dd></div>
                 <div className="sm:col-span-2"><dt className="text-muted-foreground">Address</dt><dd>{t.physicalAddress || '—'}</dd></div>
+                <div className="sm:col-span-2">
+                  <dt className="text-muted-foreground">Chama Objectives</dt>
+                  <dd>{t.objectives.length > 0 ? t.objectives.map((o) => OBJECTIVE_LABELS[o] || o).join(', ') : '—'}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Members Running SMEs</dt>
+                  <dd>{t.membersRunningSME ?? '—'}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Members Employed</dt>
+                  <dd>{t.membersEmployed ?? '—'}</dd>
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-muted-foreground">Last Respect Cover</dt>
+                  <dd>
+                    {t.hasLastRespectCover
+                      ? `Enabled · KES ${t.lastRespectContribution?.toLocaleString() ?? '—'} per member`
+                      : 'Not enabled'}
+                  </dd>
+                </div>
                 {t.additionalComments && (
                   <div className="sm:col-span-2"><dt className="text-muted-foreground">Comments</dt><dd>{t.additionalComments}</dd></div>
                 )}
@@ -319,6 +357,7 @@ const EMPTY_PRODUCT_FORM = {
   type: 'MMF' as ProductType,
   description: '',
   roi: '',
+  roiMax: '',
   duration: '',
   minAmount: '',
   maxAmount: '',
@@ -343,6 +382,7 @@ function ProductsAdminSection({ products }: { products: ProductRow[] }) {
       type: p.type,
       description: p.description ?? '',
       roi: String(p.roi),
+      roiMax: p.roiMax != null ? String(p.roiMax) : '',
       duration: String(p.duration),
       minAmount: String(p.minAmount),
       maxAmount: p.maxAmount != null ? String(p.maxAmount) : '',
@@ -354,6 +394,7 @@ function ProductsAdminSection({ products }: { products: ProductRow[] }) {
     type: form.type,
     description: form.description || undefined,
     roi: Number(form.roi),
+    roiMax: form.roiMax ? Number(form.roiMax) : null,
     duration: Number(form.duration),
     minAmount: Number(form.minAmount),
     maxAmount: form.maxAmount ? Number(form.maxAmount) : null,
@@ -420,8 +461,12 @@ function ProductsAdminSection({ products }: { products: ProductRow[] }) {
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <Label htmlFor="p-roi">ROI (% p.a.)</Label>
+          <Label htmlFor="p-roi">ROI % p.a. (min, or fixed rate)</Label>
           <Input id="p-roi" type="number" value={form.roi} onChange={(e) => setForm((f) => ({ ...f, roi: e.target.value }))} />
+        </div>
+        <div>
+          <Label htmlFor="p-roiMax">ROI % p.a. max (optional, e.g. 13 for "9–13%")</Label>
+          <Input id="p-roiMax" type="number" value={form.roiMax} onChange={(e) => setForm((f) => ({ ...f, roiMax: e.target.value }))} />
         </div>
         <div>
           <Label htmlFor="p-duration">Term (months)</Label>
@@ -469,7 +514,7 @@ function ProductsAdminSection({ products }: { products: ProductRow[] }) {
                 {p.name} <Badge variant="secondary">{TYPE_LABEL[p.type]}</Badge>
               </CardTitle>
               <CardDescription>
-                {p.roi}% p.a. · {p.duration} mo · {formatKES(p.minAmount)}{p.maxAmount ? ` – ${formatKES(p.maxAmount)}` : '+'}
+                {p.roiMax ? `${p.roi}–${p.roiMax}` : p.roi}% p.a. · {p.duration} mo · {formatKES(p.minAmount)}{p.maxAmount ? ` – ${formatKES(p.maxAmount)}` : '+'}
               </CardDescription>
             </div>
             <Badge variant={p.isActive ? 'default' : 'destructive'}>{p.isActive ? 'Active' : 'Inactive'}</Badge>

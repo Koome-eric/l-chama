@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────
-// L Chama levels — fixed platform-wide tiers a chama owner
+// L Chama levels — fixed platform-wide tiers a chama's Team Leader
 // picks from at creation time. Values are copied onto the Team
 // row when chosen (Team.levelKey/monthlyAmount/groupSize) so a later
 // change to this list never silently changes an already-running chama's
@@ -25,11 +25,11 @@ export type ChamaLevel = {
 };
 
 export const CHAMA_LEVELS: ChamaLevel[] = [
-  { key: "NYOTA", name: "Nyota", monthlyAmount: 1_000, groupSize: 10 },
-  { key: "PEPEA", name: "Pepea", monthlyAmount: 2_000, groupSize: 10 },
-  { key: "ALPHA", name: "Alpha", monthlyAmount: 3_000, groupSize: 10 },
-  { key: "JULIET", name: "Juliet", monthlyAmount: 5_000, groupSize: 10 },
-  { key: "SILVER", name: "Silver", monthlyAmount: 10_000, groupSize: 10 },
+  { key: "NYOTA", name: "Nyota", monthlyAmount: 1_000, groupSize: 6 },
+  { key: "PEPEA", name: "Pepea", monthlyAmount: 2_000, groupSize: 6 },
+  { key: "ALPHA", name: "Alpha", monthlyAmount: 3_000, groupSize: 6 },
+  { key: "JULIET", name: "Juliet", monthlyAmount: 5_000, groupSize: 6 },
+  { key: "SILVER", name: "Silver", monthlyAmount: 10_000, groupSize: 6 },
   { key: "DIAMOND", name: "Diamond", monthlyAmount: 20_000, groupSize: 6 },
   { key: "KINGS", name: "Kings", monthlyAmount: 50_000, groupSize: 6 },
   { key: "WINNERS", name: "Winners", monthlyAmount: 100_000, groupSize: 6 },

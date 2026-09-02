@@ -55,6 +55,9 @@ model User {
   loanRequestsDecided LoanRequest[]   @relation("LoanDecidedBy")
   loanGuarantees      LoanGuarantee[] @relation("LoanGuarantor")
 
+  lastRespectClaimsMade    LastRespectClaim[] @relation("LastRespectClaimant")
+  lastRespectClaimsDecided LastRespectClaim[] @relation("LastRespectDecidedBy")
+
   campaignsCreated Campaign[] @relation("CampaignCreator")
   donationsMade    Donation[] @relation("DonationDonor")
   teamInvestmentsMade TeamInvestment[] @relation("TeamInvestmentInitiator")
@@ -71,6 +74,16 @@ enum OrganisationApprovalStatus {
   PENDING_APPROVAL
   APPROVED
   REJECTED
+}
+
+// What a chama is saving towards — answered by the Team Leader at
+// account opening (multi-select).
+enum ChamaObjective {
+  BUY_ASSETS
+  GET_A_LOAN
+  GET_INTEREST
+  SCHOOL_FEES
+  DECEMBER_HOLIDAY
 }
 
 model Team {
@@ -92,6 +105,28 @@ model Team {
   totalDirectors     Int?
   physicalAddress    String?
   additionalComments String?
+
+  // Kenya-diaspora support: most members contribute from outside Kenya.
+  // Purely informational (currency/logistics are still handled the same
+  // way) but drives a "Diaspora Chama" badge and lets admins see which
+  // chamas need diaspora-specific support.
+  isDiaspora Boolean @default(false)
+
+  // ── Onboarding questions answered by the Team Leader at signup ──
+  // What is this chama saving towards? Multi-select, stored as the
+  // ChamaObjective enum values below.
+  objectives ChamaObjective[] @default([])
+  // "What is the background of half your members?" — a rough split the
+  // Team Leader estimates at signup, not a running member-by-member tally.
+  membersRunningSME Int?
+  membersEmployed   Int?
+
+  // ── Last Respect Cover — an opt-in bereavement/last-expense benefit
+  // funded by its own pool, separate from the loan account. ──
+  hasLastRespectCover     Boolean @default(false)
+  lastRespectContribution Float? // KES each member contributes towards the cover
+  lastRespectFund         LastRespectFund?
+  lastRespectClaims       LastRespectClaim[]
 
   approvalStatus OrganisationApprovalStatus @default(PENDING_APPROVAL)
   submittedAt    DateTime                   @default(now())
@@ -209,6 +244,11 @@ model LoanRequest {
   purpose String?
   status  LoanRequestStatus @default(PENDING_GUARANTORS)
 
+  // Set by the Team Leader at approval — chama loans start from 3% p.a.,
+  // never lower, so the loan account always gets back at least the
+  // principal plus a bit for the pool.
+  interestRate Float @default(3)
+
   repaymentWeeks Int?
 
   decidedById String?
@@ -253,6 +293,57 @@ model LoanRepayment {
   updatedAt DateTime @updatedAt
 
   @@map("loanrepayment")
+}
+
+// ─────────────────────────────────────────────
+// Last Respect Cover — an opt-in bereavement/last-expense benefit. Each
+// chama that enables it (Team.hasLastRespectCover) gets its own fund,
+// separate from the loan account, that members contribute to
+// (Team.lastRespectContribution per member) and can claim from when a
+// member or their immediate family passes away.
+// ─────────────────────────────────────────────
+model LastRespectFund {
+  id     String @id @default(cuid())
+  teamId String @unique
+  team   Team   @relation(fields: [teamId], references: [id])
+
+  balance Float @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("lastrespectfund")
+}
+
+enum LastRespectClaimStatus {
+  PENDING
+  APPROVED
+  PAID
+  REJECTED
+}
+
+model LastRespectClaim {
+  id     String @id @default(cuid())
+  teamId String
+  team   Team   @relation(fields: [teamId], references: [id])
+
+  claimantId String
+  claimant   User   @relation("LastRespectClaimant", fields: [claimantId], references: [id])
+
+  deceasedName String
+  relation     String // e.g. "Self (member)", "Spouse", "Child", "Parent"
+  amount       Float
+  notes        String?
+  status       LastRespectClaimStatus @default(PENDING)
+
+  decidedById String?
+  decidedBy   User?     @relation("LastRespectDecidedBy", fields: [decidedById], references: [id])
+  decidedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("lastrespectclaim")
 }
 
 model Notification {
@@ -328,7 +419,8 @@ model InvestmentProduct {
   name        String
   type        FundType
   description String?
-  roi         Float // annualized, %
+  roi         Float // annualized, % — the headline/minimum rate (e.g. 9 for "9–13% p.a.")
+  roiMax      Float? // optional upper bound of the rate range
   duration    Int // months
   minAmount   Float
   maxAmount   Float?

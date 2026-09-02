@@ -3,7 +3,7 @@ import type { User } from "@prisma/client";
 
 // ─────────────────────────────────────────────
 // L Chama Team Panel — context & permission helpers.
-// The chama owner ("Admin") always has full access. Everyone else's
+// The Team Leader ("Admin") always has full access. Everyone else's
 // access is controlled by the permission flags on their TeamMembership,
 // set by the owner (or by another member with canManagePermissions)
 // either at invite time or afterward from the Members tab.
@@ -81,6 +81,12 @@ export type ChamaContext = {
     groupSize: number | null;
     approvalStatus: "PENDING_APPROVAL" | "APPROVED" | "REJECTED";
     rejectionReason: string | null;
+    isDiaspora: boolean;
+    objectives: string[];
+    membersRunningSME: number | null;
+    membersEmployed: number | null;
+    hasLastRespectCover: boolean;
+    lastRespectContribution: number | null;
     members: Array<{ id: string; userId: string; user: User } & ChamaPermissions>;
     invites: Array<
       { id: string; email: string; status: string; expiresAt: Date; createdAt: Date } & ChamaPermissions

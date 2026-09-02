@@ -10,7 +10,7 @@ export default async function WithdrawPage() {
       icon={ArrowUpFromLine}
       title="Withdraw"
       description="Move funds out of your chama's loan account."
-      note="Self-service withdrawals are coming soon — for now, speak with your chama owner about disbursing funds."
+      note="Self-service withdrawals are coming soon — for now, speak with your Team Leader about disbursing funds."
     />
   );
 }

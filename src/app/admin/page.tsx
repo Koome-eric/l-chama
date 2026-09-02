@@ -36,6 +36,12 @@ export default async function AdminPage() {
     approvalStatus: t.approvalStatus,
     submittedAt: t.submittedAt.toISOString(),
     rejectionReason: t.rejectionReason,
+    isDiaspora: t.isDiaspora,
+    objectives: t.objectives,
+    membersRunningSME: t.membersRunningSME,
+    membersEmployed: t.membersEmployed,
+    hasLastRespectCover: t.hasLastRespectCover,
+    lastRespectContribution: t.lastRespectContribution,
   }));
 
   const campaignData = campaigns.map((c: (typeof campaigns)[number]) => ({
@@ -57,6 +63,7 @@ export default async function AdminPage() {
     type: p.type,
     description: p.description,
     roi: p.roi,
+    roiMax: p.roiMax,
     duration: p.duration,
     minAmount: p.minAmount,
     maxAmount: p.maxAmount,
