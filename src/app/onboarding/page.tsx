@@ -4,8 +4,8 @@ import { prisma } from '@/lib/prisma';
 import { getChamaContext } from '@/lib/chama';
 
 // Not a page itself — routes the person to wherever they left off in
-// the pipeline: phone/OTP (handled at /sign-up) → profile → organisation
-// → pending approval → panel.
+// the pipeline: sign up (Clerk) → profile → organisation → pending
+// approval → panel.
 export default async function OnboardingHub() {
   const { userId: clerkId } = await auth();
   if (!clerkId) redirect('/sign-in?redirect_url=/onboarding/profile');

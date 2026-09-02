@@ -44,9 +44,9 @@ export async function completeProfile(input: ProfileInput) {
     clerkUser.emailAddresses.find((e) => e.id === clerkUser.primaryEmailAddressId)?.emailAddress ||
     clerkUser.emailAddresses[0]?.emailAddress;
 
-  // Set the account password. Since this user signed up via phone OTP,
-  // they have no existing password, so this sets one for the first time
-  // rather than changing an existing one.
+  // Set/confirm the account password from the profile step. Works
+  // whether Clerk collected one already at sign-up or not — this simply
+  // (re)sets it to what the person entered here.
   try {
     await client.users.updateUser(clerkId, {
       firstName: d.firstName.trim(),

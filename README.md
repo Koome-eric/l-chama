@@ -40,17 +40,20 @@ approach differs depending on the source database type.
 
 ## Onboarding pipeline
 
-Signing up now goes through four steps, matching the client's mockup:
+Signing up goes through four steps:
 
-1. **`/sign-up`** — phone number (with country code) + optional email.
-   OTP is sent to the phone (and to email too, if one was given). This
-   uses a custom flow (`SignUpPhoneClient.tsx`) built on Clerk's client
-   SDK — not Clerk's prebuilt `<SignUp/>` widget — since the product
-   needs phone-first, not email/password-first, sign-up.
+1. **`/sign-up`** — Clerk's own prebuilt `<SignUp/>` component (same as
+   `/sign-in`'s `<SignIn/>`), configured however Contact Information/
+   verification is set up for this Clerk project. There is no custom
+   OTP flow here anymore — an earlier phone-first OTP flow
+   (`SignUpPhoneClient.tsx`) was removed since it depended on phone/SMS
+   verification not yet being connected in the Clerk project. Using
+   Clerk's own component means sign-up always works with whatever
+   strategy is actually configured, with no unconnected step blocking it.
 2. **`/onboarding/profile`** — first/last name, ID/passport number,
-   optional email, gender, country, region/county, and a password (set
-   on the Clerk account for the first time here, since phone-OTP sign-up
-   doesn't require one up front).
+   optional email, gender, country, region/county, and a password
+   (set/confirmed here regardless of how Clerk collected credentials at
+   sign-up).
 3. **`/onboarding/organisation`** — organisation/full name, business
    registration number or national ID, member count, director count,
    physical address, optional comments, and the chama level. Submitting
@@ -70,16 +73,12 @@ bootstrapping problem for who approves the very first admin.
 
 ### Required Clerk project configuration
 
-This custom flow needs your Clerk project's **Sign-up settings** set to:
-- **Phone number**: required
-- **Email address**: optional
-- **Password**: not required at sign-up (a password is instead set
-  explicitly in the profile step, via `clerkClient.users.updateUser`)
-- **Phone OTP (SMS code)** enabled as a sign-up verification strategy
-
-Without matching these, `signUp.create()` / `attemptPhoneNumberVerification()`
-calls in `SignUpPhoneClient.tsx` will fail or behave differently than this
-flow expects.
+`/sign-up` and `/sign-in` both render Clerk's own components, so
+sign-up/sign-in behavior (email vs. phone, password vs. code, social
+providers) is entirely controlled by this Clerk project's dashboard
+settings — nothing in the app code assumes a specific strategy. Once
+phone/SMS (or any other verification method) is properly connected in
+the Clerk dashboard, it'll just work here with no code changes needed.
 
 ## Setup
 
