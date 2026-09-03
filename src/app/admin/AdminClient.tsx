@@ -1,6 +1,28 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useMemo, useState, useTransition } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { UserButton } from '@clerk/nextjs';
+import {
+  LayoutDashboard,
+  Building2,
+  HeartHandshake,
+  PiggyBank,
+  FileSpreadsheet,
+  LogOut,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  Plus,
+  Pencil,
+  Power,
+  Trash2,
+  UploadCloud,
+  ChevronRight,
+  Home,
+} from 'lucide-react';
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,11 +42,34 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Sidebar,
+  SidebarHeader,
+  SidebarContent,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarTrigger,
+  SidebarInset,
+} from '@/components/ui/sidebar';
+import { ProgressBar } from '@/components/ui/progress-bar';
 import { useToast } from '@/hooks/use-toast';
 import { formatKES } from '@/lib/chama-levels';
+import { cn } from '@/lib/utils';
+import { StatCard } from '@/components/admin/StatCard';
+import { MiniBarChart } from '@/components/admin/MiniBarChart';
+import { SearchBox, FilterPill } from '@/components/admin/SectionToolbar';
 import {
   approveOrganisation,
   rejectOrganisation,
@@ -35,7 +80,12 @@ import {
   toggleInvestmentProductActive,
   syncMemberReportsCsv,
   deleteMemberReport,
+  logoutAdmin,
 } from './actions';
+
+/* ────────────────────────────────────────────────────────────── */
+/*                              TYPES                              */
+/* ────────────────────────────────────────────────────────────── */
 
 type TeamRow = {
   id: string;
@@ -102,6 +152,25 @@ type ReportRow = {
   uploadedAt: string;
 };
 
+type Stats = {
+  totalUsers: number;
+  totalPooledFunds: number;
+  orgs: { total: number; pending: number; approved: number; rejected: number };
+  campaigns: {
+    total: number;
+    unverified: number;
+    verified: number;
+    active: number;
+    totalRaised: number;
+    totalTarget: number;
+  };
+  products: { total: number; active: number; inactive: number };
+  reports: { total: number; matched: number };
+  monthlyOrgSubmissions: { label: string; value: number }[];
+};
+
+type Section = 'overview' | 'organisations' | 'campaigns' | 'products' | 'reports';
+
 const TYPE_LABEL: Record<ProductType, string> = {
   MMF: 'Money Market Fund',
   STOCK: 'Stocks',
@@ -123,48 +192,409 @@ const STATUS_VARIANT: Record<TeamRow['approvalStatus'], 'default' | 'secondary' 
   REJECTED: 'destructive',
 };
 
+/* ────────────────────────────────────────────────────────────── */
+/*                          NAV CONFIGURATION                      */
+/* ────────────────────────────────────────────────────────────── */
+
+function useNavItems(stats: Stats) {
+  return [
+    { id: 'overview' as Section, label: 'Overview', icon: LayoutDashboard, badge: 0 },
+    { id: 'organisations' as Section, label: 'Organisations', icon: Building2, badge: stats.orgs.pending },
+    { id: 'campaigns' as Section, label: 'Campaigns', icon: HeartHandshake, badge: stats.campaigns.unverified },
+    { id: 'products' as Section, label: 'Investment Products', icon: PiggyBank, badge: 0 },
+    { id: 'reports' as Section, label: 'Member Reports', icon: FileSpreadsheet, badge: 0 },
+  ];
+}
+
+const SECTION_META: Record<Section, { title: string; description: string }> = {
+  overview: { title: 'Overview', description: 'A snapshot of L-Chama right now.' },
+  organisations: { title: 'Organisations', description: 'Review chamas awaiting approval.' },
+  campaigns: { title: 'Campaigns', description: 'Verify fundraising campaigns.' },
+  products: { title: 'Investment Products', description: 'Manage the catalog chamas invest their pooled fund into.' },
+  reports: { title: 'Member Reports', description: 'Sync and review performance data from Google Sheets.' },
+};
+
+/* ────────────────────────────────────────────────────────────── */
+/*                          ROOT COMPONENT                         */
+/* ────────────────────────────────────────────────────────────── */
+
 export function AdminClient({
   teams,
   campaigns,
   products,
   reports,
+  stats,
+  authMethod,
 }: {
   teams: TeamRow[];
   campaigns: CampaignRow[];
   products: ProductRow[];
   reports: ReportRow[];
+  stats: Stats;
+  authMethod: 'clerk' | 'password';
 }) {
-  const pendingOrgCount = teams.filter((t) => t.approvalStatus === 'PENDING_APPROVAL').length;
-  const unverifiedCount = campaigns.filter((c) => !c.verified).length;
+  const [section, setSection] = useState<Section>('overview');
+  const navItems = useNavItems(stats);
+  const router = useRouter();
+  const [loggingOut, startLogout] = useTransition();
+
+  const handleSignOut = () => {
+    startLogout(async () => {
+      await logoutAdmin();
+      router.refresh();
+    });
+  };
 
   return (
-    <Tabs defaultValue="organisations">
-      <TabsList className="flex-wrap h-auto">
-        <TabsTrigger value="organisations">Organisations ({pendingOrgCount})</TabsTrigger>
-        <TabsTrigger value="campaigns">Campaigns ({unverifiedCount})</TabsTrigger>
-        <TabsTrigger value="products">Investment Products</TabsTrigger>
-        <TabsTrigger value="reports">Member Reports</TabsTrigger>
-      </TabsList>
-      <TabsContent value="organisations" className="mt-6">
-        <OrganisationsAdminSection teams={teams} />
-      </TabsContent>
-      <TabsContent value="campaigns" className="mt-6">
-        <CampaignsAdminSection campaigns={campaigns} />
-      </TabsContent>
-      <TabsContent value="products" className="mt-6">
-        <ProductsAdminSection products={products} />
-      </TabsContent>
-      <TabsContent value="reports" className="mt-6">
-        <MemberReportsAdminSection reports={reports} />
-      </TabsContent>
-    </Tabs>
+    <>
+      <Sidebar variant="inset" collapsible="icon">
+        <SidebarHeader>
+          <Link href="/panel" className="flex items-center gap-2.5 px-1 py-1">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <ShieldMark />
+            </div>
+            <div className="whitespace-nowrap group-data-[collapsible=icon]:hidden">
+              <span className="font-headline text-base font-bold leading-none">L-CHAMA</span>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Admin</p>
+            </div>
+          </Link>
+        </SidebarHeader>
+
+        <SidebarContent className="flex flex-col justify-between">
+          <SidebarMenu>
+            {navItems.map((item) => {
+              const active = section === item.id;
+              return (
+                <SidebarMenuItem key={item.id}>
+                  <SidebarMenuButton
+                    isActive={active}
+                    tooltip={item.label}
+                    onClick={() => setSection(item.id)}
+                    className={cn(
+                      'w-full rounded-xl transition-colors',
+                      active && 'bg-primary/10 text-primary shadow-sm font-medium'
+                    )}
+                  >
+                    <item.icon className={cn('h-4 w-4 shrink-0', active && 'text-primary')} />
+                    <span className="flex-1 truncate text-left">{item.label}</span>
+                    {item.badge > 0 && (
+                      <span
+                        className={cn(
+                          'ml-auto inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[11px] font-bold group-data-[collapsible=icon]:hidden',
+                          active ? 'bg-primary text-primary-foreground' : 'bg-destructive/10 text-destructive'
+                        )}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            })}
+          </SidebarMenu>
+
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Back to L-Chama" className="rounded-xl text-muted-foreground">
+                <Link href="/panel" className="flex items-center gap-3">
+                  <Home className="h-4 w-4 shrink-0" />
+                  <span className="truncate">Back to site</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            {authMethod === 'password' && (
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={handleSignOut}
+                  disabled={loggingOut}
+                  tooltip="Sign out"
+                  className="rounded-xl text-destructive hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <LogOut className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{loggingOut ? 'Signing out…' : 'Sign out'}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
+          </SidebarMenu>
+        </SidebarContent>
+      </Sidebar>
+
+      <SidebarInset>
+        <header className="sticky top-0 z-40 flex h-16 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur sm:px-6">
+          <SidebarTrigger className="md:hidden" />
+          <div className="min-w-0">
+            <h1 className="truncate font-headline text-lg font-semibold sm:text-xl">{SECTION_META[section].title}</h1>
+            <p className="hidden truncate text-xs text-muted-foreground sm:block">{SECTION_META[section].description}</p>
+          </div>
+          <div className="ml-auto flex items-center gap-3">
+            {stats.orgs.pending + stats.campaigns.unverified > 0 && (
+              <button
+                onClick={() => setSection(stats.orgs.pending > 0 ? 'organisations' : 'campaigns')}
+                className="hidden items-center gap-1.5 rounded-full border border-gold/30 bg-gold/10 px-3 py-1.5 text-xs font-semibold text-gold sm:inline-flex"
+              >
+                <Clock className="h-3.5 w-3.5" />
+                {stats.orgs.pending + stats.campaigns.unverified} need review
+              </button>
+            )}
+            {authMethod === 'clerk' ? (
+              <UserButton afterSignOutUrl="/" appearance={{ elements: { avatarBox: 'h-9 w-9 rounded-lg' } }} />
+            ) : (
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
+                A
+              </div>
+            )}
+          </div>
+        </header>
+
+        <main className="flex-1 bg-muted/40">
+          <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
+            {section === 'overview' && (
+              <OverviewSection stats={stats} teams={teams} campaigns={campaigns} onNavigate={setSection} />
+            )}
+            {section === 'organisations' && <OrganisationsAdminSection teams={teams} />}
+            {section === 'campaigns' && <CampaignsAdminSection campaigns={campaigns} />}
+            {section === 'products' && <ProductsAdminSection products={products} />}
+            {section === 'reports' && <MemberReportsAdminSection reports={reports} />}
+          </div>
+        </main>
+      </SidebarInset>
+    </>
   );
 }
+
+function ShieldMark() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" strokeWidth={2}>
+      <path
+        d="M12 2.5 4 5.75V11c0 5.05 3.4 8.86 8 10.5 4.6-1.64 8-5.45 8-10.5V5.75L12 2.5Z"
+        stroke="currentColor"
+        strokeLinejoin="round"
+      />
+      <path d="m8.5 12 2.4 2.4L15.5 9.6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────── */
+/*                              OVERVIEW                            */
+/* ────────────────────────────────────────────────────────────── */
+
+function OverviewSection({
+  stats,
+  teams,
+  campaigns,
+  onNavigate,
+}: {
+  stats: Stats;
+  teams: TeamRow[];
+  campaigns: CampaignRow[];
+  onNavigate: (s: Section) => void;
+}) {
+  const pendingTeams = teams.filter((t) => t.approvalStatus === 'PENDING_APPROVAL').slice(0, 4);
+  const unverifiedCampaigns = campaigns.filter((c) => !c.verified).slice(0, 4);
+
+  const recentActivity = useMemo(() => {
+    const teamEvents = teams.slice(0, 6).map((t) => ({
+      id: `team-${t.id}`,
+      title: t.name,
+      subtitle: `Organisation submitted by ${t.ownerName}`,
+      date: t.submittedAt,
+      icon: Building2,
+      status: t.approvalStatus,
+    }));
+    const campaignEvents = campaigns.slice(0, 6).map((c) => ({
+      id: `campaign-${c.id}`,
+      title: c.title,
+      subtitle: `Campaign by ${c.creatorName} · ${c.category}`,
+      date: c.createdAt,
+      icon: HeartHandshake,
+      status: c.verified ? 'APPROVED' : 'PENDING_APPROVAL',
+    }));
+    return [...teamEvents, ...campaignEvents]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 6);
+  }, [teams, campaigns]);
+
+  return (
+    <div className="space-y-6">
+      {/* Hero ledger strip */}
+      <div className="relative overflow-hidden rounded-3xl bg-ledger p-6 shadow-lg sm:p-8">
+        <div className="pointer-events-none absolute inset-0 bg-fintech-mesh" />
+        <div className="relative flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/50">Total pooled funds</p>
+            <p className="mt-2 font-figures text-3xl font-bold text-white sm:text-4xl">
+              {formatKES(Math.round(stats.totalPooledFunds))}
+            </p>
+            <p className="mt-2 text-sm text-white/60">Across every chama loan account on the platform.</p>
+          </div>
+          <div className="flex flex-wrap gap-6 sm:gap-10">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-white/50">Users</p>
+              <p className="font-figures text-xl font-bold text-white">{stats.totalUsers.toLocaleString()}</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-white/50">Organisations</p>
+              <p className="font-figures text-xl font-bold text-white">{stats.orgs.total.toLocaleString()}</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-white/50">Campaigns raised</p>
+              <p className="font-figures text-xl font-bold text-white">{formatKES(stats.campaigns.totalRaised)}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Stat grid */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label="Pending organisations"
+          value={stats.orgs.pending}
+          icon={Clock}
+          tone="gold"
+          hint="Awaiting your review"
+        />
+        <StatCard
+          label="Approved organisations"
+          value={stats.orgs.approved}
+          icon={CheckCircle2}
+          tone="chama"
+          hint={`${stats.orgs.rejected} rejected all-time`}
+        />
+        <StatCard
+          label="Unverified campaigns"
+          value={stats.campaigns.unverified}
+          icon={HeartHandshake}
+          tone="destructive"
+          hint={`${stats.campaigns.active} currently active`}
+        />
+        <StatCard
+          label="Active investment products"
+          value={stats.products.active}
+          icon={PiggyBank}
+          tone="primary"
+          hint={`${stats.products.inactive} inactive`}
+        />
+      </div>
+
+      {/* Chart + attention panel */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-base">Organisation submissions</CardTitle>
+            <CardDescription>New chamas submitted for approval, last 6 months</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <MiniBarChart data={stats.monthlyOrgSubmissions} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-base">Needs attention</CardTitle>
+              <CardDescription>Quick jumps to pending items</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {pendingTeams.length === 0 && unverifiedCampaigns.length === 0 && (
+              <p className="py-6 text-center text-sm text-muted-foreground">All caught up. Nothing waiting on you.</p>
+            )}
+            {pendingTeams.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => onNavigate('organisations')}
+                className="flex w-full items-center gap-3 rounded-xl border border-border/60 p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
+              >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gold/15 text-gold">
+                  <Building2 className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{t.name}</p>
+                  <p className="truncate text-xs text-muted-foreground">Organisation · needs review</p>
+                </div>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </button>
+            ))}
+            {unverifiedCampaigns.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => onNavigate('campaigns')}
+                className="flex w-full items-center gap-3 rounded-xl border border-border/60 p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
+              >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+                  <HeartHandshake className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{c.title}</p>
+                  <p className="truncate text-xs text-muted-foreground">Campaign · unverified</p>
+                </div>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </button>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent activity */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Recent activity</CardTitle>
+          <CardDescription>Latest organisations and campaigns submitted to the platform</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-1">
+          {recentActivity.map((item) => (
+            <div key={item.id} className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-muted/60">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <item.icon className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{item.title}</p>
+                <p className="truncate text-xs text-muted-foreground">{item.subtitle}</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <Badge variant={item.status === 'PENDING_APPROVAL' ? 'secondary' : item.status === 'REJECTED' ? 'destructive' : 'default'}>
+                  {item.status === 'PENDING_APPROVAL' ? 'Pending' : item.status === 'REJECTED' ? 'Rejected' : 'Approved'}
+                </Badge>
+                <span className="hidden text-xs text-muted-foreground sm:inline">
+                  {new Date(item.date).toLocaleDateString('en-KE', { day: 'numeric', month: 'short' })}
+                </span>
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────── */
+/*                           ORGANISATIONS                          */
+/* ────────────────────────────────────────────────────────────── */
+
+type OrgFilter = 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'ALL';
 
 function OrganisationsAdminSection({ teams }: { teams: TeamRow[] }) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [reasonById, setReasonById] = useState<Record<string, string>>({});
+  const [filter, setFilter] = useState<OrgFilter>('PENDING_APPROVAL');
+  const [query, setQuery] = useState('');
+  const [rejectTarget, setRejectTarget] = useState<TeamRow | null>(null);
+
+  const counts = {
+    PENDING_APPROVAL: teams.filter((t) => t.approvalStatus === 'PENDING_APPROVAL').length,
+    APPROVED: teams.filter((t) => t.approvalStatus === 'APPROVED').length,
+    REJECTED: teams.filter((t) => t.approvalStatus === 'REJECTED').length,
+    ALL: teams.length,
+  };
+
+  const filtered = teams.filter((t) => {
+    if (filter !== 'ALL' && t.approvalStatus !== filter) return false;
+    if (!query.trim()) return true;
+    const q = query.toLowerCase();
+    return t.name.toLowerCase().includes(q) || t.ownerName.toLowerCase().includes(q) || (t.ownerEmail ?? '').toLowerCase().includes(q);
+  });
 
   const handleApprove = (id: string) => {
     startTransition(async () => {
@@ -183,6 +613,7 @@ function OrganisationsAdminSection({ teams }: { teams: TeamRow[] }) {
       try {
         await rejectOrganisation(id, reasonById[id]);
         toast({ title: 'Organisation rejected' });
+        setRejectTarget(null);
         window.location.reload();
       } catch (err: any) {
         toast({ title: 'Error', description: err.message, variant: 'destructive' });
@@ -190,49 +621,74 @@ function OrganisationsAdminSection({ teams }: { teams: TeamRow[] }) {
     });
   };
 
-  const pending = teams.filter((t) => t.approvalStatus === 'PENDING_APPROVAL');
-  const decided = teams.filter((t) => t.approvalStatus !== 'PENDING_APPROVAL');
-
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-2">
+          <FilterPill active={filter === 'PENDING_APPROVAL'} onClick={() => setFilter('PENDING_APPROVAL')}>
+            Pending ({counts.PENDING_APPROVAL})
+          </FilterPill>
+          <FilterPill active={filter === 'APPROVED'} onClick={() => setFilter('APPROVED')}>
+            Approved ({counts.APPROVED})
+          </FilterPill>
+          <FilterPill active={filter === 'REJECTED'} onClick={() => setFilter('REJECTED')}>
+            Rejected ({counts.REJECTED})
+          </FilterPill>
+          <FilterPill active={filter === 'ALL'} onClick={() => setFilter('ALL')}>
+            All ({counts.ALL})
+          </FilterPill>
+        </div>
+        <SearchBox value={query} onChange={setQuery} placeholder="Search organisations…" />
+      </div>
+
+      {filtered.length === 0 && (
+        <Card>
+          <CardContent className="py-12 text-center text-sm text-muted-foreground">
+            No organisations match this view.
+          </CardContent>
+        </Card>
+      )}
+
       <div className="space-y-4">
-        <h2 className="font-headline font-semibold text-lg">Pending ({pending.length})</h2>
-        {pending.length === 0 && <p className="text-sm text-muted-foreground">Nothing waiting on review.</p>}
-        {pending.map((t) => (
-          <Card key={t.id} className="rounded-2xl shadow-sm">
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <div>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    {t.name}
-                    {t.isDiaspora && <Badge variant="secondary">Diaspora Chama</Badge>}
-                  </CardTitle>
-                  <CardDescription>
-                    Team Leader: {t.ownerName} {t.ownerEmail ? `· ${t.ownerEmail}` : ''} {t.ownerPhone ? `· ${t.ownerPhone}` : ''}
-                  </CardDescription>
+        {filtered.map((t) => (
+          <Card key={t.id} className="overflow-hidden">
+            <CardHeader className="pb-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-sm font-bold text-primary">
+                    {t.name.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+                      {t.name}
+                      {t.isDiaspora && <Badge variant="secondary">Diaspora Chama</Badge>}
+                    </CardTitle>
+                    <CardDescription>
+                      {t.ownerName} {t.ownerEmail ? `· ${t.ownerEmail}` : ''} {t.ownerPhone ? `· ${t.ownerPhone}` : ''}
+                    </CardDescription>
+                  </div>
                 </div>
-                <Badge variant={STATUS_VARIANT[t.approvalStatus]}>Pending</Badge>
+                <Badge variant={STATUS_VARIANT[t.approvalStatus]}>
+                  {t.approvalStatus === 'PENDING_APPROVAL' ? 'Pending' : t.approvalStatus === 'APPROVED' ? 'Approved' : 'Rejected'}
+                </Badge>
               </div>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <dl className="grid sm:grid-cols-2 gap-2 text-sm">
-                <div><dt className="text-muted-foreground">Level</dt><dd>{t.levelName || '—'}</dd></div>
-                <div><dt className="text-muted-foreground">Registration No.</dt><dd>{t.businessRegNumber || '—'}</dd></div>
-                <div><dt className="text-muted-foreground">Members</dt><dd>{t.numberOfMembers ?? '—'}</dd></div>
-                <div><dt className="text-muted-foreground">Directors</dt><dd>{t.totalDirectors ?? '—'}</dd></div>
+            <CardContent className="space-y-4">
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl bg-muted/40 p-4 text-sm sm:grid-cols-4">
+                <div><dt className="text-xs text-muted-foreground">Level</dt><dd className="font-medium">{t.levelName || '—'}</dd></div>
+                <div><dt className="text-xs text-muted-foreground">Registration No.</dt><dd className="font-medium">{t.businessRegNumber || '—'}</dd></div>
+                <div><dt className="text-xs text-muted-foreground">Members</dt><dd className="font-medium">{t.numberOfMembers ?? '—'}</dd></div>
+                <div><dt className="text-xs text-muted-foreground">Directors</dt><dd className="font-medium">{t.totalDirectors ?? '—'}</dd></div>
+              </dl>
+
+              <dl className="grid gap-3 text-sm sm:grid-cols-2">
                 <div className="sm:col-span-2"><dt className="text-muted-foreground">Address</dt><dd>{t.physicalAddress || '—'}</dd></div>
                 <div className="sm:col-span-2">
                   <dt className="text-muted-foreground">Chama Objectives</dt>
                   <dd>{t.objectives.length > 0 ? t.objectives.map((o) => OBJECTIVE_LABELS[o] || o).join(', ') : '—'}</dd>
                 </div>
-                <div>
-                  <dt className="text-muted-foreground">Members Running SMEs</dt>
-                  <dd>{t.membersRunningSME ?? '—'}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Members Employed</dt>
-                  <dd>{t.membersEmployed ?? '—'}</dd>
-                </div>
+                <div><dt className="text-muted-foreground">Members Running SMEs</dt><dd>{t.membersRunningSME ?? '—'}</dd></div>
+                <div><dt className="text-muted-foreground">Members Employed</dt><dd>{t.membersEmployed ?? '—'}</dd></div>
                 <div className="sm:col-span-2">
                   <dt className="text-muted-foreground">Last Respect Cover</dt>
                   <dd>
@@ -244,48 +700,63 @@ function OrganisationsAdminSection({ teams }: { teams: TeamRow[] }) {
                 {t.additionalComments && (
                   <div className="sm:col-span-2"><dt className="text-muted-foreground">Comments</dt><dd>{t.additionalComments}</dd></div>
                 )}
+                {t.approvalStatus === 'REJECTED' && t.rejectionReason && (
+                  <div className="sm:col-span-2 rounded-lg bg-destructive/5 p-3">
+                    <dt className="text-xs font-medium text-destructive">Rejection reason</dt>
+                    <dd className="text-destructive/90">{t.rejectionReason}</dd>
+                  </div>
+                )}
               </dl>
-              <div>
-                <Textarea
-                  placeholder="Rejection reason (optional)"
-                  value={reasonById[t.id] ?? ''}
-                  onChange={(e) => setReasonById((p) => ({ ...p, [t.id]: e.target.value }))}
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button size="sm" onClick={() => handleApprove(t.id)} disabled={isPending}>Approve</Button>
-                <Button size="sm" variant="destructive" onClick={() => handleReject(t.id)} disabled={isPending}>Reject</Button>
-              </div>
+
+              {t.approvalStatus === 'PENDING_APPROVAL' && (
+                <div className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
+                  <Button size="sm" onClick={() => handleApprove(t.id)} disabled={isPending} className="gap-1.5">
+                    <CheckCircle2 className="h-4 w-4" /> Approve
+                  </Button>
+                  <Dialog open={rejectTarget?.id === t.id} onOpenChange={(open) => !open && setRejectTarget(null)}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" variant="outline" onClick={() => setRejectTarget(t)} className="gap-1.5 text-destructive hover:text-destructive">
+                        <XCircle className="h-4 w-4" /> Reject
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Reject {t.name}?</DialogTitle>
+                        <DialogDescription>Optionally tell the team leader why. This is visible to them.</DialogDescription>
+                      </DialogHeader>
+                      <Textarea
+                        placeholder="Rejection reason (optional)"
+                        value={reasonById[t.id] ?? ''}
+                        onChange={(e) => setReasonById((p) => ({ ...p, [t.id]: e.target.value }))}
+                      />
+                      <DialogFooter>
+                        <Button variant="destructive" onClick={() => handleReject(t.id)} disabled={isPending}>
+                          {isPending ? 'Rejecting…' : 'Confirm rejection'}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              )}
             </CardContent>
           </Card>
         ))}
       </div>
-
-      {decided.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="font-headline font-semibold text-lg">Decided</h2>
-          {decided.map((t) => (
-            <Card key={t.id} className="rounded-2xl shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle className="text-base">{t.name}</CardTitle>
-                  <CardDescription>{t.ownerName}</CardDescription>
-                </div>
-                <Badge variant={STATUS_VARIANT[t.approvalStatus]}>
-                  {t.approvalStatus === 'APPROVED' ? 'Approved' : 'Rejected'}
-                </Badge>
-              </CardHeader>
-            </Card>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
 
+/* ────────────────────────────────────────────────────────────── */
+/*                              CAMPAIGNS                           */
+/* ────────────────────────────────────────────────────────────── */
+
+type CampaignFilter = 'ALL' | 'UNVERIFIED' | 'VERIFIED' | 'CLOSED';
+
 function CampaignsAdminSection({ campaigns }: { campaigns: CampaignRow[] }) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
+  const [filter, setFilter] = useState<CampaignFilter>('ALL');
+  const [query, setQuery] = useState('');
 
   const handleVerify = (id: string) => {
     startTransition(async () => {
@@ -311,46 +782,98 @@ function CampaignsAdminSection({ campaigns }: { campaigns: CampaignRow[] }) {
     });
   };
 
+  const filtered = campaigns.filter((c) => {
+    if (filter === 'UNVERIFIED' && c.verified) return false;
+    if (filter === 'VERIFIED' && !c.verified) return false;
+    if (filter === 'CLOSED' && c.status !== 'CLOSED') return false;
+    if (!query.trim()) return true;
+    const q = query.toLowerCase();
+    return c.title.toLowerCase().includes(q) || c.creatorName.toLowerCase().includes(q) || c.category.toLowerCase().includes(q);
+  });
+
   if (campaigns.length === 0) {
-    return <p className="text-sm text-muted-foreground">No campaigns yet.</p>;
+    return (
+      <Card>
+        <CardContent className="py-12 text-center text-sm text-muted-foreground">No campaigns yet.</CardContent>
+      </Card>
+    );
   }
 
   return (
     <div className="space-y-4">
-      {campaigns.map((c) => (
-        <Card key={c.id} className="rounded-2xl shadow-sm">
-          <CardHeader className="flex flex-row items-start justify-between">
-            <div>
-              <CardTitle className="text-base">{c.title}</CardTitle>
-              <CardDescription>
-                by {c.creatorName} · {c.category} · {formatKES(c.raisedAmount)} of {formatKES(c.targetAmount)}
-              </CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              {c.status === 'CLOSED' && <Badge variant="destructive">Closed</Badge>}
-              {c.verified ? (
-                <Badge>Verified</Badge>
-              ) : (
-                <Badge variant="secondary">Unverified</Badge>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
-            {c.verified ? (
-              <Button size="sm" variant="outline" onClick={() => handleUnverify(c.id)} disabled={isPending}>
-                Remove Verification
-              </Button>
-            ) : (
-              <Button size="sm" onClick={() => handleVerify(c.id)} disabled={isPending}>
-                Verify Campaign
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      ))}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-2">
+          <FilterPill active={filter === 'ALL'} onClick={() => setFilter('ALL')}>All ({campaigns.length})</FilterPill>
+          <FilterPill active={filter === 'UNVERIFIED'} onClick={() => setFilter('UNVERIFIED')}>
+            Unverified ({campaigns.filter((c) => !c.verified).length})
+          </FilterPill>
+          <FilterPill active={filter === 'VERIFIED'} onClick={() => setFilter('VERIFIED')}>
+            Verified ({campaigns.filter((c) => c.verified).length})
+          </FilterPill>
+          <FilterPill active={filter === 'CLOSED'} onClick={() => setFilter('CLOSED')}>
+            Closed ({campaigns.filter((c) => c.status === 'CLOSED').length})
+          </FilterPill>
+        </div>
+        <SearchBox value={query} onChange={setQuery} placeholder="Search campaigns…" />
+      </div>
+
+      <Card className="overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Campaign</TableHead>
+              <TableHead className="hidden md:table-cell">Category</TableHead>
+              <TableHead>Progress</TableHead>
+              <TableHead className="hidden sm:table-cell">Status</TableHead>
+              <TableHead className="text-right">Action</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filtered.map((c) => (
+              <TableRow key={c.id}>
+                <TableCell className="max-w-[220px]">
+                  <p className="truncate font-medium">{c.title}</p>
+                  <p className="truncate text-xs text-muted-foreground">by {c.creatorName}</p>
+                </TableCell>
+                <TableCell className="hidden md:table-cell">
+                  <Badge variant="outline">{c.category}</Badge>
+                </TableCell>
+                <TableCell className="min-w-[160px]">
+                  <p className="font-figures text-xs font-medium">
+                    {formatKES(c.raisedAmount)} <span className="text-muted-foreground">/ {formatKES(c.targetAmount)}</span>
+                  </p>
+                  <ProgressBar value={c.raisedAmount} max={c.targetAmount} className="mt-1.5" />
+                </TableCell>
+                <TableCell className="hidden sm:table-cell">
+                  <div className="flex flex-wrap gap-1.5">
+                    {c.status === 'CLOSED' && <Badge variant="destructive">Closed</Badge>}
+                    {c.verified ? <Badge>Verified</Badge> : <Badge variant="secondary">Unverified</Badge>}
+                  </div>
+                </TableCell>
+                <TableCell className="text-right">
+                  {c.verified ? (
+                    <Button size="sm" variant="outline" onClick={() => handleUnverify(c.id)} disabled={isPending}>
+                      Unverify
+                    </Button>
+                  ) : (
+                    <Button size="sm" onClick={() => handleVerify(c.id)} disabled={isPending}>
+                      Verify
+                    </Button>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        {filtered.length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">No campaigns match this view.</p>}
+      </Card>
     </div>
   );
 }
+
+/* ────────────────────────────────────────────────────────────── */
+/*                        INVESTMENT PRODUCTS                       */
+/* ────────────────────────────────────────────────────────────── */
 
 const EMPTY_PRODUCT_FORM = {
   name: '',
@@ -361,6 +884,13 @@ const EMPTY_PRODUCT_FORM = {
   duration: '',
   minAmount: '',
   maxAmount: '',
+};
+
+const PRODUCT_TONE: Record<ProductType, string> = {
+  MMF: 'bg-primary/10 text-primary',
+  STOCK: 'bg-gold/15 text-gold',
+  BOND: 'bg-chama/10 text-chama',
+  FIXED_DEPOSIT: 'bg-destructive/10 text-destructive',
 };
 
 function ProductsAdminSection({ products }: { products: ProductRow[] }) {
@@ -486,54 +1016,84 @@ function ProductsAdminSection({ products }: { products: ProductRow[] }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted-foreground">
           The product catalog chamas invest their pooled fund into from /invest.
         </p>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
-            <Button size="sm" onClick={openCreate}>Add Product</Button>
+            <Button size="sm" onClick={openCreate} className="gap-1.5">
+              <Plus className="h-4 w-4" /> Add Product
+            </Button>
           </DialogTrigger>
           <DialogContent className="max-h-[85vh] overflow-y-auto">
             <DialogHeader><DialogTitle>New Investment Product</DialogTitle></DialogHeader>
             {formFields}
             <DialogFooter>
-              <Button onClick={handleCreate} disabled={isPending}>Create</Button>
+              <Button onClick={handleCreate} disabled={isPending}>{isPending ? 'Creating…' : 'Create'}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
 
-      {products.length === 0 && <p className="text-sm text-muted-foreground">No products yet.</p>}
-
-      {products.map((p) => (
-        <Card key={p.id} className="rounded-2xl shadow-sm">
-          <CardHeader className="flex flex-row items-start justify-between">
-            <div>
-              <CardTitle className="text-base flex items-center gap-2">
-                {p.name} <Badge variant="secondary">{TYPE_LABEL[p.type]}</Badge>
-              </CardTitle>
-              <CardDescription>
-                {p.roiMax ? `${p.roi}–${p.roiMax}` : p.roi}% p.a. · {p.duration} mo · {formatKES(p.minAmount)}{p.maxAmount ? ` – ${formatKES(p.maxAmount)}` : '+'}
-              </CardDescription>
-            </div>
-            <Badge variant={p.isActive ? 'default' : 'destructive'}>{p.isActive ? 'Active' : 'Inactive'}</Badge>
-          </CardHeader>
-          <CardContent className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={() => openEdit(p)}>Edit</Button>
-            <Button size="sm" variant="outline" onClick={() => handleToggle(p.id)} disabled={isPending}>
-              {p.isActive ? 'Deactivate' : 'Activate'}
-            </Button>
-          </CardContent>
+      {products.length === 0 && (
+        <Card>
+          <CardContent className="py-12 text-center text-sm text-muted-foreground">No products yet.</CardContent>
         </Card>
-      ))}
+      )}
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {products.map((p) => (
+          <Card key={p.id} className="flex flex-col">
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className={cn('flex h-10 w-10 items-center justify-center rounded-xl', PRODUCT_TONE[p.type])}>
+                  <PiggyBank className="h-5 w-5" />
+                </div>
+                <Badge variant={p.isActive ? 'default' : 'secondary'}>{p.isActive ? 'Active' : 'Inactive'}</Badge>
+              </div>
+              <CardTitle className="text-base">{p.name}</CardTitle>
+              <CardDescription>{TYPE_LABEL[p.type]}</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-1 flex-col justify-between gap-4">
+              <div className="space-y-2 rounded-xl bg-muted/40 p-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Return</span>
+                  <span className="font-figures font-semibold text-chama">
+                    {p.roiMax ? `${p.roi}–${p.roiMax}` : p.roi}% p.a.
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Term</span>
+                  <span className="font-figures font-medium">{p.duration} mo</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Range</span>
+                  <span className="font-figures font-medium">
+                    {formatKES(p.minAmount)}{p.maxAmount ? ` – ${formatKES(p.maxAmount)}` : '+'}
+                  </span>
+                </div>
+              </div>
+              {p.description && <p className="line-clamp-2 text-xs text-muted-foreground">{p.description}</p>}
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" className="flex-1 gap-1.5" onClick={() => openEdit(p)}>
+                  <Pencil className="h-3.5 w-3.5" /> Edit
+                </Button>
+                <Button size="sm" variant="outline" className="flex-1 gap-1.5" onClick={() => handleToggle(p.id)} disabled={isPending}>
+                  <Power className="h-3.5 w-3.5" /> {p.isActive ? 'Deactivate' : 'Activate'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
       <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
         <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Edit {editing?.name}</DialogTitle></DialogHeader>
           {formFields}
           <DialogFooter>
-            <Button onClick={handleUpdate} disabled={isPending}>Save</Button>
+            <Button onClick={handleUpdate} disabled={isPending}>{isPending ? 'Saving…' : 'Save'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -541,10 +1101,15 @@ function ProductsAdminSection({ products }: { products: ProductRow[] }) {
   );
 }
 
+/* ────────────────────────────────────────────────────────────── */
+/*                           MEMBER REPORTS                         */
+/* ────────────────────────────────────────────────────────────── */
+
 function MemberReportsAdminSection({ reports }: { reports: ReportRow[] }) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [csv, setCsv] = useState('');
+  const [query, setQuery] = useState('');
 
   const handleSync = () => {
     startTransition(async () => {
@@ -574,16 +1139,33 @@ function MemberReportsAdminSection({ reports }: { reports: ReportRow[] }) {
     });
   };
 
+  const filtered = reports.filter((r) => {
+    if (!query.trim()) return true;
+    const q = query.toLowerCase();
+    return (
+      (r.memberName ?? '').toLowerCase().includes(q) ||
+      r.memberEmail.toLowerCase().includes(q) ||
+      (r.teamName ?? '').toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div className="space-y-6">
-      <Card className="rounded-2xl shadow-sm">
+      <Card className="overflow-hidden border-primary/20 bg-gradient-to-br from-primary/[0.04] to-transparent">
         <CardHeader>
-          <CardTitle className="text-base">Sync from Google Sheets</CardTitle>
-          <CardDescription>
-            Paste a CSV export (header row required: <code>email,name,date,principal,rate,roi,withdrawal,closingBalance,period,notes</code>).
-            For automatic syncing, point a Google Sheets Apps Script trigger at <code>/api/member-reports/sync</code> instead — same
-            column names, sent as JSON.
-          </CardDescription>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <UploadCloud className="h-5 w-5" />
+            </div>
+            <div>
+              <CardTitle className="text-base">Sync from Google Sheets</CardTitle>
+              <CardDescription>
+                Paste a CSV export (header row required: <code>email,name,date,principal,rate,roi,withdrawal,closingBalance,period,notes</code>).
+                For automatic syncing, point a Google Sheets Apps Script trigger at <code>/api/member-reports/sync</code> instead — same
+                column names, sent as JSON.
+              </CardDescription>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-3">
           <Textarea
@@ -591,38 +1173,64 @@ function MemberReportsAdminSection({ reports }: { reports: ReportRow[] }) {
             placeholder="email,name,date,principal,rate,roi,withdrawal,closingBalance,period,notes"
             value={csv}
             onChange={(e) => setCsv(e.target.value)}
+            className="font-figures"
           />
-          <Button onClick={handleSync} disabled={isPending || !csv.trim()}>
-            {isPending ? 'Syncing...' : 'Sync Rows'}
+          <Button onClick={handleSync} disabled={isPending || !csv.trim()} className="gap-1.5">
+            <UploadCloud className="h-4 w-4" /> {isPending ? 'Syncing…' : 'Sync Rows'}
           </Button>
         </CardContent>
       </Card>
 
-      <div>
-        <h2 className="font-headline font-semibold text-lg mb-3">Recent Rows ({reports.length})</h2>
-        {reports.length === 0 && <p className="text-sm text-muted-foreground">No member reports synced yet.</p>}
-        <div className="space-y-2">
-          {reports.map((r) => (
-            <Card key={r.id} className="rounded-xl shadow-sm">
-              <CardContent className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
-                <div>
-                  <p className="font-medium">
-                    {r.memberName || r.memberEmail}{' '}
-                    <span className="text-muted-foreground font-normal">
-                      · {r.teamName || 'unmatched to a chama'} · {r.periodLabel || r.date || '—'}
-                    </span>
-                  </p>
-                  <p className="text-muted-foreground">
-                    Principal {r.principal || '—'} · ROI {r.roi || '—'} · Closing {r.closingBal || '—'}
-                  </p>
-                </div>
-                <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDelete(r.id)}>
-                  Delete
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
+      <div className="space-y-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="font-headline text-lg font-semibold">Recent Rows ({reports.length})</h2>
+          <SearchBox value={query} onChange={setQuery} placeholder="Search member, chama, email…" />
         </div>
+
+        {reports.length === 0 ? (
+          <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">No member reports synced yet.</CardContent></Card>
+        ) : (
+          <Card className="overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Member</TableHead>
+                  <TableHead className="hidden sm:table-cell">Chama</TableHead>
+                  <TableHead className="hidden md:table-cell">Period</TableHead>
+                  <TableHead>Principal</TableHead>
+                  <TableHead className="hidden lg:table-cell">ROI</TableHead>
+                  <TableHead>Closing Bal.</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="max-w-[180px]">
+                      <p className="truncate font-medium">{r.memberName || r.memberEmail}</p>
+                      <p className="truncate text-xs text-muted-foreground">{r.memberEmail}</p>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      {r.teamName ? r.teamName : <span className="text-xs text-muted-foreground">Unmatched</span>}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                      {r.periodLabel || r.date || '—'}
+                    </TableCell>
+                    <TableCell className="font-figures text-sm">{r.principal || '—'}</TableCell>
+                    <TableCell className="hidden lg:table-cell font-figures text-sm">{r.roi || '—'}</TableCell>
+                    <TableCell className="font-figures text-sm">{r.closingBal || '—'}</TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => handleDelete(r.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {filtered.length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">No rows match your search.</p>}
+          </Card>
+        )}
       </div>
     </div>
   );

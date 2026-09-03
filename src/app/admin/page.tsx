@@ -1,25 +1,29 @@
-import { redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
 import { isPlatformAdmin } from '@/lib/admin';
-import LChamaHeader from '@/components/LChamaHeader';
-import LChamaFooter from '@/components/LChamaFooter';
+import { hasAdminSession } from '@/lib/admin-auth';
 import { AdminClient } from './AdminClient';
+import { AdminLogin } from './AdminLogin';
+import { SidebarProvider } from '@/components/ui/sidebar';
 
 export default async function AdminPage() {
   const { userId: clerkId } = await auth();
-  if (!clerkId) redirect('/sign-in?redirect_url=/admin');
-  if (!isPlatformAdmin(clerkId)) redirect('/');
+  const viaClerk = isPlatformAdmin(clerkId);
+  const viaPassword = await hasAdminSession();
+  const hasAccess = viaClerk || viaPassword;
 
-  const teams = await prisma.team.findMany({
-    include: { owner: true },
-    orderBy: { submittedAt: 'desc' },
-  });
+  if (!hasAccess) {
+    return <AdminLogin />;
+  }
 
-  const campaigns = await prisma.campaign.findMany({
-    include: { creator: true },
-    orderBy: { createdAt: 'desc' },
-  });
+  const [teams, campaigns, products, reports, totalUsers, pooledFundsAgg] = await Promise.all([
+    prisma.team.findMany({ include: { owner: true }, orderBy: { submittedAt: 'desc' } }),
+    prisma.campaign.findMany({ include: { creator: true }, orderBy: { createdAt: 'desc' } }),
+    prisma.investmentProduct.findMany({ orderBy: { createdAt: 'desc' } }),
+    prisma.memberReport.findMany({ include: { team: true }, orderBy: { uploadedAt: 'desc' }, take: 200 }),
+    prisma.user.count(),
+    prisma.loanAccount.aggregate({ _sum: { balance: true } }),
+  ]);
 
   const data = teams.map((t: (typeof teams)[number]) => ({
     id: t.id,
@@ -56,7 +60,6 @@ export default async function AdminPage() {
     createdAt: c.createdAt.toISOString(),
   }));
 
-  const products = await prisma.investmentProduct.findMany({ orderBy: { createdAt: 'desc' } });
   const productData = products.map((p: (typeof products)[number]) => ({
     id: p.id,
     name: p.name,
@@ -70,11 +73,6 @@ export default async function AdminPage() {
     isActive: p.isActive,
   }));
 
-  const reports = await prisma.memberReport.findMany({
-    include: { team: true },
-    orderBy: { uploadedAt: 'desc' },
-    take: 200,
-  });
   const reportData = reports.map((r: (typeof reports)[number]) => ({
     id: r.id,
     teamName: r.team?.name ?? null,
@@ -90,19 +88,60 @@ export default async function AdminPage() {
     uploadedAt: r.uploadedAt.toISOString(),
   }));
 
+  // ── Aggregate stats for the Overview dashboard ──
+  const now = new Date();
+  const monthLabels: string[] = [];
+  const monthCounts: number[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const label = d.toLocaleDateString('en-US', { month: 'short' });
+    const count = teams.filter((t: (typeof teams)[number]) => {
+      const s = t.submittedAt;
+      return s.getFullYear() === d.getFullYear() && s.getMonth() === d.getMonth();
+    }).length;
+    monthLabels.push(label);
+    monthCounts.push(count);
+  }
+
+  const stats = {
+    totalUsers,
+    totalPooledFunds: pooledFundsAgg._sum.balance ?? 0,
+    orgs: {
+      total: teams.length,
+      pending: teams.filter((t: (typeof teams)[number]) => t.approvalStatus === 'PENDING_APPROVAL').length,
+      approved: teams.filter((t: (typeof teams)[number]) => t.approvalStatus === 'APPROVED').length,
+      rejected: teams.filter((t: (typeof teams)[number]) => t.approvalStatus === 'REJECTED').length,
+    },
+    campaigns: {
+      total: campaigns.length,
+      unverified: campaigns.filter((c: (typeof campaigns)[number]) => !c.verified).length,
+      verified: campaigns.filter((c: (typeof campaigns)[number]) => c.verified).length,
+      active: campaigns.filter((c: (typeof campaigns)[number]) => c.status === 'ACTIVE').length,
+      totalRaised: campaigns.reduce((sum: number, c: (typeof campaigns)[number]) => sum + c.raisedAmount, 0),
+      totalTarget: campaigns.reduce((sum: number, c: (typeof campaigns)[number]) => sum + c.targetAmount, 0),
+    },
+    products: {
+      total: products.length,
+      active: products.filter((p: (typeof products)[number]) => p.isActive).length,
+      inactive: products.filter((p: (typeof products)[number]) => !p.isActive).length,
+    },
+    reports: {
+      total: reports.length,
+      matched: reports.filter((r: (typeof reports)[number]) => r.teamId).length,
+    },
+    monthlyOrgSubmissions: monthLabels.map((label, i) => ({ label, value: monthCounts[i] })),
+  };
+
   return (
-    <div className="flex flex-col min-h-screen bg-background">
-      <LChamaHeader />
-      <main className="flex-1 container mx-auto px-4">
-        <div className="py-10 max-w-4xl mx-auto space-y-6">
-          <div>
-            <h1 className="font-headline text-2xl font-semibold">Admin</h1>
-            <p className="text-muted-foreground">Review chamas, campaigns, investment products, and member reports.</p>
-          </div>
-          <AdminClient teams={data} campaigns={campaignData} products={productData} reports={reportData} />
-        </div>
-      </main>
-      <LChamaFooter />
-    </div>
+    <SidebarProvider>
+      <AdminClient
+        teams={data}
+        campaigns={campaignData}
+        products={productData}
+        reports={reportData}
+        stats={stats}
+        authMethod={viaClerk ? 'clerk' : 'password'}
+      />
+    </SidebarProvider>
   );
 }

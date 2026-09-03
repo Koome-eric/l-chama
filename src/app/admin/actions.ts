@@ -4,12 +4,30 @@ import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { isPlatformAdmin } from '@/lib/admin';
+import { clearAdminSession, hasAdminSession, isValidAdminCredentials, setAdminSession } from '@/lib/admin-auth';
 import { notifyUser } from '@/lib/notifications';
 import { syncChamaToLudeva } from '@/lib/ludeva-sync';
 
 async function requireAdmin() {
   const { userId: clerkId } = await auth();
-  if (!isPlatformAdmin(clerkId)) throw new Error('You are not authorized to review organisations.');
+  if (!isPlatformAdmin(clerkId) && !(await hasAdminSession())) {
+    throw new Error('You are not authorized to review organisations.');
+  }
+}
+
+export async function loginAdmin(formData: FormData) {
+  const email = String(formData.get('email') || '');
+  const password = String(formData.get('password') || '');
+  if (!isValidAdminCredentials(email, password)) {
+    return { success: false as const, error: 'Invalid email or password.' };
+  }
+
+  await setAdminSession();
+  return { success: true as const };
+}
+
+export async function logoutAdmin() {
+  await clearAdminSession();
 }
 
 export async function approveOrganisation(teamId: string) {
