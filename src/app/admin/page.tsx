@@ -16,13 +16,23 @@ export default async function AdminPage() {
     return <AdminLogin />;
   }
 
-  const [teams, campaigns, products, reports, totalUsers, pooledFundsAgg] = await Promise.all([
+  const [teams, campaigns, products, reports, totalUsers, pooledFundsAgg, payments, juniorApplications] = await Promise.all([
     prisma.team.findMany({ include: { owner: true }, orderBy: { submittedAt: 'desc' } }),
     prisma.campaign.findMany({ include: { creator: true }, orderBy: { createdAt: 'desc' } }),
     prisma.investmentProduct.findMany({ orderBy: { createdAt: 'desc' } }),
     prisma.memberReport.findMany({ include: { team: true }, orderBy: { uploadedAt: 'desc' }, take: 200 }),
     prisma.user.count(),
     prisma.loanAccount.aggregate({ _sum: { balance: true } }),
+    prisma.payment.findMany({
+      include: { user: true, memberAccount: { include: { product: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    }),
+    prisma.juniorAccountApplication.findMany({
+      include: { guardian: true },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    }),
   ]);
 
   const data = teams.map((t: (typeof teams)[number]) => ({
@@ -88,6 +98,37 @@ export default async function AdminPage() {
     uploadedAt: r.uploadedAt.toISOString(),
   }));
 
+  const paymentData = payments.map((p: (typeof payments)[number]) => ({
+    id: p.id,
+    memberName: p.user.fullName || p.user.email || p.user.phone || 'Unknown',
+    productName: p.memberAccount.product.name,
+    channel: p.channel,
+    amount: p.amount,
+    status: p.status,
+    phone: p.phone,
+    note: p.note,
+    createdAt: p.createdAt.toISOString(),
+  }));
+
+  const juniorApplicationData = juniorApplications.map((a: (typeof juniorApplications)[number]) => ({
+    id: a.id,
+    childFullName: a.childFullName,
+    childDateOfBirth: a.childDateOfBirth ? a.childDateOfBirth.toISOString() : null,
+    guardianName: a.guardian.fullName || a.guardian.email || a.guardian.phone || 'Unknown',
+    guardianIdNumber: a.guardianIdNumber,
+    guardianPhone: a.guardianPhone,
+    guardianKraPin: a.guardianKraPin,
+    birthCertFileName: a.birthCertFileName,
+    birthCertMimeType: a.birthCertMimeType,
+    birthCertData: a.birthCertData,
+    childPhotoFileName: a.childPhotoFileName,
+    childPhotoMimeType: a.childPhotoMimeType,
+    childPhotoData: a.childPhotoData,
+    status: a.status,
+    reviewNotes: a.reviewNotes,
+    createdAt: a.createdAt.toISOString(),
+  }));
+
   // ── Aggregate stats for the Overview dashboard ──
   const now = new Date();
   const monthLabels: string[] = [];
@@ -129,6 +170,14 @@ export default async function AdminPage() {
       total: reports.length,
       matched: reports.filter((r: (typeof reports)[number]) => r.teamId).length,
     },
+    payments: {
+      total: payments.length,
+      pending: payments.filter((p: (typeof payments)[number]) => p.status === 'PENDING').length,
+    },
+    juniorApplications: {
+      total: juniorApplications.length,
+      pending: juniorApplications.filter((a: (typeof juniorApplications)[number]) => a.status === 'PENDING_REVIEW').length,
+    },
     monthlyOrgSubmissions: monthLabels.map((label, i) => ({ label, value: monthCounts[i] })),
   };
 
@@ -139,6 +188,8 @@ export default async function AdminPage() {
         campaigns={campaignData}
         products={productData}
         reports={reportData}
+        payments={paymentData}
+        juniorApplications={juniorApplicationData}
         stats={stats}
         authMethod={viaClerk ? 'clerk' : 'password'}
       />

@@ -18,7 +18,7 @@ const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mon
 export const metadata: Metadata = {
   title: "L-CHAMA — Save Together, Borrow Together",
   description:
-    "Start a chama, invite your members, and manage a shared loan account guaranteed by your own people.",
+    "L-Chama is a community-centric fintech platform that digitizes informal banking systems, enhances contribution management, and streamlines group lending mechanisms.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

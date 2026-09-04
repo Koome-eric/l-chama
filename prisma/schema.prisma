@@ -62,6 +62,14 @@ model User {
   donationsMade    Donation[] @relation("DonationDonor")
   teamInvestmentsMade TeamInvestment[] @relation("TeamInvestmentInitiator")
 
+  // Personal Ludeva accounts (Shares/Savings/Junior) — separate from a
+  // chama's pooled TeamInvestment, these belong to the member directly.
+  memberAccounts MemberAccount[]
+  payments       Payment[]
+
+  juniorApplications         JuniorAccountApplication[] @relation("JuniorGuardian")
+  juniorApplicationsReviewed JuniorAccountApplication[] @relation("JuniorReviewer")
+
   notifications Notification[]
 
   createdAt DateTime @default(now())
@@ -412,6 +420,8 @@ enum FundType {
   STOCK
   BOND
   FIXED_DEPOSIT
+  SAVINGS
+  JUNIOR
 }
 
 model InvestmentProduct {
@@ -426,7 +436,8 @@ model InvestmentProduct {
   maxAmount   Float?
   isActive    Boolean  @default(true)
 
-  investments TeamInvestment[]
+  investments    TeamInvestment[]
+  memberAccounts MemberAccount[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -458,6 +469,126 @@ model TeamInvestment {
   completedAt DateTime?
 
   @@map("teaminvestment")
+}
+
+// ─────────────────────────────────────────────
+// Personal Ludeva accounts — Shares, Savings, and Junior accounts a
+// member opens for themselves (as opposed to TeamInvestment, which is
+// the chama's shared pooled fund going into a product together). One
+// account per member per product; funding it happens through Payment
+// rows (M-Pesa or Visa card).
+// ─────────────────────────────────────────────
+enum MemberAccountStatus {
+  ACTIVE
+  CLOSED
+}
+
+model MemberAccount {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  productId String
+  product   InvestmentProduct @relation(fields: [productId], references: [id])
+
+  balance Float               @default(0)
+  status  MemberAccountStatus @default(ACTIVE)
+
+  payments Payment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, productId])
+  @@map("memberaccount")
+}
+
+// ─────────────────────────────────────────────
+// A payment attempt against a personal MemberAccount, over M-Pesa
+// (STK push) or a Visa card. No gateway is wired yet — this is the
+// ledger + UI flow, created PENDING and settled by an admin from
+// /admin until Daraja / a card processor is connected. When that
+// happens, the real gateway's webhook should call the same
+// resolvePayment() path admins use today.
+// ─────────────────────────────────────────────
+enum PaymentChannel {
+  MPESA
+  VISA_CARD
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+model Payment {
+  id String @id @default(cuid())
+
+  userId          String
+  user            User           @relation(fields: [userId], references: [id])
+  memberAccountId String
+  memberAccount   MemberAccount  @relation(fields: [memberAccountId], references: [id])
+
+  channel PaymentChannel
+  amount  Float
+  status  PaymentStatus @default(PENDING)
+
+  phone     String? // M-Pesa number the STK push would go to
+  reference String? @unique // gateway checkout/reference ID, once wired
+  note      String? // admin note when manually resolving
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("payment")
+}
+
+// ─────────────────────────────────────────────
+// Ludeva Junior Account application — a guardian applies on behalf of
+// a child, uploading KYC documents for an admin to review manually.
+// Files are stored inline (base64) since no object-storage provider is
+// configured yet; swap fileData for a blob-storage URL once one is.
+// Approving creates the child's MemberAccount against the JUNIOR
+// product.
+// ─────────────────────────────────────────────
+enum JuniorApplicationStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+model JuniorAccountApplication {
+  id String @id @default(cuid())
+
+  guardianId String
+  guardian   User   @relation("JuniorGuardian", fields: [guardianId], references: [id])
+
+  childFullName   String
+  childDateOfBirth DateTime?
+
+  guardianIdNumber String
+  guardianPhone    String
+  guardianKraPin   String
+
+  birthCertFileName String
+  birthCertMimeType String
+  birthCertData     String // base64
+
+  childPhotoFileName String
+  childPhotoMimeType String
+  childPhotoData     String // base64
+
+  status       JuniorApplicationStatus @default(PENDING_REVIEW)
+  reviewNotes  String?
+  reviewedById String?
+  reviewedBy   User?                   @relation("JuniorReviewer", fields: [reviewedById], references: [id])
+  reviewedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("junioraccountapplication")
 }
 
 // ─────────────────────────────────────────────

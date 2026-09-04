@@ -122,7 +122,7 @@ export async function unverifyCampaign(campaignId: string) {
 
 export async function createInvestmentProduct(input: {
   name: string;
-  type: 'MMF' | 'STOCK' | 'BOND' | 'FIXED_DEPOSIT';
+  type: 'MMF' | 'STOCK' | 'BOND' | 'FIXED_DEPOSIT' | 'SAVINGS' | 'JUNIOR';
   description?: string;
   roi: number;
   roiMax?: number | null;
@@ -165,7 +165,7 @@ export async function updateInvestmentProduct(
   productId: string,
   input: {
     name: string;
-    type: 'MMF' | 'STOCK' | 'BOND' | 'FIXED_DEPOSIT';
+    type: 'MMF' | 'STOCK' | 'BOND' | 'FIXED_DEPOSIT' | 'SAVINGS' | 'JUNIOR';
     description?: string;
     roi: number;
     roiMax?: number | null;
@@ -302,5 +302,99 @@ export async function deleteMemberReport(reportId: string) {
   await prisma.memberReport.delete({ where: { id: reportId } });
   revalidatePath('/admin');
   revalidatePath('/reports');
+  return { success: true };
+}
+
+// ─────────────────────────────────────────────
+// Payments — M-Pesa / Visa card requests logged from a member's
+// /accounts page. No gateway is wired up yet, so an admin resolves
+// these manually: SUCCESS credits the member's MemberAccount balance,
+// FAILED/CANCELLED just record the outcome. Once Daraja/a card
+// processor is connected, their webhook should call this same credit
+// logic instead of an admin click.
+// ─────────────────────────────────────────────
+
+export async function resolvePayment(paymentId: string, status: 'SUCCESS' | 'FAILED' | 'CANCELLED', note?: string) {
+  await requireAdmin();
+
+  const payment = await prisma.payment.findUnique({ where: { id: paymentId }, include: { memberAccount: { include: { product: true } }, user: true } });
+  if (!payment) throw new Error('Payment not found.');
+  if (payment.status !== 'PENDING') throw new Error('This payment has already been resolved.');
+
+  if (status === 'SUCCESS') {
+    await prisma.$transaction([
+      prisma.payment.update({ where: { id: paymentId }, data: { status, note: note?.trim() || undefined } }),
+      prisma.memberAccount.update({
+        where: { id: payment.memberAccountId },
+        data: { balance: { increment: payment.amount } },
+      }),
+    ]);
+    await notifyUser(
+      payment.userId,
+      'Payment confirmed',
+      `Your KES ${payment.amount.toLocaleString()} payment to ${payment.memberAccount.product.name} was confirmed and credited.`
+    );
+  } else {
+    await prisma.payment.update({ where: { id: paymentId }, data: { status, note: note?.trim() || undefined } });
+    await notifyUser(
+      payment.userId,
+      'Payment not completed',
+      `Your KES ${payment.amount.toLocaleString()} payment to ${payment.memberAccount.product.name} could not be confirmed.${note ? ` ${note}` : ''}`
+    );
+  }
+
+  revalidatePath('/admin');
+  revalidatePath('/accounts');
+  return { success: true };
+}
+
+// ─────────────────────────────────────────────
+// Ludeva Junior Account applications — a guardian's KYC submission for
+// a child's account. Approving opens (or reuses) a MemberAccount
+// against the active JUNIOR product so the guardian can then fund it
+// from /accounts.
+// ─────────────────────────────────────────────
+
+export async function decideJuniorApplication(
+  applicationId: string,
+  decision: 'APPROVED' | 'REJECTED',
+  note?: string
+) {
+  await requireAdmin();
+
+  const application = await prisma.juniorAccountApplication.findUnique({ where: { id: applicationId } });
+  if (!application) throw new Error('Application not found.');
+  if (application.status !== 'PENDING_REVIEW') throw new Error('This application has already been decided.');
+
+  await prisma.juniorAccountApplication.update({
+    where: { id: applicationId },
+    data: {
+      status: decision,
+      reviewNotes: note?.trim() || undefined,
+      reviewedAt: new Date(),
+    },
+  });
+
+  if (decision === 'APPROVED') {
+    const juniorProduct = await prisma.investmentProduct.findFirst({ where: { type: 'JUNIOR', isActive: true } });
+    if (juniorProduct) {
+      await prisma.memberAccount.upsert({
+        where: { userId_productId: { userId: application.guardianId, productId: juniorProduct.id } },
+        update: {},
+        create: { userId: application.guardianId, productId: juniorProduct.id },
+      });
+    }
+  }
+
+  await notifyUser(
+    application.guardianId,
+    decision === 'APPROVED' ? 'Junior Account approved' : 'Junior Account application not approved',
+    decision === 'APPROVED'
+      ? `The Ludeva Junior Account for ${application.childFullName} has been approved. You can now fund it from your Accounts page.`
+      : `The Junior Account application for ${application.childFullName} was not approved.${note ? ` Reason: ${note}` : ''}`
+  );
+
+  revalidatePath('/admin');
+  revalidatePath('/accounts');
   return { success: true };
 }

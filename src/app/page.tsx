@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { auth } from '@clerk/nextjs/server';
-import { ArrowRight, ShieldCheck, HandCoins, Users2, CalendarClock, HeartHandshake, Globe, TrendingUp, Percent } from 'lucide-react';
+import { ArrowRight, ShieldCheck, HeartHandshake, ClipboardCheck, Landmark } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { getChamaContext } from '@/lib/chama';
 import LChamaHeader from '@/components/LChamaHeader';
@@ -12,46 +12,24 @@ import { CHAMA_LEVELS, formatKES } from '@/lib/chama-levels';
 import { HeroReveal, HeroRevealItem } from '@/components/motion/HeroReveal';
 import { CountUp } from '@/components/motion/CountUp';
 
+// L-Chama is a community-centric fintech platform that digitizes informal
+// banking systems, enhances contribution management, and streamlines group
+// lending mechanisms. These are its three core, top-line capabilities.
 const FEATURES = [
   {
-    icon: Users2,
-    title: 'One chama, one dashboard',
-    body: 'Every member sees the same team account — who is in, what has been paid, and where things stand. Only the Team Leader can edit details or add members.',
-  },
-  {
-    icon: HandCoins,
-    title: 'Team loan account',
-    body: 'Your chama pools into a shared loan account that every member can view, separate from personal contributions.',
+    icon: ClipboardCheck,
+    title: 'Digital Ledger & Transparency',
+    body: 'Automates capital collection, ledger reconciliation, and real-time transaction reporting and remittance reminders. It replaces manual bookkeeping with an audit trail accessible via a unified dashboard.',
   },
   {
     icon: ShieldCheck,
-    title: 'Guaranteed loan requests',
-    body: 'Any member can request a loan. It needs two fellow members to guarantee it before the Team Leader reviews and approves.',
+    title: 'Social Guarantee',
+    body: 'Operates a decentralized trust model where credit facility approvals and loan risk assessments rely on social collateral, peer underwriting, and designated admin authorizations rather than traditional credit scoring.',
   },
   {
-    icon: CalendarClock,
-    title: 'Weekly repayments',
-    body: 'Approved loans come with a clear weekly repayment schedule, visible to the borrower and tracked automatically.',
-  },
-  {
-    icon: Globe,
-    title: 'Kenya-diaspora chamas welcome',
-    body: 'Running your chama from abroad? L Chama supports diaspora groups the same way — one dashboard, wherever your members are.',
-  },
-  {
-    icon: HeartHandshake,
-    title: 'Last Respect Cover',
-    body: "An optional bereavement fund your chama contributes to together, so no member's family carries a loss alone.",
-  },
-  {
-    icon: TrendingUp,
-    title: 'Linked to Ludeva MMF',
-    body: "Put your chama's pooled fund into Ludeva's Money Market Fund and earn 9–13% p.a. — the same MMF Ludeva's individual members use.",
-  },
-  {
-    icon: Percent,
-    title: 'Loans from 3%',
-    body: "Chama loans start from as little as 3% interest, set by your Team Leader — never lower, so the pool always grows.",
+    icon: Landmark,
+    title: 'Digital Group Treasury Management',
+    body: 'Offers a digital hub for multi-tiered social structures — investment chamas, merry-go-rounds, diaspora chamas, welfare groups, and Bodaboda associations — to aggregate deposits, manage liquidity, and disburse internal loans.',
   },
 ];
 
@@ -108,8 +86,9 @@ export default async function LandingPage() {
                   </HeroRevealItem>
                   <HeroRevealItem>
                     <p className="mt-4 text-lg sm:text-xl text-muted-foreground">
-                      Start a chama, invite your members, and manage a shared loan account —
-                      guaranteed by your own people, approved by your Team Leader.
+                      L-Chama is a community-centric fintech platform that digitizes informal
+                      banking systems, enhances contribution management, and streamlines group
+                      lending mechanisms.
                     </p>
                   </HeroRevealItem>
                   <HeroRevealItem className="mt-8 flex flex-wrap items-center gap-4">
@@ -169,10 +148,14 @@ export default async function LandingPage() {
 
         <section className="py-16 md:py-24">
           <div className="container mx-auto px-4">
-            <h2 className="text-3xl font-bold font-headline text-center mb-12">
-              Built for how a chama actually runs
+            <h2 className="text-3xl font-bold font-headline text-center mb-2">
+              Platform Top Features
             </h2>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <p className="text-muted-foreground text-center max-w-2xl mx-auto mb-12">
+              L-Chama digitizes informal banking systems, enhances contribution management, and
+              streamlines group lending mechanisms.
+            </p>
+            <div className="grid gap-6 md:grid-cols-3">
               {FEATURES.map((f) => (
                 <Card
                   key={f.title}

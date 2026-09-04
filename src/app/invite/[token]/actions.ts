@@ -6,9 +6,17 @@ import { revalidatePath } from 'next/cache';
 import { notifyUser } from '@/lib/notifications';
 import { syncChamaToLudeva } from '@/lib/ludeva-sync';
 
-export async function acceptChamaInvite(token: string) {
+export async function acceptChamaInvite(
+  token: string,
+  profile: { idNumber: string; phone: string }
+) {
   const clerkUser = await currentUser();
   if (!clerkUser) throw new Error('You must be signed in to accept this invite.');
+
+  const idNumber = profile.idNumber.trim();
+  const phone = profile.phone.trim();
+  if (idNumber.length < 4) throw new Error('Enter a valid ID/passport number.');
+  if (phone.length < 7) throw new Error('Enter a valid phone number.');
 
   const invite = await prisma.teamInvite.findUnique({
     where: { token },
@@ -42,7 +50,10 @@ export async function acceptChamaInvite(token: string) {
       data: {
         clerkId: clerkUser.id,
         email: clerkEmail,
+        phone,
+        idNumber,
         fullName: `${clerkUser.firstName ?? ''} ${clerkUser.lastName ?? ''}`.trim() || undefined,
+        profileCompleted: true,
         onboardingCompleted: true,
       },
     });
@@ -54,7 +65,12 @@ export async function acceptChamaInvite(token: string) {
 
     user = await prisma.user.update({
       where: { id: user.id },
-      data: { onboardingCompleted: true },
+      data: {
+        phone: user.phone || phone,
+        idNumber: user.idNumber || idNumber,
+        profileCompleted: true,
+        onboardingCompleted: true,
+      },
     });
   }
 

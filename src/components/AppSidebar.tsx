@@ -17,6 +17,7 @@ import {
   Settings,
   HeartHandshake,
   PiggyBank,
+  Wallet,
 } from 'lucide-react';
 
 import {
@@ -42,6 +43,7 @@ const menuItems = [
   { href: '/panel', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/team', label: 'Team Members', icon: Users },
   { href: '/panel?tab=loan-account', label: 'Contribute', icon: HandCoins, match: '/panel' },
+  { href: '/accounts', label: 'Accounts', icon: Wallet },
   { href: '/invest', label: 'Invest', icon: PiggyBank },
   { href: '/campaigns', label: 'Campaigns', icon: HeartHandshake },
   { href: '/deposit', label: 'Deposit', icon: ArrowDownToLine },
@@ -69,9 +71,9 @@ export function AppSidebar({
 
   const items = hasLastRespectCover
     ? [
-        ...menuItems.slice(0, 4),
+        ...menuItems.slice(0, 5),
         { href: '/last-respect', label: 'Last Respect Cover', icon: HeartHandshake },
-        ...menuItems.slice(4),
+        ...menuItems.slice(5),
       ]
     : menuItems;
 

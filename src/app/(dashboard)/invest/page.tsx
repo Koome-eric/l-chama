@@ -2,11 +2,17 @@ import { prisma } from '@/lib/prisma';
 import { requirePanelAccess } from '@/lib/require-panel-access';
 import { InvestClient } from './InvestClient';
 
+const POOLED_TYPES = ['MMF', 'STOCK', 'BOND', 'FIXED_DEPOSIT'] as const;
+type PooledProductType = (typeof POOLED_TYPES)[number];
+
 export default async function InvestPage() {
   const { ctx } = await requirePanelAccess('/invest');
 
   const [products, investments, loanAccount] = await Promise.all([
-    prisma.investmentProduct.findMany({ where: { isActive: true }, orderBy: { roi: 'desc' } }),
+    prisma.investmentProduct.findMany({
+      where: { isActive: true, type: { in: [...POOLED_TYPES] } },
+      orderBy: { roi: 'desc' },
+    }),
     prisma.teamInvestment.findMany({
       where: { teamId: ctx.team.id },
       include: { product: true, investedBy: true },
@@ -22,7 +28,7 @@ export default async function InvestPage() {
     products: products.map((p) => ({
       id: p.id,
       name: p.name,
-      type: p.type,
+      type: p.type as PooledProductType,
       description: p.description,
       roi: p.roi,
       roiMax: p.roiMax,
@@ -33,7 +39,7 @@ export default async function InvestPage() {
     investments: investments.map((i) => ({
       id: i.id,
       productName: i.product.name,
-      productType: i.product.type,
+      productType: i.product.type as PooledProductType,
       amount: i.amount,
       status: i.status,
       investedByName: i.investedBy.fullName || i.investedBy.email || 'Unknown member',

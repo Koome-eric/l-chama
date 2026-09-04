@@ -1,3 +1,4 @@
+import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
 import LChamaHeader from '@/components/LChamaHeader';
 import LChamaFooter from '@/components/LChamaFooter';
@@ -17,6 +18,9 @@ export default async function ChamaInvitePage({
     include: { team: true, invitedBy: true },
   });
 
+  const { userId: clerkId } = await auth();
+  const dbUser = clerkId ? await prisma.user.findUnique({ where: { clerkId } }) : null;
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <LChamaHeader />
@@ -35,6 +39,8 @@ export default async function ChamaInvitePage({
             teamName={invite.team.name}
             invitedByName={invite.invitedBy.fullName || invite.invitedBy.email || 'Team leader'}
             email={invite.email}
+            existingIdNumber={dbUser?.idNumber ?? ''}
+            existingPhone={dbUser?.phone ?? ''}
           />
         )}
       </main>

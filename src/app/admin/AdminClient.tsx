@@ -21,6 +21,12 @@ import {
   UploadCloud,
   ChevronRight,
   Home,
+  Wallet,
+  Baby,
+  Smartphone,
+  CreditCard,
+  FileText,
+  Image as ImageIcon,
 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -81,6 +87,8 @@ import {
   syncMemberReportsCsv,
   deleteMemberReport,
   logoutAdmin,
+  resolvePayment,
+  decideJuniorApplication,
 } from './actions';
 
 /* ────────────────────────────────────────────────────────────── */
@@ -122,7 +130,7 @@ type CampaignRow = {
   createdAt: string;
 };
 
-type ProductType = 'MMF' | 'STOCK' | 'BOND' | 'FIXED_DEPOSIT';
+type ProductType = 'MMF' | 'STOCK' | 'BOND' | 'FIXED_DEPOSIT' | 'SAVINGS' | 'JUNIOR';
 
 type ProductRow = {
   id: string;
@@ -152,6 +160,37 @@ type ReportRow = {
   uploadedAt: string;
 };
 
+type PaymentRow = {
+  id: string;
+  memberName: string;
+  productName: string;
+  channel: 'MPESA' | 'VISA_CARD';
+  amount: number;
+  status: 'PENDING' | 'SUCCESS' | 'FAILED' | 'CANCELLED';
+  phone: string | null;
+  note: string | null;
+  createdAt: string;
+};
+
+type JuniorApplicationRow = {
+  id: string;
+  childFullName: string;
+  childDateOfBirth: string | null;
+  guardianName: string;
+  guardianIdNumber: string;
+  guardianPhone: string;
+  guardianKraPin: string;
+  birthCertFileName: string;
+  birthCertMimeType: string;
+  birthCertData: string;
+  childPhotoFileName: string;
+  childPhotoMimeType: string;
+  childPhotoData: string;
+  status: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED';
+  reviewNotes: string | null;
+  createdAt: string;
+};
+
 type Stats = {
   totalUsers: number;
   totalPooledFunds: number;
@@ -166,16 +205,20 @@ type Stats = {
   };
   products: { total: number; active: number; inactive: number };
   reports: { total: number; matched: number };
+  payments: { total: number; pending: number };
+  juniorApplications: { total: number; pending: number };
   monthlyOrgSubmissions: { label: string; value: number }[];
 };
 
-type Section = 'overview' | 'organisations' | 'campaigns' | 'products' | 'reports';
+type Section = 'overview' | 'organisations' | 'campaigns' | 'products' | 'reports' | 'payments' | 'junior';
 
 const TYPE_LABEL: Record<ProductType, string> = {
   MMF: 'Money Market Fund',
-  STOCK: 'Stocks',
+  STOCK: 'Shares Account',
   BOND: 'Bonds',
   FIXED_DEPOSIT: 'Fixed Deposit',
+  SAVINGS: 'Savings Account',
+  JUNIOR: 'Ludeva Junior Account',
 };
 
 const OBJECTIVE_LABELS: Record<string, string> = {
@@ -202,6 +245,8 @@ function useNavItems(stats: Stats) {
     { id: 'organisations' as Section, label: 'Organisations', icon: Building2, badge: stats.orgs.pending },
     { id: 'campaigns' as Section, label: 'Campaigns', icon: HeartHandshake, badge: stats.campaigns.unverified },
     { id: 'products' as Section, label: 'Investment Products', icon: PiggyBank, badge: 0 },
+    { id: 'payments' as Section, label: 'Payments', icon: Wallet, badge: stats.payments.pending },
+    { id: 'junior' as Section, label: 'Junior Accounts', icon: Baby, badge: stats.juniorApplications.pending },
     { id: 'reports' as Section, label: 'Member Reports', icon: FileSpreadsheet, badge: 0 },
   ];
 }
@@ -211,6 +256,8 @@ const SECTION_META: Record<Section, { title: string; description: string }> = {
   organisations: { title: 'Organisations', description: 'Review chamas awaiting approval.' },
   campaigns: { title: 'Campaigns', description: 'Verify fundraising campaigns.' },
   products: { title: 'Investment Products', description: 'Manage the catalog chamas invest their pooled fund into.' },
+  payments: { title: 'Payments', description: 'M-Pesa and Visa card requests from member accounts, awaiting confirmation.' },
+  junior: { title: 'Junior Accounts', description: "Review Ludeva Junior Account applications and their KYC documents." },
   reports: { title: 'Member Reports', description: 'Sync and review performance data from Google Sheets.' },
 };
 
@@ -223,6 +270,8 @@ export function AdminClient({
   campaigns,
   products,
   reports,
+  payments,
+  juniorApplications,
   stats,
   authMethod,
 }: {
@@ -230,6 +279,8 @@ export function AdminClient({
   campaigns: CampaignRow[];
   products: ProductRow[];
   reports: ReportRow[];
+  payments: PaymentRow[];
+  juniorApplications: JuniorApplicationRow[];
   stats: Stats;
   authMethod: 'clerk' | 'password';
 }) {
@@ -327,15 +378,28 @@ export function AdminClient({
             <p className="hidden truncate text-xs text-muted-foreground sm:block">{SECTION_META[section].description}</p>
           </div>
           <div className="ml-auto flex items-center gap-3">
-            {stats.orgs.pending + stats.campaigns.unverified > 0 && (
-              <button
-                onClick={() => setSection(stats.orgs.pending > 0 ? 'organisations' : 'campaigns')}
-                className="hidden items-center gap-1.5 rounded-full border border-gold/30 bg-gold/10 px-3 py-1.5 text-xs font-semibold text-gold sm:inline-flex"
-              >
-                <Clock className="h-3.5 w-3.5" />
-                {stats.orgs.pending + stats.campaigns.unverified} need review
-              </button>
-            )}
+            {(() => {
+              const totalNeedsReview =
+                stats.orgs.pending + stats.campaigns.unverified + stats.payments.pending + stats.juniorApplications.pending;
+              if (totalNeedsReview === 0) return null;
+              const target: Section =
+                stats.orgs.pending > 0
+                  ? 'organisations'
+                  : stats.campaigns.unverified > 0
+                    ? 'campaigns'
+                    : stats.payments.pending > 0
+                      ? 'payments'
+                      : 'junior';
+              return (
+                <button
+                  onClick={() => setSection(target)}
+                  className="hidden items-center gap-1.5 rounded-full border border-gold/30 bg-gold/10 px-3 py-1.5 text-xs font-semibold text-gold sm:inline-flex"
+                >
+                  <Clock className="h-3.5 w-3.5" />
+                  {totalNeedsReview} need review
+                </button>
+              );
+            })()}
             {authMethod === 'clerk' ? (
               <UserButton afterSignOutUrl="/" appearance={{ elements: { avatarBox: 'h-9 w-9 rounded-lg' } }} />
             ) : (
@@ -354,6 +418,8 @@ export function AdminClient({
             {section === 'organisations' && <OrganisationsAdminSection teams={teams} />}
             {section === 'campaigns' && <CampaignsAdminSection campaigns={campaigns} />}
             {section === 'products' && <ProductsAdminSection products={products} />}
+            {section === 'payments' && <PaymentsAdminSection payments={payments} />}
+            {section === 'junior' && <JuniorAdminSection applications={juniorApplications} />}
             {section === 'reports' && <MemberReportsAdminSection reports={reports} />}
           </div>
         </main>
@@ -891,6 +957,8 @@ const PRODUCT_TONE: Record<ProductType, string> = {
   STOCK: 'bg-gold/15 text-gold',
   BOND: 'bg-chama/10 text-chama',
   FIXED_DEPOSIT: 'bg-destructive/10 text-destructive',
+  SAVINGS: 'bg-primary/10 text-primary',
+  JUNIOR: 'bg-chama/10 text-chama',
 };
 
 function ProductsAdminSection({ products }: { products: ProductRow[] }) {
@@ -1232,6 +1300,335 @@ function MemberReportsAdminSection({ reports }: { reports: ReportRow[] }) {
           </Card>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────── */
+/*                              PAYMENTS                            */
+/* ────────────────────────────────────────────────────────────── */
+
+type PaymentFilter = 'PENDING' | 'SUCCESS' | 'FAILED' | 'ALL';
+
+const PAYMENT_STATUS_VARIANT: Record<PaymentRow['status'], 'default' | 'secondary' | 'destructive'> = {
+  PENDING: 'secondary',
+  SUCCESS: 'default',
+  FAILED: 'destructive',
+  CANCELLED: 'destructive',
+};
+
+function PaymentsAdminSection({ payments }: { payments: PaymentRow[] }) {
+  const { toast } = useToast();
+  const [isPending, startTransition] = useTransition();
+  const [filter, setFilter] = useState<PaymentFilter>('PENDING');
+  const [query, setQuery] = useState('');
+  const [noteById, setNoteById] = useState<Record<string, string>>({});
+
+  const counts = {
+    PENDING: payments.filter((p) => p.status === 'PENDING').length,
+    SUCCESS: payments.filter((p) => p.status === 'SUCCESS').length,
+    FAILED: payments.filter((p) => p.status === 'FAILED' || p.status === 'CANCELLED').length,
+    ALL: payments.length,
+  };
+
+  const filtered = payments.filter((p) => {
+    if (filter === 'PENDING' && p.status !== 'PENDING') return false;
+    if (filter === 'SUCCESS' && p.status !== 'SUCCESS') return false;
+    if (filter === 'FAILED' && !(p.status === 'FAILED' || p.status === 'CANCELLED')) return false;
+    if (!query.trim()) return true;
+    const q = query.toLowerCase();
+    return p.memberName.toLowerCase().includes(q) || p.productName.toLowerCase().includes(q) || (p.phone ?? '').includes(q);
+  });
+
+  const handleResolve = (id: string, status: 'SUCCESS' | 'FAILED') => {
+    startTransition(async () => {
+      try {
+        await resolvePayment(id, status, noteById[id]);
+        toast({ title: status === 'SUCCESS' ? 'Payment confirmed & credited' : 'Payment marked failed' });
+        window.location.reload();
+      } catch (err: any) {
+        toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      }
+    });
+  };
+
+  if (payments.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center text-sm text-muted-foreground">
+          No payment requests yet. They'll show up here once a member pays via M-Pesa or Visa card from /accounts.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-gold/30 bg-gold/5 p-4 text-sm text-muted-foreground">
+        No live payment gateway is connected yet — confirm M-Pesa/Visa requests here once you've verified the
+        money landed, and it'll be credited to the member's account balance automatically.
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-2">
+          <FilterPill active={filter === 'PENDING'} onClick={() => setFilter('PENDING')}>
+            Pending ({counts.PENDING})
+          </FilterPill>
+          <FilterPill active={filter === 'SUCCESS'} onClick={() => setFilter('SUCCESS')}>
+            Confirmed ({counts.SUCCESS})
+          </FilterPill>
+          <FilterPill active={filter === 'FAILED'} onClick={() => setFilter('FAILED')}>
+            Failed ({counts.FAILED})
+          </FilterPill>
+          <FilterPill active={filter === 'ALL'} onClick={() => setFilter('ALL')}>
+            All ({counts.ALL})
+          </FilterPill>
+        </div>
+        <SearchBox value={query} onChange={setQuery} placeholder="Search member, account, phone…" />
+      </div>
+
+      <Card className="overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Member</TableHead>
+              <TableHead className="hidden sm:table-cell">Account</TableHead>
+              <TableHead>Channel</TableHead>
+              <TableHead>Amount</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Action</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filtered.map((p) => (
+              <TableRow key={p.id}>
+                <TableCell className="max-w-[160px]">
+                  <p className="truncate font-medium">{p.memberName}</p>
+                  {p.phone && <p className="truncate text-xs text-muted-foreground">{p.phone}</p>}
+                </TableCell>
+                <TableCell className="hidden sm:table-cell text-sm">{p.productName}</TableCell>
+                <TableCell>
+                  <span className="inline-flex items-center gap-1.5 text-sm">
+                    {p.channel === 'MPESA' ? (
+                      <Smartphone className="h-3.5 w-3.5 text-muted-foreground" />
+                    ) : (
+                      <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
+                    )}
+                    {p.channel === 'MPESA' ? 'M-Pesa' : 'Visa Card'}
+                  </span>
+                </TableCell>
+                <TableCell className="font-figures">{formatKES(p.amount)}</TableCell>
+                <TableCell>
+                  <Badge variant={PAYMENT_STATUS_VARIANT[p.status]}>{p.status}</Badge>
+                  {p.note && <p className="mt-1 text-xs text-muted-foreground">{p.note}</p>}
+                </TableCell>
+                <TableCell className="text-right">
+                  {p.status === 'PENDING' ? (
+                    <div className="flex flex-col items-end gap-1.5">
+                      <Input
+                        placeholder="Note (optional)"
+                        value={noteById[p.id] ?? ''}
+                        onChange={(e) => setNoteById((n) => ({ ...n, [p.id]: e.target.value }))}
+                        className="h-8 w-40 text-xs"
+                      />
+                      <div className="flex gap-1.5">
+                        <Button size="sm" variant="outline" className="h-7 gap-1 px-2 text-xs" onClick={() => handleResolve(p.id, 'FAILED')} disabled={isPending}>
+                          <XCircle className="h-3 w-3" /> Failed
+                        </Button>
+                        <Button size="sm" className="h-7 gap-1 px-2 text-xs" onClick={() => handleResolve(p.id, 'SUCCESS')} disabled={isPending}>
+                          <CheckCircle2 className="h-3 w-3" /> Confirm
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(p.createdAt).toLocaleDateString()}
+                    </span>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        {filtered.length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">No payments match this view.</p>}
+      </Card>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────── */
+/*                       JUNIOR ACCOUNT APPLICATIONS                */
+/* ────────────────────────────────────────────────────────────── */
+
+type JuniorFilter = 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'ALL';
+
+function JuniorAdminSection({ applications }: { applications: JuniorApplicationRow[] }) {
+  const { toast } = useToast();
+  const [isPending, startTransition] = useTransition();
+  const [filter, setFilter] = useState<JuniorFilter>('PENDING_REVIEW');
+  const [noteById, setNoteById] = useState<Record<string, string>>({});
+  const [preview, setPreview] = useState<{ url: string; label: string } | null>(null);
+
+  const counts = {
+    PENDING_REVIEW: applications.filter((a) => a.status === 'PENDING_REVIEW').length,
+    APPROVED: applications.filter((a) => a.status === 'APPROVED').length,
+    REJECTED: applications.filter((a) => a.status === 'REJECTED').length,
+    ALL: applications.length,
+  };
+
+  const filtered = filter === 'ALL' ? applications : applications.filter((a) => a.status === filter);
+
+  const handleDecide = (id: string, decision: 'APPROVED' | 'REJECTED') => {
+    startTransition(async () => {
+      try {
+        await decideJuniorApplication(id, decision, noteById[id]);
+        toast({ title: decision === 'APPROVED' ? 'Junior Account approved' : 'Application rejected' });
+        window.location.reload();
+      } catch (err: any) {
+        toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      }
+    });
+  };
+
+  if (applications.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center text-sm text-muted-foreground">
+          No Junior Account applications yet.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2">
+        <FilterPill active={filter === 'PENDING_REVIEW'} onClick={() => setFilter('PENDING_REVIEW')}>
+          Pending review ({counts.PENDING_REVIEW})
+        </FilterPill>
+        <FilterPill active={filter === 'APPROVED'} onClick={() => setFilter('APPROVED')}>
+          Approved ({counts.APPROVED})
+        </FilterPill>
+        <FilterPill active={filter === 'REJECTED'} onClick={() => setFilter('REJECTED')}>
+          Rejected ({counts.REJECTED})
+        </FilterPill>
+        <FilterPill active={filter === 'ALL'} onClick={() => setFilter('ALL')}>
+          All ({counts.ALL})
+        </FilterPill>
+      </div>
+
+      {filtered.length === 0 && (
+        <Card>
+          <CardContent className="py-12 text-center text-sm text-muted-foreground">
+            No applications match this view.
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="space-y-4">
+        {filtered.map((a) => {
+          const birthCertUrl = `data:${a.birthCertMimeType};base64,${a.birthCertData}`;
+          const childPhotoUrl = `data:${a.childPhotoMimeType};base64,${a.childPhotoData}`;
+          const isImageCert = a.birthCertMimeType.startsWith('image/');
+
+          return (
+            <Card key={a.id} className="overflow-hidden">
+              <CardHeader className="pb-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-chama/10 text-chama">
+                      <Baby className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base">{a.childFullName}</CardTitle>
+                      <CardDescription>
+                        Guardian: {a.guardianName} · {a.guardianPhone}
+                        {a.childDateOfBirth && ` · DOB ${new Date(a.childDateOfBirth).toLocaleDateString()}`}
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <Badge variant={a.status === 'APPROVED' ? 'default' : a.status === 'REJECTED' ? 'destructive' : 'secondary'}>
+                    {a.status === 'PENDING_REVIEW' ? 'Pending review' : a.status === 'APPROVED' ? 'Approved' : 'Rejected'}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <dl className="grid grid-cols-1 gap-x-4 gap-y-3 rounded-xl bg-muted/40 p-4 text-sm sm:grid-cols-3">
+                  <div><dt className="text-xs text-muted-foreground">Guardian ID/Passport</dt><dd className="font-medium">{a.guardianIdNumber}</dd></div>
+                  <div><dt className="text-xs text-muted-foreground">Guardian Phone</dt><dd className="font-medium">{a.guardianPhone}</dd></div>
+                  <div><dt className="text-xs text-muted-foreground">Guardian KRA PIN</dt><dd className="font-medium">{a.guardianKraPin}</dd></div>
+                </dl>
+
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    onClick={() => setPreview({ url: birthCertUrl, label: `${a.childFullName} — Birth Certificate` })}
+                    className="flex items-center gap-2 rounded-xl border border-border/60 px-3 py-2 text-sm transition-colors hover:border-primary/40 hover:bg-primary/5"
+                  >
+                    {isImageCert ? <ImageIcon className="h-4 w-4 text-muted-foreground" /> : <FileText className="h-4 w-4 text-muted-foreground" />}
+                    {a.birthCertFileName}
+                  </button>
+                  <button
+                    onClick={() => setPreview({ url: childPhotoUrl, label: `${a.childFullName} — Passport Photo` })}
+                    className="flex items-center gap-2 rounded-xl border border-border/60 px-3 py-2 text-sm transition-colors hover:border-primary/40 hover:bg-primary/5"
+                  >
+                    <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                    {a.childPhotoFileName}
+                  </button>
+                </div>
+
+                {a.reviewNotes && (
+                  <div className="rounded-lg bg-muted/40 p-3 text-sm">
+                    <p className="text-xs font-medium text-muted-foreground">Review note</p>
+                    <p>{a.reviewNotes}</p>
+                  </div>
+                )}
+
+                {a.status === 'PENDING_REVIEW' && (
+                  <div className="space-y-2 border-t border-border/60 pt-4">
+                    <Textarea
+                      placeholder="Note for the guardian (optional, shown if rejected)"
+                      value={noteById[a.id] ?? ''}
+                      onChange={(e) => setNoteById((n) => ({ ...n, [a.id]: e.target.value }))}
+                      rows={2}
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" onClick={() => handleDecide(a.id, 'APPROVED')} disabled={isPending} className="gap-1.5">
+                        <CheckCircle2 className="h-4 w-4" /> Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDecide(a.id, 'REJECTED')}
+                        disabled={isPending}
+                        className="gap-1.5 text-destructive hover:text-destructive"
+                      >
+                        <XCircle className="h-4 w-4" /> Reject
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      <Dialog open={!!preview} onOpenChange={(open) => !open && setPreview(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{preview?.label}</DialogTitle>
+          </DialogHeader>
+          {preview && (
+            preview.url.startsWith('data:application/pdf') ? (
+              <a href={preview.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-primary underline">
+                Open PDF in a new tab
+              </a>
+            ) : (
+              <img src={preview.url} alt={preview.label} className="max-h-[70vh] w-full rounded-lg object-contain" />
+            )
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
