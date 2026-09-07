@@ -180,12 +180,8 @@ type JuniorApplicationRow = {
   guardianIdNumber: string;
   guardianPhone: string;
   guardianKraPin: string;
-  birthCertFileName: string;
-  birthCertMimeType: string;
-  birthCertData: string;
-  childPhotoFileName: string;
-  childPhotoMimeType: string;
-  childPhotoData: string;
+  birthCertUrl: string;
+  childPhotoUrl: string;
   status: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED';
   reviewNotes: string | null;
   createdAt: string;
@@ -1527,9 +1523,7 @@ function JuniorAdminSection({ applications }: { applications: JuniorApplicationR
 
       <div className="space-y-4">
         {filtered.map((a) => {
-          const birthCertUrl = `data:${a.birthCertMimeType};base64,${a.birthCertData}`;
-          const childPhotoUrl = `data:${a.childPhotoMimeType};base64,${a.childPhotoData}`;
-          const isImageCert = a.birthCertMimeType.startsWith('image/');
+          const isImageCert = !a.birthCertUrl.toLowerCase().endsWith('.pdf');
 
           return (
             <Card key={a.id} className="overflow-hidden">
@@ -1561,18 +1555,18 @@ function JuniorAdminSection({ applications }: { applications: JuniorApplicationR
 
                 <div className="flex flex-wrap gap-3">
                   <button
-                    onClick={() => setPreview({ url: birthCertUrl, label: `${a.childFullName} — Birth Certificate` })}
+                    onClick={() => setPreview({ url: a.birthCertUrl, label: `${a.childFullName} — Birth Certificate` })}
                     className="flex items-center gap-2 rounded-xl border border-border/60 px-3 py-2 text-sm transition-colors hover:border-primary/40 hover:bg-primary/5"
                   >
                     {isImageCert ? <ImageIcon className="h-4 w-4 text-muted-foreground" /> : <FileText className="h-4 w-4 text-muted-foreground" />}
-                    {a.birthCertFileName}
+                    Birth Certificate
                   </button>
                   <button
-                    onClick={() => setPreview({ url: childPhotoUrl, label: `${a.childFullName} — Passport Photo` })}
+                    onClick={() => setPreview({ url: a.childPhotoUrl, label: `${a.childFullName} — Passport Photo` })}
                     className="flex items-center gap-2 rounded-xl border border-border/60 px-3 py-2 text-sm transition-colors hover:border-primary/40 hover:bg-primary/5"
                   >
                     <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                    {a.childPhotoFileName}
+                    Passport Photo
                   </button>
                 </div>
 
@@ -1619,7 +1613,7 @@ function JuniorAdminSection({ applications }: { applications: JuniorApplicationR
             <DialogTitle>{preview?.label}</DialogTitle>
           </DialogHeader>
           {preview && (
-            preview.url.startsWith('data:application/pdf') ? (
+            preview.url.toLowerCase().endsWith('.pdf') ? (
               <a href={preview.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-primary underline">
                 Open PDF in a new tab
               </a>

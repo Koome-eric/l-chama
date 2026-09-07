@@ -70,6 +70,7 @@ export default async function ChamaPanelPage({
       status: i.status,
       expiresAt: i.expiresAt.toISOString(),
       createdAt: i.createdAt.toISOString(),
+      token: i.token,
       canInvite: i.canInvite,
       canManagePermissions: i.canManagePermissions,
       canRemoveMembers: i.canRemoveMembers,

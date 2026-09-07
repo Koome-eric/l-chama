@@ -16,6 +16,13 @@ import {
 import { syncChamaToLudeva } from '@/lib/ludeva-sync';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
+// The domain in this address MUST be a domain verified in the Resend
+// account tied to RESEND_API_KEY above (Settings → Domains in Resend),
+// or every send will fail silently from the caller's point of view.
+// Override via EMAIL_FROM_ADDRESS once you know which domain that is —
+// this is precisely why Ludeva's own invite emails work: its Resend
+// account has "ludevaplc.co.ke" verified and sends from an address on it.
+const INVITE_FROM_ADDRESS = process.env.EMAIL_FROM_ADDRESS || 'L-CHAMA <noreply@ludevaplc.co.ke>';
 const INVITE_EXPIRY_DAYS = 7;
 const REQUIRED_GUARANTORS = 2;
 
@@ -73,10 +80,22 @@ export async function inviteChamaMember(email: string, permissions?: Partial<Cha
 
   const acceptUrl = `${appUrl()}/invite/${token}`;
 
-  if (process.env.RESEND_API_KEY) {
+  // Email delivery is best-effort: the invite row is the source of truth,
+  // and the team leader can always fall back to sharing acceptUrl directly
+  // (see the "Copy Link" action on each pending invite). We report whether
+  // the email actually went out rather than assuming success, since a
+  // silently-failed send (e.g. an unverified sending domain in Resend, or
+  // a missing RESEND_API_KEY in this environment) looks identical to a
+  // successful one unless the caller is told.
+  let emailSent = false;
+  let emailError: string | undefined;
+
+  if (!process.env.RESEND_API_KEY) {
+    emailError = 'Email sending is not configured on this server (missing RESEND_API_KEY).';
+  } else {
     try {
       await resend.emails.send({
-        from: 'L-CHAMA <noreply@lchama.ludevaplc.co.ke>',
+        from: INVITE_FROM_ADDRESS,
         to: [cleanEmail],
         subject: `You're invited to join ${ctx.team.name} on L-CHAMA`,
         html: `
@@ -87,13 +106,15 @@ export async function inviteChamaMember(email: string, permissions?: Partial<Cha
           <p style="color:#888;font-size:12px;">This invite expires in ${INVITE_EXPIRY_DAYS} days.</p>
         `,
       });
-    } catch (err) {
+      emailSent = true;
+    } catch (err: any) {
       console.error('❌ Failed to send chama invite email:', err);
+      emailError = err?.message || 'The email service rejected the message.';
     }
   }
 
   revalidatePath('/panel');
-  return { success: true, acceptUrl };
+  return { success: true, acceptUrl, emailSent, emailError };
 }
 
 export async function revokeChamaInvite(inviteId: string) {

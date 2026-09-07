@@ -57,6 +57,7 @@ type Member = {
 type Invite = {
   id: string;
   email: string;
+  token: string;
   status: string;
   expiresAt: string;
   createdAt: string;

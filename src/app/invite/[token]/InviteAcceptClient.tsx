@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useUser, SignIn, SignUp } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import {
@@ -41,6 +41,7 @@ export function ChamaInviteAcceptClient({
   const [error, setError] = useState<string | null>(null);
   const [idNumber, setIdNumber] = useState(existingIdNumber);
   const [phone, setPhone] = useState(existingPhone);
+  const [autoAccepting, setAutoAccepting] = useState(false);
 
   const returnUrl = `/invite/${token}`;
   const canAccept = idNumber.trim().length >= 4 && phone.trim().length >= 7;
@@ -54,14 +55,34 @@ export function ChamaInviteAcceptClient({
         router.replace('/panel');
       } catch (err: any) {
         setError(err.message || 'Something went wrong. Please try again.');
+        setAutoAccepting(false);
       }
     });
   };
 
-  if (!isLoaded) {
+  // If this person already has an ID number and phone on file (e.g. they
+  // signed up for L-CHAMA before, or just filled these in on this same
+  // page a moment ago after a sign-up redirect that re-rendered), skip
+  // the extra click and take them straight into the chama — this is the
+  // "redirected directly, with their permissions already applied" path.
+  useEffect(() => {
+    if (isSignedIn && user && !autoAccepting && canAccept) {
+      const currentEmail = user.primaryEmailAddress?.emailAddress || user.emailAddresses[0]?.emailAddress;
+      const emailMatches = currentEmail?.toLowerCase() === email.toLowerCase();
+      if (emailMatches && existingIdNumber && existingPhone) {
+        setAutoAccepting(true);
+        handleAccept();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSignedIn, user]);
+
+  if (!isLoaded || autoAccepting) {
     return (
       <Card className="max-w-md w-full rounded-2xl shadow-sm">
-        <CardContent className="py-10 text-center text-muted-foreground">Loading…</CardContent>
+        <CardContent className="py-10 text-center text-muted-foreground">
+          {autoAccepting ? 'Adding you to the chama…' : 'Loading…'}
+        </CardContent>
       </Card>
     );
   }

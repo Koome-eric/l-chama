@@ -547,10 +547,10 @@ model Payment {
 // ─────────────────────────────────────────────
 // Ludeva Junior Account application — a guardian applies on behalf of
 // a child, uploading KYC documents for an admin to review manually.
-// Files are stored inline (base64) since no object-storage provider is
-// configured yet; swap fileData for a blob-storage URL once one is.
-// Approving creates the child's MemberAccount against the JUNIOR
-// product.
+// Files are stored in Cloudflare R2 (same storage the main Ludeva app
+// uses for its KYC documents) via /api/upload-doc, so these fields hold
+// public URLs, not file data. Approving creates the child's
+// MemberAccount against the JUNIOR product.
 // ─────────────────────────────────────────────
 enum JuniorApplicationStatus {
   PENDING_REVIEW
@@ -571,13 +571,8 @@ model JuniorAccountApplication {
   guardianPhone    String
   guardianKraPin   String
 
-  birthCertFileName String
-  birthCertMimeType String
-  birthCertData     String // base64
-
-  childPhotoFileName String
-  childPhotoMimeType String
-  childPhotoData     String // base64
+  birthCertUrl  String // hosted file URL (Cloudflare R2 — see /api/upload-doc)
+  childPhotoUrl String // hosted file URL (Cloudflare R2 — see /api/upload-doc)
 
   status       JuniorApplicationStatus @default(PENDING_REVIEW)
   reviewNotes  String?

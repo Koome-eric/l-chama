@@ -17,6 +17,14 @@ export function PostAuthRedirect() {
         const res = await fetch('/api/auth/check-user', { cache: 'no-store' });
         const data = await res.json();
 
+        // A pending chama invite always wins — send them to accept it
+        // (which then takes them into that chama's dashboard) rather
+        // than into "create your own chama" onboarding.
+        if (data.pendingInviteToken) {
+          router.replace(`/invite/${data.pendingInviteToken}`);
+          return;
+        }
+
         if (!data.exists || !data.profileCompleted) {
           router.replace('/onboarding/profile');
           return;

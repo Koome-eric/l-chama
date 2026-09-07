@@ -89,7 +89,7 @@ export type ChamaContext = {
     lastRespectContribution: number | null;
     members: Array<{ id: string; userId: string; user: User } & ChamaPermissions>;
     invites: Array<
-      { id: string; email: string; status: string; expiresAt: Date; createdAt: Date } & ChamaPermissions
+      { id: string; email: string; token: string; status: string; expiresAt: Date; createdAt: Date } & ChamaPermissions
     >;
   };
   isOwner: boolean;

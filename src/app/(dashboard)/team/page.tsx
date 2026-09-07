@@ -31,6 +31,7 @@ export default async function TeamPage() {
     invites: ctx.team.invites.map((i: (typeof ctx.team.invites)[number]) => ({
       id: i.id,
       email: i.email,
+      token: i.token,
       status: i.status,
       expiresAt: i.expiresAt.toISOString(),
       createdAt: i.createdAt.toISOString(),

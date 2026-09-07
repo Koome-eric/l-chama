@@ -100,16 +100,32 @@ export function TeamMembersSection({
     startTransition(async () => {
       try {
         const res = await inviteChamaMember(inviteEmail, invitePerms);
-        toast({ title: 'Invite sent', description: `An invite email was sent to ${inviteEmail}.` });
+        if (res.emailSent) {
+          toast({ title: 'Invite sent', description: `An invite email was sent to ${inviteEmail}.` });
+        } else {
+          navigator.clipboard?.writeText(res.acceptUrl).catch(() => {});
+          toast({
+            title: "Invite created, but the email didn't go out",
+            description: `${res.emailError || 'The email service failed.'} The invite link has been copied — share it with ${inviteEmail} directly, or use "Copy Link" from the Pending Invites list below any time.`,
+            variant: 'destructive',
+          });
+        }
         setInviteOpen(false);
         setInviteEmail('');
         setInvitePerms(DEFAULT_INVITE_PERMISSIONS);
-        if (res.acceptUrl) navigator.clipboard?.writeText(res.acceptUrl).catch(() => {});
         window.location.reload();
       } catch (err: any) {
-        toast({ title: "Couldn't send invite", description: err.message, variant: 'destructive' });
+        toast({ title: "Couldn't create invite", description: err.message, variant: 'destructive' });
       }
     });
+  };
+
+  const handleCopyLink = (token: string) => {
+    const url = `${window.location.origin}/invite/${token}`;
+    navigator.clipboard?.writeText(url).then(
+      () => toast({ title: 'Link copied', description: 'Share it with your invitee directly.' }),
+      () => toast({ title: 'Could not copy', description: url, variant: 'destructive' })
+    );
   };
 
   const handleRevoke = (inviteId: string) => {
@@ -323,7 +339,10 @@ export function TeamMembersSection({
                     <TableCell><Badge variant="secondary">{roleSummary(inv)}</Badge></TableCell>
                     <TableCell>{new Date(inv.createdAt).toLocaleDateString()}</TableCell>
                     <TableCell>{new Date(inv.expiresAt).toLocaleDateString()}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right space-x-1">
+                      <Button size="sm" variant="outline" onClick={() => handleCopyLink(inv.token)}>
+                        Copy Link
+                      </Button>
                       <Button size="sm" variant="ghost" onClick={() => handleRevoke(inv.id)}>
                         Revoke
                       </Button>

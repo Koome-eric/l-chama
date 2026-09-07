@@ -99,54 +99,46 @@ export async function initiateCardPayment(input: { productId: string; amount: nu
 
 /* ────────────────────────────────────────────────────────────── */
 /*                    LUDEVA JUNIOR ACCOUNT APPLICATION            */
+/*                                                                   */
+/*  Files are uploaded client-side first via POST /api/upload-doc   */
+/*  (Cloudflare R2 — same storage pipeline the main Ludeva app uses  */
+/*  for its KYC documents), so this action only ever receives the   */
+/*  resulting hosted URLs, not raw file data.                       */
 /* ────────────────────────────────────────────────────────────── */
 
-const MAX_FILE_BYTES = 4 * 1024 * 1024; // 4MB
-const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
-
-async function fileToBase64(file: File, label: string) {
-  if (file.size === 0) throw new Error(`Upload ${label}.`);
-  if (file.size > MAX_FILE_BYTES) throw new Error(`${label} must be smaller than 4MB.`);
-  if (!ALLOWED_MIME.has(file.type)) throw new Error(`${label} must be a JPG, PNG, or PDF file.`);
-  const buffer = Buffer.from(await file.arrayBuffer());
-  return { fileName: file.name, mimeType: file.type, data: buffer.toString('base64') };
-}
-
-export async function submitJuniorApplication(formData: FormData) {
+export async function submitJuniorApplication(input: {
+  childFullName: string;
+  childDateOfBirth?: string;
+  guardianIdNumber: string;
+  guardianPhone: string;
+  guardianKraPin: string;
+  birthCertUrl: string;
+  childPhotoUrl: string;
+}) {
   const user = await getCurrentDbUser();
 
-  const childFullName = String(formData.get('childFullName') || '').trim();
-  const childDob = String(formData.get('childDateOfBirth') || '').trim();
-  const guardianIdNumber = String(formData.get('guardianIdNumber') || '').trim();
-  const guardianPhone = String(formData.get('guardianPhone') || '').trim();
-  const guardianKraPin = String(formData.get('guardianKraPin') || '').trim();
-  const birthCertFile = formData.get('birthCert') as File | null;
-  const childPhotoFile = formData.get('childPhoto') as File | null;
+  const childFullName = input.childFullName?.trim();
+  const guardianIdNumber = input.guardianIdNumber?.trim();
+  const guardianPhone = input.guardianPhone?.trim();
+  const guardianKraPin = input.guardianKraPin?.trim();
 
   if (!childFullName) throw new Error("Enter the child's full name.");
   if (!guardianIdNumber) throw new Error('Enter your ID/passport number.');
   if (!guardianPhone) throw new Error('Enter your phone number.');
   if (!guardianKraPin) throw new Error('Enter your KRA PIN.');
-  if (!birthCertFile) throw new Error("Upload the child's birth certificate.");
-  if (!childPhotoFile) throw new Error("Upload the child's passport photo.");
-
-  const birthCert = await fileToBase64(birthCertFile, "Child's birth certificate");
-  const childPhoto = await fileToBase64(childPhotoFile, "Child's passport photo");
+  if (!input.birthCertUrl) throw new Error("Upload the child's birth certificate.");
+  if (!input.childPhotoUrl) throw new Error("Upload the child's passport photo.");
 
   const application = await prisma.juniorAccountApplication.create({
     data: {
       guardianId: user.id,
       childFullName,
-      childDateOfBirth: childDob ? new Date(childDob) : undefined,
+      childDateOfBirth: input.childDateOfBirth ? new Date(input.childDateOfBirth) : undefined,
       guardianIdNumber,
       guardianPhone,
       guardianKraPin,
-      birthCertFileName: birthCert.fileName,
-      birthCertMimeType: birthCert.mimeType,
-      birthCertData: birthCert.data,
-      childPhotoFileName: childPhoto.fileName,
-      childPhotoMimeType: childPhoto.mimeType,
-      childPhotoData: childPhoto.data,
+      birthCertUrl: input.birthCertUrl,
+      childPhotoUrl: input.childPhotoUrl,
     },
   });
 
