@@ -4,26 +4,127 @@ import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { isPlatformAdmin } from '@/lib/admin';
-import { clearAdminSession, hasAdminSession, isValidAdminCredentials, setAdminSession } from '@/lib/admin-auth';
+import {
+  clearAdminSession,
+  getAdminSessionEmail,
+  hashPassword,
+  isSuperAdminCredentials,
+  isSuperAdminEmail,
+  setAdminSession,
+  verifyPassword,
+} from '@/lib/admin-auth';
 import { notifyUser } from '@/lib/notifications';
 import { syncChamaToLudeva } from '@/lib/ludeva-sync';
 
 async function requireAdmin() {
   const { userId: clerkId } = await auth();
-  if (!isPlatformAdmin(clerkId) && !(await hasAdminSession())) {
-    throw new Error('You are not authorized to review organisations.');
+  if (isPlatformAdmin(clerkId)) {
+    return { email: null as string | null, isSuper: true };
   }
+
+  const email = await getAdminSessionEmail();
+  if (!email) throw new Error('You are not authorized to review organisations.');
+  return { email, isSuper: isSuperAdminEmail(email) };
+}
+
+// Admin-account management (create/edit/delete other admins) is reserved
+// for the super admin — the ADMIN_EMAIL/ADMIN_PASSWORD pair from the
+// environment (or a Clerk-allowlisted platform admin).
+async function requireSuperAdmin() {
+  const ctx = await requireAdmin();
+  if (!ctx.isSuper) throw new Error('Only the super admin can manage admin accounts.');
+  return ctx;
 }
 
 export async function loginAdmin(formData: FormData) {
-  const email = String(formData.get('email') || '');
+  const email = String(formData.get('email') || '').trim();
   const password = String(formData.get('password') || '');
-  if (!isValidAdminCredentials(email, password)) {
-    return { success: false as const, error: 'Invalid email or password.' };
+
+  if (isSuperAdminCredentials(email, password)) {
+    await setAdminSession(email);
+    return { success: true as const };
   }
 
-  await setAdminSession();
-  return { success: true as const };
+  const admin = await prisma.adminAccount.findUnique({ where: { email: email.toLowerCase() } });
+  if (admin && verifyPassword(password, admin.passwordHash)) {
+    await setAdminSession(admin.email);
+    return { success: true as const };
+  }
+
+  return { success: false as const, error: 'Invalid email or password.' };
+}
+
+// ─────────────────────────────────────────────
+// Admin accounts — the super admin can create, edit and delete the
+// other admins who can sign in to /admin with their own email/password.
+// ─────────────────────────────────────────────
+
+export async function createAdminAccount(input: { email: string; password: string; fullName?: string }) {
+  await requireSuperAdmin();
+
+  const email = input.email.trim().toLowerCase();
+  if (!email || !email.includes('@')) throw new Error('Enter a valid email address.');
+  if (isSuperAdminEmail(email)) throw new Error('That email is already used by the super admin.');
+  if (!input.password || input.password.length < 8) {
+    throw new Error('Password must be at least 8 characters.');
+  }
+
+  const existing = await prisma.adminAccount.findUnique({ where: { email } });
+  if (existing) throw new Error('An admin with that email already exists.');
+
+  await prisma.adminAccount.create({
+    data: {
+      email,
+      fullName: input.fullName?.trim() || null,
+      passwordHash: hashPassword(input.password),
+    },
+  });
+
+  revalidatePath('/admin');
+  return { success: true };
+}
+
+export async function updateAdminAccount(
+  adminId: string,
+  input: { email: string; password?: string; fullName?: string }
+) {
+  await requireSuperAdmin();
+
+  const admin = await prisma.adminAccount.findUnique({ where: { id: adminId } });
+  if (!admin) throw new Error('Admin not found.');
+
+  const email = input.email.trim().toLowerCase();
+  if (!email || !email.includes('@')) throw new Error('Enter a valid email address.');
+  if (isSuperAdminEmail(email)) throw new Error('That email is reserved for the super admin.');
+  if (input.password && input.password.length < 8) {
+    throw new Error('Password must be at least 8 characters.');
+  }
+
+  if (email !== admin.email) {
+    const clash = await prisma.adminAccount.findUnique({ where: { email } });
+    if (clash) throw new Error('An admin with that email already exists.');
+  }
+
+  await prisma.adminAccount.update({
+    where: { id: adminId },
+    data: {
+      email,
+      fullName: input.fullName?.trim() || null,
+      ...(input.password ? { passwordHash: hashPassword(input.password) } : {}),
+    },
+  });
+
+  revalidatePath('/admin');
+  return { success: true };
+}
+
+export async function deleteAdminAccount(adminId: string) {
+  await requireSuperAdmin();
+
+  await prisma.adminAccount.delete({ where: { id: adminId } });
+
+  revalidatePath('/admin');
+  return { success: true };
 }
 
 export async function logoutAdmin() {

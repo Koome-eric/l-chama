@@ -27,6 +27,8 @@ import {
   CreditCard,
   FileText,
   Image as ImageIcon,
+  Users,
+  ShieldCheck,
 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -89,6 +91,9 @@ import {
   logoutAdmin,
   resolvePayment,
   decideJuniorApplication,
+  createAdminAccount,
+  updateAdminAccount,
+  deleteAdminAccount,
 } from './actions';
 
 /* ────────────────────────────────────────────────────────────── */
@@ -187,6 +192,13 @@ type JuniorApplicationRow = {
   createdAt: string;
 };
 
+type AdminRow = {
+  id: string;
+  email: string;
+  fullName: string | null;
+  createdAt: string;
+};
+
 type Stats = {
   totalUsers: number;
   totalPooledFunds: number;
@@ -206,7 +218,7 @@ type Stats = {
   monthlyOrgSubmissions: { label: string; value: number }[];
 };
 
-type Section = 'overview' | 'organisations' | 'campaigns' | 'products' | 'reports' | 'payments' | 'junior';
+type Section = 'overview' | 'organisations' | 'campaigns' | 'products' | 'reports' | 'payments' | 'junior' | 'admins';
 
 const TYPE_LABEL: Record<ProductType, string> = {
   MMF: 'Money Market Fund',
@@ -235,8 +247,8 @@ const STATUS_VARIANT: Record<TeamRow['approvalStatus'], 'default' | 'secondary' 
 /*                          NAV CONFIGURATION                      */
 /* ────────────────────────────────────────────────────────────── */
 
-function useNavItems(stats: Stats) {
-  return [
+function useNavItems(stats: Stats, isSuperAdmin: boolean) {
+  const items = [
     { id: 'overview' as Section, label: 'Overview', icon: LayoutDashboard, badge: 0 },
     { id: 'organisations' as Section, label: 'Organisations', icon: Building2, badge: stats.orgs.pending },
     { id: 'campaigns' as Section, label: 'Campaigns', icon: HeartHandshake, badge: stats.campaigns.unverified },
@@ -245,6 +257,10 @@ function useNavItems(stats: Stats) {
     { id: 'junior' as Section, label: 'Junior Accounts', icon: Baby, badge: stats.juniorApplications.pending },
     { id: 'reports' as Section, label: 'Member Reports', icon: FileSpreadsheet, badge: 0 },
   ];
+  if (isSuperAdmin) {
+    items.push({ id: 'admins' as Section, label: 'Admins', icon: Users, badge: 0 });
+  }
+  return items;
 }
 
 const SECTION_META: Record<Section, { title: string; description: string }> = {
@@ -255,6 +271,7 @@ const SECTION_META: Record<Section, { title: string; description: string }> = {
   payments: { title: 'Payments', description: 'M-Pesa and Visa card requests from member accounts, awaiting confirmation.' },
   junior: { title: 'Junior Accounts', description: "Review Ludeva Junior Account applications and their KYC documents." },
   reports: { title: 'Member Reports', description: 'Sync and review performance data from Google Sheets.' },
+  admins: { title: 'Admins', description: 'Create, edit and remove the admins who can sign in to this panel.' },
 };
 
 /* ────────────────────────────────────────────────────────────── */
@@ -270,6 +287,9 @@ export function AdminClient({
   juniorApplications,
   stats,
   authMethod,
+  admins,
+  isSuperAdmin,
+  currentAdminEmail,
 }: {
   teams: TeamRow[];
   campaigns: CampaignRow[];
@@ -279,9 +299,12 @@ export function AdminClient({
   juniorApplications: JuniorApplicationRow[];
   stats: Stats;
   authMethod: 'clerk' | 'password';
+  admins: AdminRow[];
+  isSuperAdmin: boolean;
+  currentAdminEmail: string | null;
 }) {
   const [section, setSection] = useState<Section>('overview');
-  const navItems = useNavItems(stats);
+  const navItems = useNavItems(stats, isSuperAdmin);
   const router = useRouter();
   const [loggingOut, startLogout] = useTransition();
 
@@ -417,6 +440,9 @@ export function AdminClient({
             {section === 'payments' && <PaymentsAdminSection payments={payments} />}
             {section === 'junior' && <JuniorAdminSection applications={juniorApplications} />}
             {section === 'reports' && <MemberReportsAdminSection reports={reports} />}
+            {section === 'admins' && isSuperAdmin && (
+              <AdminsAdminSection admins={admins} currentAdminEmail={currentAdminEmail} />
+            )}
           </div>
         </main>
       </SidebarInset>
@@ -1155,6 +1181,222 @@ function ProductsAdminSection({ products }: { products: ProductRow[] }) {
       <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
         <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Edit {editing?.name}</DialogTitle></DialogHeader>
+          {formFields}
+          <DialogFooter>
+            <Button onClick={handleUpdate} disabled={isPending}>{isPending ? 'Saving…' : 'Save'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────── */
+/*                               ADMINS                              */
+/* ────────────────────────────────────────────────────────────── */
+
+const EMPTY_ADMIN_FORM = { email: '', password: '', fullName: '' };
+
+function AdminsAdminSection({
+  admins,
+  currentAdminEmail,
+}: {
+  admins: AdminRow[];
+  currentAdminEmail: string | null;
+}) {
+  const { toast } = useToast();
+  const [isPending, startTransition] = useTransition();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editing, setEditing] = useState<AdminRow | null>(null);
+  const [form, setForm] = useState(EMPTY_ADMIN_FORM);
+
+  const openCreate = () => {
+    setForm(EMPTY_ADMIN_FORM);
+    setCreateOpen(true);
+  };
+
+  const openEdit = (a: AdminRow) => {
+    setEditing(a);
+    setForm({ email: a.email, password: '', fullName: a.fullName ?? '' });
+  };
+
+  const handleCreate = () => {
+    startTransition(async () => {
+      try {
+        await createAdminAccount({
+          email: form.email,
+          password: form.password,
+          fullName: form.fullName || undefined,
+        });
+        toast({ title: 'Admin created', description: `${form.email} can now sign in to /admin.` });
+        setCreateOpen(false);
+        window.location.reload();
+      } catch (err: any) {
+        toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      }
+    });
+  };
+
+  const handleUpdate = () => {
+    if (!editing) return;
+    startTransition(async () => {
+      try {
+        await updateAdminAccount(editing.id, {
+          email: form.email,
+          password: form.password || undefined,
+          fullName: form.fullName || undefined,
+        });
+        toast({ title: 'Admin updated' });
+        setEditing(null);
+        window.location.reload();
+      } catch (err: any) {
+        toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      }
+    });
+  };
+
+  const handleDelete = (a: AdminRow) => {
+    if (!confirm(`Remove admin access for ${a.email}? They will no longer be able to sign in.`)) return;
+    startTransition(async () => {
+      try {
+        await deleteAdminAccount(a.id);
+        toast({ title: 'Admin removed' });
+        window.location.reload();
+      } catch (err: any) {
+        toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      }
+    });
+  };
+
+  const formFields = (
+    <div className="space-y-3">
+      <div>
+        <Label htmlFor="a-email">Email</Label>
+        <Input
+          id="a-email"
+          type="email"
+          value={form.email}
+          onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+        />
+      </div>
+      <div>
+        <Label htmlFor="a-name">Full name (optional)</Label>
+        <Input
+          id="a-name"
+          value={form.fullName}
+          onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
+        />
+      </div>
+      <div>
+        <Label htmlFor="a-password">{editing ? 'New password (leave blank to keep current)' : 'Password'}</Label>
+        <Input
+          id="a-password"
+          type="password"
+          autoComplete="new-password"
+          value={form.password}
+          onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+        />
+        <p className="mt-1 text-xs text-muted-foreground">At least 8 characters.</p>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-muted-foreground">
+          Admins you create sign in at /admin with the email and password set here.
+        </p>
+        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm" onClick={openCreate} className="gap-1.5">
+              <Plus className="h-4 w-4" /> Add Admin
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>New Admin</DialogTitle>
+              <DialogDescription>They'll be able to sign in to this panel with these credentials.</DialogDescription>
+            </DialogHeader>
+            {formFields}
+            <DialogFooter>
+              <Button onClick={handleCreate} disabled={isPending}>{isPending ? 'Creating…' : 'Create'}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <ShieldCheck className="h-4 w-4" />
+            </div>
+            <div>
+              <CardTitle className="text-base">Super admin</CardTitle>
+              <CardDescription>
+                {currentAdminEmail ?? 'Signed in via Clerk'} — always has full access and can't be edited or removed here.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+      </Card>
+
+      {admins.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-sm text-muted-foreground">
+            No other admins yet. Add one to let them sign in to this panel.
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Added</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {admins.map((a) => (
+                  <TableRow key={a.id}>
+                    <TableCell className="font-medium">{a.fullName || '—'}</TableCell>
+                    <TableCell className="text-muted-foreground">{a.email}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {new Date(a.createdAt).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button size="sm" variant="outline" className="gap-1.5" onClick={() => openEdit(a)}>
+                          <Pencil className="h-3.5 w-3.5" /> Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1.5 text-destructive hover:text-destructive"
+                          onClick={() => handleDelete(a)}
+                          disabled={isPending}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" /> Delete
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit {editing?.email}</DialogTitle>
+          </DialogHeader>
           {formFields}
           <DialogFooter>
             <Button onClick={handleUpdate} disabled={isPending}>{isPending ? 'Saving…' : 'Save'}</Button>

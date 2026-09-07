@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
 import { isPlatformAdmin } from '@/lib/admin';
-import { hasAdminSession } from '@/lib/admin-auth';
+import { getAdminSessionEmail, isSuperAdminEmail } from '@/lib/admin-auth';
 import { AdminClient } from './AdminClient';
 import { AdminLogin } from './AdminLogin';
 import { SidebarProvider } from '@/components/ui/sidebar';
@@ -9,14 +9,19 @@ import { SidebarProvider } from '@/components/ui/sidebar';
 export default async function AdminPage() {
   const { userId: clerkId } = await auth();
   const viaClerk = isPlatformAdmin(clerkId);
-  const viaPassword = await hasAdminSession();
+  const sessionEmail = await getAdminSessionEmail();
+  const viaPassword = !!sessionEmail;
   const hasAccess = viaClerk || viaPassword;
 
   if (!hasAccess) {
     return <AdminLogin />;
   }
 
-  const [teams, campaigns, products, reports, totalUsers, pooledFundsAgg, payments, juniorApplications] = await Promise.all([
+  // The super admin (env-configured, or any Clerk-allowlisted platform
+  // admin) is the only one who can create/edit/delete other admins.
+  const isSuperAdmin = viaClerk || isSuperAdminEmail(sessionEmail);
+
+  const [teams, campaigns, products, reports, totalUsers, pooledFundsAgg, payments, juniorApplications, adminAccounts] = await Promise.all([
     prisma.team.findMany({ include: { owner: true }, orderBy: { submittedAt: 'desc' } }),
     prisma.campaign.findMany({ include: { creator: true }, orderBy: { createdAt: 'desc' } }),
     prisma.investmentProduct.findMany({ orderBy: { createdAt: 'desc' } }),
@@ -33,6 +38,7 @@ export default async function AdminPage() {
       orderBy: { createdAt: 'desc' },
       take: 100,
     }),
+    prisma.adminAccount.findMany({ orderBy: { createdAt: 'desc' } }),
   ]);
 
   const data = teams.map((t: (typeof teams)[number]) => ({
@@ -125,6 +131,13 @@ export default async function AdminPage() {
     createdAt: a.createdAt.toISOString(),
   }));
 
+  const adminAccountData = adminAccounts.map((a: (typeof adminAccounts)[number]) => ({
+    id: a.id,
+    email: a.email,
+    fullName: a.fullName,
+    createdAt: a.createdAt.toISOString(),
+  }));
+
   // ── Aggregate stats for the Overview dashboard ──
   const now = new Date();
   const monthLabels: string[] = [];
@@ -188,6 +201,9 @@ export default async function AdminPage() {
         juniorApplications={juniorApplicationData}
         stats={stats}
         authMethod={viaClerk ? 'clerk' : 'password'}
+        admins={adminAccountData}
+        isSuperAdmin={isSuperAdmin}
+        currentAdminEmail={sessionEmail}
       />
     </SidebarProvider>
   );
