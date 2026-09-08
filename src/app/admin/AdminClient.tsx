@@ -29,6 +29,7 @@ import {
   Image as ImageIcon,
   Users,
   ShieldCheck,
+  Coins,
 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -88,6 +89,10 @@ import {
   toggleInvestmentProductActive,
   syncMemberReportsCsv,
   deleteMemberReport,
+  syncSavingsCsv,
+  createSavingsEntry,
+  updateSavingsEntry,
+  deleteSavingsEntry,
   logoutAdmin,
   resolvePayment,
   decideJuniorApplication,
@@ -165,6 +170,24 @@ type ReportRow = {
   uploadedAt: string;
 };
 
+type SavingsRow = {
+  id: string;
+  teamName: string | null;
+  memberEmail: string;
+  memberName: string | null;
+  accountNo: string | null;
+  date: string | null;
+  openingBalance: string | null;
+  deposit: string | null;
+  withdrawal: string | null;
+  monthlyRate: string | null;
+  interestEarned: string | null;
+  closingBalance: string | null;
+  periodLabel: string | null;
+  notes: string | null;
+  uploadedAt: string;
+};
+
 type PaymentRow = {
   id: string;
   memberName: string;
@@ -213,12 +236,13 @@ type Stats = {
   };
   products: { total: number; active: number; inactive: number };
   reports: { total: number; matched: number };
+  savings: { total: number; matched: number };
   payments: { total: number; pending: number };
   juniorApplications: { total: number; pending: number };
   monthlyOrgSubmissions: { label: string; value: number }[];
 };
 
-type Section = 'overview' | 'organisations' | 'campaigns' | 'products' | 'reports' | 'payments' | 'junior' | 'admins';
+type Section = 'overview' | 'organisations' | 'campaigns' | 'products' | 'reports' | 'savings' | 'payments' | 'junior' | 'admins';
 
 const TYPE_LABEL: Record<ProductType, string> = {
   MMF: 'Money Market Fund',
@@ -256,6 +280,7 @@ function useNavItems(stats: Stats, isSuperAdmin: boolean) {
     { id: 'payments' as Section, label: 'Payments', icon: Wallet, badge: stats.payments.pending },
     { id: 'junior' as Section, label: 'Junior Accounts', icon: Baby, badge: stats.juniorApplications.pending },
     { id: 'reports' as Section, label: 'Member Reports', icon: FileSpreadsheet, badge: 0 },
+    { id: 'savings' as Section, label: 'Savings Accounts', icon: Coins, badge: 0 },
   ];
   if (isSuperAdmin) {
     items.push({ id: 'admins' as Section, label: 'Admins', icon: Users, badge: 0 });
@@ -271,6 +296,7 @@ const SECTION_META: Record<Section, { title: string; description: string }> = {
   payments: { title: 'Payments', description: 'M-Pesa and Visa card requests from member accounts, awaiting confirmation.' },
   junior: { title: 'Junior Accounts', description: "Review Ludeva Junior Account applications and their KYC documents." },
   reports: { title: 'Member Reports', description: 'Sync and review performance data from Google Sheets.' },
+  savings: { title: 'Savings Accounts', description: 'Sync, correct, or manually add running-balance Savings entries.' },
   admins: { title: 'Admins', description: 'Create, edit and remove the admins who can sign in to this panel.' },
 };
 
@@ -283,6 +309,7 @@ export function AdminClient({
   campaigns,
   products,
   reports,
+  savingsEntries,
   payments,
   juniorApplications,
   stats,
@@ -295,6 +322,7 @@ export function AdminClient({
   campaigns: CampaignRow[];
   products: ProductRow[];
   reports: ReportRow[];
+  savingsEntries: SavingsRow[];
   payments: PaymentRow[];
   juniorApplications: JuniorApplicationRow[];
   stats: Stats;
@@ -440,6 +468,7 @@ export function AdminClient({
             {section === 'payments' && <PaymentsAdminSection payments={payments} />}
             {section === 'junior' && <JuniorAdminSection applications={juniorApplications} />}
             {section === 'reports' && <MemberReportsAdminSection reports={reports} />}
+            {section === 'savings' && <SavingsAdminSection entries={savingsEntries} />}
             {section === 'admins' && isSuperAdmin && (
               <AdminsAdminSection admins={admins} currentAdminEmail={currentAdminEmail} />
             )}
@@ -1538,6 +1567,287 @@ function MemberReportsAdminSection({ reports }: { reports: ReportRow[] }) {
           </Card>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────── */
+/*                        SAVINGS ACCOUNTS                          */
+/* ────────────────────────────────────────────────────────────── */
+
+const SAVINGS_FORM_FIELDS: { key: keyof SavingsEntryForm; label: string; placeholder?: string }[] = [
+  { key: 'memberEmail', label: 'Member email', placeholder: 'member@example.com' },
+  { key: 'memberName', label: 'Member name' },
+  { key: 'accountNo', label: 'Account no.', placeholder: 'SAV-0012' },
+  { key: 'date', label: 'Date', placeholder: '2026-08-01' },
+  { key: 'openingBalance', label: 'Opening balance' },
+  { key: 'deposit', label: 'Deposit' },
+  { key: 'withdrawal', label: 'Withdrawal' },
+  { key: 'monthlyRate', label: 'Monthly rate', placeholder: '0.7%' },
+  { key: 'interestEarned', label: 'Interest earned' },
+  { key: 'closingBalance', label: 'Closing balance' },
+  { key: 'periodLabel', label: 'Period', placeholder: 'Aug 2026' },
+  { key: 'notes', label: 'Notes' },
+];
+
+type SavingsEntryForm = {
+  memberEmail: string;
+  memberName: string;
+  accountNo: string;
+  date: string;
+  openingBalance: string;
+  deposit: string;
+  withdrawal: string;
+  monthlyRate: string;
+  interestEarned: string;
+  closingBalance: string;
+  periodLabel: string;
+  notes: string;
+};
+
+const EMPTY_SAVINGS_FORM: SavingsEntryForm = {
+  memberEmail: '',
+  memberName: '',
+  accountNo: '',
+  date: '',
+  openingBalance: '',
+  deposit: '',
+  withdrawal: '',
+  monthlyRate: '',
+  interestEarned: '',
+  closingBalance: '',
+  periodLabel: '',
+  notes: '',
+};
+
+function rowToForm(r: SavingsRow): SavingsEntryForm {
+  return {
+    memberEmail: r.memberEmail,
+    memberName: r.memberName ?? '',
+    accountNo: r.accountNo ?? '',
+    date: r.date ?? '',
+    openingBalance: r.openingBalance ?? '',
+    deposit: r.deposit ?? '',
+    withdrawal: r.withdrawal ?? '',
+    monthlyRate: r.monthlyRate ?? '',
+    interestEarned: r.interestEarned ?? '',
+    closingBalance: r.closingBalance ?? '',
+    periodLabel: r.periodLabel ?? '',
+    notes: r.notes ?? '',
+  };
+}
+
+function SavingsAdminSection({ entries }: { entries: SavingsRow[] }) {
+  const { toast } = useToast();
+  const [isPending, startTransition] = useTransition();
+  const [csv, setCsv] = useState('');
+  const [query, setQuery] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState<SavingsEntryForm>(EMPTY_SAVINGS_FORM);
+
+  const handleSync = () => {
+    startTransition(async () => {
+      try {
+        const res = await syncSavingsCsv(csv);
+        toast({
+          title: 'Synced',
+          description: `Imported ${res.imported} row${res.imported === 1 ? '' : 's'} (${res.matched} matched to a chama).`,
+        });
+        setCsv('');
+        window.location.reload();
+      } catch (err: any) {
+        toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      }
+    });
+  };
+
+  const openAddDialog = () => {
+    setEditingId(null);
+    setForm(EMPTY_SAVINGS_FORM);
+    setDialogOpen(true);
+  };
+
+  const openEditDialog = (row: SavingsRow) => {
+    setEditingId(row.id);
+    setForm(rowToForm(row));
+    setDialogOpen(true);
+  };
+
+  const handleSave = () => {
+    if (!form.memberEmail.trim()) {
+      toast({ title: 'Error', description: 'A member email is required.', variant: 'destructive' });
+      return;
+    }
+    startTransition(async () => {
+      try {
+        if (editingId) {
+          await updateSavingsEntry(editingId, form);
+          toast({ title: 'Entry updated' });
+        } else {
+          await createSavingsEntry(form);
+          toast({ title: 'Entry added' });
+        }
+        setDialogOpen(false);
+        window.location.reload();
+      } catch (err: any) {
+        toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      }
+    });
+  };
+
+  const handleDelete = (id: string) => {
+    if (!confirm('Delete this savings entry?')) return;
+    startTransition(async () => {
+      try {
+        await deleteSavingsEntry(id);
+        window.location.reload();
+      } catch (err: any) {
+        toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      }
+    });
+  };
+
+  const filtered = entries.filter((r) => {
+    if (!query.trim()) return true;
+    const q = query.toLowerCase();
+    return (
+      (r.memberName ?? '').toLowerCase().includes(q) ||
+      r.memberEmail.toLowerCase().includes(q) ||
+      (r.teamName ?? '').toLowerCase().includes(q) ||
+      (r.accountNo ?? '').toLowerCase().includes(q)
+    );
+  });
+
+  return (
+    <div className="space-y-6">
+      <Card className="overflow-hidden border-primary/20 bg-gradient-to-br from-primary/[0.04] to-transparent">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <UploadCloud className="h-5 w-5" />
+            </div>
+            <div>
+              <CardTitle className="text-base">Sync from Google Sheets</CardTitle>
+              <CardDescription>
+                Paste a CSV export of the Savings Data tab (header row required:{' '}
+                <code>
+                  memberEmail,memberName,accountNo,date,openingBalance,deposit,withdrawal,monthlyRate,interestEarned,closingBalance,periodLabel,notes
+                </code>
+                ). For automatic syncing, point a Google Sheets Apps Script trigger at{' '}
+                <code>/api/savings/sync</code> instead — same column names, sent as JSON under{' '}
+                <code>records</code>.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Textarea
+            rows={6}
+            placeholder="memberEmail,memberName,accountNo,date,openingBalance,deposit,withdrawal,monthlyRate,interestEarned,closingBalance,periodLabel,notes"
+            value={csv}
+            onChange={(e) => setCsv(e.target.value)}
+            className="font-figures"
+          />
+          <Button onClick={handleSync} disabled={isPending || !csv.trim()} className="gap-1.5">
+            <UploadCloud className="h-4 w-4" /> {isPending ? 'Syncing…' : 'Sync Rows'}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <div className="space-y-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="font-headline text-lg font-semibold">Savings Entries ({entries.length})</h2>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <SearchBox value={query} onChange={setQuery} placeholder="Search member, chama, account…" />
+            <Button size="sm" onClick={openAddDialog} className="gap-1.5">
+              <Plus className="h-4 w-4" /> Add Entry
+            </Button>
+          </div>
+        </div>
+
+        {entries.length === 0 ? (
+          <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">No savings entries yet.</CardContent></Card>
+        ) : (
+          <Card className="overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Member</TableHead>
+                  <TableHead className="hidden sm:table-cell">Chama</TableHead>
+                  <TableHead className="hidden md:table-cell">Period</TableHead>
+                  <TableHead className="hidden lg:table-cell">Opening</TableHead>
+                  <TableHead className="hidden lg:table-cell">Deposit</TableHead>
+                  <TableHead className="hidden xl:table-cell">Withdrawal</TableHead>
+                  <TableHead>Closing Bal.</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="max-w-[180px]">
+                      <p className="truncate font-medium">{r.memberName || r.memberEmail}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {r.memberEmail}
+                        {r.accountNo ? ` · ${r.accountNo}` : ''}
+                      </p>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      {r.teamName ? r.teamName : <span className="text-xs text-muted-foreground">Unmatched</span>}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                      {r.periodLabel || r.date || '—'}
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell font-figures text-sm">{r.openingBalance || '—'}</TableCell>
+                    <TableCell className="hidden lg:table-cell font-figures text-sm">{r.deposit || '—'}</TableCell>
+                    <TableCell className="hidden xl:table-cell font-figures text-sm">{r.withdrawal || '—'}</TableCell>
+                    <TableCell className="font-figures text-sm">{r.closingBalance || '—'}</TableCell>
+                    <TableCell className="text-right space-x-1">
+                      <Button size="sm" variant="ghost" onClick={() => openEditDialog(r)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => handleDelete(r.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {filtered.length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">No rows match your search.</p>}
+          </Card>
+        )}
+      </div>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingId ? 'Edit Savings Entry' : 'Add Savings Entry'}</DialogTitle>
+            <DialogDescription>
+              {editingId
+                ? 'Correct any field on this entry.'
+                : 'Manually add a savings entry — useful for one-off corrections outside the normal Sheets sync.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {SAVINGS_FORM_FIELDS.map((f) => (
+              <div key={f.key} className={cn('space-y-1.5', f.key === 'notes' && 'sm:col-span-2')}>
+                <Label htmlFor={`savings-${f.key}`}>{f.label}</Label>
+                <Input
+                  id={`savings-${f.key}`}
+                  placeholder={f.placeholder}
+                  value={form[f.key]}
+                  onChange={(e) => setForm((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                />
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button onClick={handleSave} disabled={isPending}>{isPending ? 'Saving…' : 'Save'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

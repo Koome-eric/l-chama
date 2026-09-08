@@ -8,7 +8,7 @@ import { CountUp } from '@/components/motion/CountUp';
 export default async function ReportsPage() {
   const { ctx } = await requirePanelAccess('/reports');
 
-  const [loanAccount, loanRequests, investments, memberReports] = await Promise.all([
+  const [loanAccount, loanRequests, investments, memberReports, savingsEntries] = await Promise.all([
     prisma.loanAccount.findUnique({ where: { teamId: ctx.team.id } }),
     prisma.loanRequest.findMany({
       where: { teamId: ctx.team.id },
@@ -19,6 +19,11 @@ export default async function ReportsPage() {
       include: { product: true },
     }),
     prisma.memberReport.findMany({
+      where: { teamId: ctx.team.id },
+      orderBy: { uploadedAt: 'desc' },
+      take: 25,
+    }),
+    prisma.savingsEntry.findMany({
       where: { teamId: ctx.team.id },
       orderBy: { uploadedAt: 'desc' },
       take: 25,
@@ -104,7 +109,7 @@ export default async function ReportsPage() {
       {memberReports.length > 0 && (
         <Card className="rounded-2xl shadow-sm">
           <CardHeader>
-            <CardTitle>Member Performance</CardTitle>
+            <CardTitle>Member Performance — Investments</CardTitle>
             <CardDescription>Synced in from Google Sheets by your admin.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -117,6 +122,31 @@ export default async function ReportsPage() {
                   </p>
                 </div>
                 {r.closingBal && <Badge variant="secondary">Closing: {r.closingBal}</Badge>}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {savingsEntries.length > 0 && (
+        <Card className="rounded-2xl shadow-sm">
+          <CardHeader>
+            <CardTitle>Member Performance — Savings</CardTitle>
+            <CardDescription>
+              Running-balance Savings entries, synced in separately from Investments by your admin.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {savingsEntries.map((s: (typeof savingsEntries)[number]) => (
+              <div key={s.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm">
+                <div>
+                  <p className="font-medium">{s.memberName || s.memberEmail}</p>
+                  <p className="text-muted-foreground">
+                    {s.periodLabel || s.date || '—'} · Opening {s.openingBalance || '—'} · Interest{' '}
+                    {s.interestEarned || '—'}
+                  </p>
+                </div>
+                {s.closingBalance && <Badge variant="secondary">Closing: {s.closingBalance}</Badge>}
               </div>
             ))}
           </CardContent>

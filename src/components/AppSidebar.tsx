@@ -18,6 +18,7 @@ import {
   HeartHandshake,
   PiggyBank,
   Wallet,
+  Coins,
 } from 'lucide-react';
 
 import {
@@ -45,6 +46,7 @@ const menuItems = [
   { href: '/panel?tab=loan-account', label: 'Contribute', icon: HandCoins, match: '/panel' },
   { href: '/accounts', label: 'Accounts', icon: Wallet },
   { href: '/invest', label: 'Invest', icon: PiggyBank },
+  { href: '/savings', label: 'Savings', icon: Coins },
   { href: '/campaigns', label: 'Campaigns', icon: HeartHandshake },
   { href: '/deposit', label: 'Deposit', icon: ArrowDownToLine },
   { href: '/withdraw', label: 'Withdraw', icon: ArrowUpFromLine },

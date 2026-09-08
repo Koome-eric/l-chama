@@ -407,6 +407,157 @@ export async function deleteMemberReport(reportId: string) {
 }
 
 // ─────────────────────────────────────────────
+// Savings Account — a second, running-balance product alongside
+// Investments. Entries are fed from a dedicated "Savings Data" tab in
+// the same workbook (pasted here as CSV, or pushed automatically via
+// /api/savings/sync from an Apps Script trigger — same column names,
+// sent as JSON under "records"), and can be reviewed, corrected, or
+// added by hand from the admin Savings screen.
+// ─────────────────────────────────────────────
+
+function parseSavingsCsv(csvText: string) {
+  const lines = csvText.trim().split(/\r?\n/).filter((l) => l.trim().length > 0);
+  if (lines.length < 2) throw new Error('CSV needs a header row plus at least one data row.');
+
+  const header = lines[0].split(',').map((h) => h.trim().toLowerCase());
+  const col = (name: string) => header.indexOf(name);
+
+  const emailIdx = col('memberemail') !== -1 ? col('memberemail') : col('email');
+  if (emailIdx === -1) throw new Error('CSV header must include a "memberEmail" column.');
+
+  return lines.slice(1).map((line) => {
+    const cells = line.split(',').map((c) => c.trim());
+    const get = (name: string) => {
+      const idx = col(name);
+      return idx === -1 ? undefined : cells[idx] || undefined;
+    };
+    return {
+      memberEmail: cells[emailIdx]?.toLowerCase(),
+      memberName: get('membername') || get('name'),
+      accountNo: get('accountno') || get('account'),
+      date: get('date'),
+      openingBalance: get('openingbalance'),
+      deposit: get('deposit'),
+      withdrawal: get('withdrawal'),
+      monthlyRate: get('monthlyrate') || get('rate'),
+      interestEarned: get('interestearned') || get('interest'),
+      closingBalance: get('closingbalance') || get('closing_balance') || get('closingbal'),
+      periodLabel: get('periodlabel') || get('period'),
+      notes: get('notes'),
+    };
+  });
+}
+
+async function matchSavingsRowsToTeams(rows: { memberEmail?: string }[]) {
+  const emails = [...new Set(rows.map((r) => r.memberEmail).filter(Boolean))] as string[];
+  const users = await prisma.user.findMany({ where: { email: { in: emails } } });
+  const userByEmail = new Map(
+    users
+      .filter((u): u is typeof u & { email: string } => !!u.email)
+      .map((u) => [u.email.toLowerCase(), u])
+  );
+
+  const memberships = await prisma.teamMembership.findMany({
+    where: { userId: { in: users.map((u) => u.id) } },
+  });
+  const teamIdByUserId = new Map(memberships.map((m) => [m.userId, m.teamId]));
+
+  const owners = await prisma.team.findMany({ where: { ownerId: { in: users.map((u) => u.id) } } });
+  const teamIdByOwnerId = new Map(owners.map((t) => [t.ownerId, t.id]));
+
+  return (email: string) => {
+    const user = userByEmail.get(email);
+    return user ? teamIdByOwnerId.get(user.id) || teamIdByUserId.get(user.id) || null : null;
+  };
+}
+
+export async function syncSavingsCsv(csvText: string) {
+  await requireAdmin();
+
+  const rows = parseSavingsCsv(csvText).filter((r) => r.memberEmail);
+  if (rows.length === 0) throw new Error('No valid rows found in that CSV.');
+
+  const teamIdFor = await matchSavingsRowsToTeams(rows);
+  let matched = 0;
+
+  await prisma.$transaction(
+    rows.map((row) => {
+      const teamId = teamIdFor(row.memberEmail!);
+      if (teamId) matched += 1;
+      return prisma.savingsEntry.create({
+        data: { ...row, memberEmail: row.memberEmail!, teamId },
+      });
+    })
+  );
+
+  revalidatePath('/admin');
+  revalidatePath('/reports');
+  revalidatePath('/savings');
+  return { success: true, imported: rows.length, matched };
+}
+
+export type SavingsEntryInput = {
+  memberEmail: string;
+  memberName?: string;
+  accountNo?: string;
+  date?: string;
+  openingBalance?: string;
+  deposit?: string;
+  withdrawal?: string;
+  monthlyRate?: string;
+  interestEarned?: string;
+  closingBalance?: string;
+  periodLabel?: string;
+  notes?: string;
+};
+
+export async function createSavingsEntry(input: SavingsEntryInput) {
+  await requireAdmin();
+
+  const memberEmail = input.memberEmail.toLowerCase().trim();
+  if (!memberEmail) throw new Error('A member email is required.');
+
+  const teamIdFor = await matchSavingsRowsToTeams([{ memberEmail }]);
+
+  await prisma.savingsEntry.create({
+    data: { ...input, memberEmail, teamId: teamIdFor(memberEmail) },
+  });
+
+  revalidatePath('/admin');
+  revalidatePath('/reports');
+  revalidatePath('/savings');
+  return { success: true };
+}
+
+export async function updateSavingsEntry(entryId: string, input: SavingsEntryInput) {
+  await requireAdmin();
+
+  const memberEmail = input.memberEmail.toLowerCase().trim();
+  if (!memberEmail) throw new Error('A member email is required.');
+
+  const teamIdFor = await matchSavingsRowsToTeams([{ memberEmail }]);
+
+  await prisma.savingsEntry.update({
+    where: { id: entryId },
+    data: { ...input, memberEmail, teamId: teamIdFor(memberEmail) },
+  });
+
+  revalidatePath('/admin');
+  revalidatePath('/reports');
+  revalidatePath('/savings');
+  return { success: true };
+}
+
+export async function deleteSavingsEntry(entryId: string) {
+  await requireAdmin();
+  await prisma.savingsEntry.delete({ where: { id: entryId } });
+  revalidatePath('/admin');
+  revalidatePath('/reports');
+  revalidatePath('/savings');
+  return { success: true };
+}
+
+// ─────────────────────────────────────────────
 // Payments — M-Pesa / Visa card requests logged from a member's
 // /accounts page. No gateway is wired up yet, so an admin resolves
 // these manually: SUCCESS credits the member's MemberAccount balance,

@@ -149,6 +149,7 @@ model Team {
   loanRequests    LoanRequest[]
   investments     TeamInvestment[]
   memberReports   MemberReport[]
+  savingsEntries  SavingsEntry[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -615,6 +616,40 @@ model MemberReport {
   updatedAt  DateTime @updatedAt
 
   @@map("memberreport")
+}
+
+// Savings Account entries, fed from a dedicated "Savings Data" sheet in
+// the same Excel workbook Ludeva already uses for Investments (separate
+// tab, separate columns). Unlike Investments (per-transaction: interest
+// = principal x rate on the amount in that row), Savings uses a running
+// balance: each entry carries forward the previous closing balance, adds
+// a deposit, subtracts a withdrawal, then applies interest to the
+// running balance. Pushed in via the same Apps-Script-to-webhook pattern
+// as MemberReport (see /api/savings/sync), or added/corrected by hand
+// from the admin Savings screen.
+model SavingsEntry {
+  id     String @id @default(cuid())
+  teamId String?
+  team   Team?  @relation(fields: [teamId], references: [id])
+
+  memberEmail String
+  memberName  String?
+  accountNo   String?
+
+  date           String?
+  openingBalance String?
+  deposit        String?
+  withdrawal     String?
+  monthlyRate    String?
+  interestEarned String?
+  closingBalance String?
+  periodLabel    String?
+  notes          String?
+
+  uploadedAt DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("savingsentry")
 }
 
 // Donations are manually recorded (like the loan account's manual

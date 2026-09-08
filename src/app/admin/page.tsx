@@ -21,11 +21,12 @@ export default async function AdminPage() {
   // admin) is the only one who can create/edit/delete other admins.
   const isSuperAdmin = viaClerk || isSuperAdminEmail(sessionEmail);
 
-  const [teams, campaigns, products, reports, totalUsers, pooledFundsAgg, payments, juniorApplications, adminAccounts] = await Promise.all([
+  const [teams, campaigns, products, reports, savingsEntries, totalUsers, pooledFundsAgg, payments, juniorApplications, adminAccounts] = await Promise.all([
     prisma.team.findMany({ include: { owner: true }, orderBy: { submittedAt: 'desc' } }),
     prisma.campaign.findMany({ include: { creator: true }, orderBy: { createdAt: 'desc' } }),
     prisma.investmentProduct.findMany({ orderBy: { createdAt: 'desc' } }),
     prisma.memberReport.findMany({ include: { team: true }, orderBy: { uploadedAt: 'desc' }, take: 200 }),
+    prisma.savingsEntry.findMany({ include: { team: true }, orderBy: { uploadedAt: 'desc' }, take: 200 }),
     prisma.user.count(),
     prisma.loanAccount.aggregate({ _sum: { balance: true } }),
     prisma.payment.findMany({
@@ -104,6 +105,24 @@ export default async function AdminPage() {
     uploadedAt: r.uploadedAt.toISOString(),
   }));
 
+  const savingsData = savingsEntries.map((s: (typeof savingsEntries)[number]) => ({
+    id: s.id,
+    teamName: s.team?.name ?? null,
+    memberEmail: s.memberEmail,
+    memberName: s.memberName,
+    accountNo: s.accountNo,
+    date: s.date,
+    openingBalance: s.openingBalance,
+    deposit: s.deposit,
+    withdrawal: s.withdrawal,
+    monthlyRate: s.monthlyRate,
+    interestEarned: s.interestEarned,
+    closingBalance: s.closingBalance,
+    periodLabel: s.periodLabel,
+    notes: s.notes,
+    uploadedAt: s.uploadedAt.toISOString(),
+  }));
+
   const paymentData = payments.map((p: (typeof payments)[number]) => ({
     id: p.id,
     memberName: p.user.fullName || p.user.email || p.user.phone || 'Unknown',
@@ -179,6 +198,10 @@ export default async function AdminPage() {
       total: reports.length,
       matched: reports.filter((r: (typeof reports)[number]) => r.teamId).length,
     },
+    savings: {
+      total: savingsEntries.length,
+      matched: savingsEntries.filter((s: (typeof savingsEntries)[number]) => s.teamId).length,
+    },
     payments: {
       total: payments.length,
       pending: payments.filter((p: (typeof payments)[number]) => p.status === 'PENDING').length,
@@ -197,6 +220,7 @@ export default async function AdminPage() {
         campaigns={campaignData}
         products={productData}
         reports={reportData}
+        savingsEntries={savingsData}
         payments={paymentData}
         juniorApplications={juniorApplicationData}
         stats={stats}
