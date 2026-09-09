@@ -88,12 +88,17 @@ export default async function ChamaPanelPage({
       amount: r.amount,
       purpose: r.purpose,
       status: r.status,
+      months: r.months,
       repaymentWeeks: r.repaymentWeeks,
       interestRate: r.interestRate,
+      processingFee: r.processingFee,
+      processingFeePaid: r.processingFeePaid,
       createdAt: r.createdAt.toISOString(),
       guarantees: r.guarantees.map((g: (typeof r.guarantees)[number]) => ({
         guarantorId: g.guarantorId,
         guarantorName: g.guarantor.fullName || g.guarantor.email || 'Unknown member',
+        signatureName: g.signatureName,
+        signedAt: g.createdAt.toISOString(),
       })),
       repayments: r.repayments
         .sort((a: (typeof r.repayments)[number], b: (typeof r.repayments)[number]) => a.weekNumber - b.weekNumber)

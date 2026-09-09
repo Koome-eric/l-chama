@@ -1,5 +1,6 @@
 'use client';
 
+import { useSearchParams } from 'next/navigation';
 import {
   Card,
   CardContent,
@@ -90,6 +91,8 @@ export function AccountsClient({
     juniorApplications: JuniorApp[];
   };
 }) {
+  const searchParams = useSearchParams();
+  const openJunior = searchParams.get('open') === 'junior';
   const accountByProductId = new Map(data.accounts.map((a) => [a.productId, a]));
   const latestJuniorApp = data.juniorApplications[0];
 
@@ -158,7 +161,7 @@ export function AccountsClient({
                     </div>
                   ) : (
                     <div className="w-full space-y-1.5">
-                      <JuniorApplicationDialog />
+                      <JuniorApplicationDialog defaultOpen={openJunior} />
                       {latestJuniorApp?.status === 'REJECTED' && (
                         <p className="text-xs text-destructive">
                           Previous application was rejected{latestJuniorApp.reviewNotes ? `: ${latestJuniorApp.reviewNotes}` : '.'} You can re-apply.

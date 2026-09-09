@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { requirePanelAccess } from '@/lib/require-panel-access';
 import { InvestClient } from './InvestClient';
+import { Suspense } from 'react';
 
 const POOLED_TYPES = ['MMF', 'STOCK', 'BOND', 'FIXED_DEPOSIT'] as const;
 type PooledProductType = (typeof POOLED_TYPES)[number];
@@ -57,7 +58,9 @@ export default async function InvestPage() {
           MMF, stocks, bonds, and fixed deposit products Ludeva members invest in individually.
         </p>
       </div>
-      <InvestClient data={data} />
+      <Suspense fallback={null}>
+        <InvestClient data={data} />
+      </Suspense>
     </div>
   );
 }

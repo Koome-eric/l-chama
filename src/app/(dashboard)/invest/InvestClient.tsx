@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   Card,
   CardContent,
@@ -72,10 +73,26 @@ export function InvestClient({ data }: { data: Data }) {
   const [isPending, startTransition] = useTransition();
   const [selected, setSelected] = useState<Product | null>(null);
   const [amount, setAmount] = useState('');
+  const searchParams = useSearchParams();
+  const highlightType = searchParams.get('type');
+  const highlightRef = useRef<HTMLDivElement | null>(null);
 
   const canInvest = data.isOwner || data.permissions.canInvestPooled;
   const canViewPool = data.isOwner || data.permissions.canViewPooledFunds;
   const canWithdraw = data.isOwner || data.permissions.canWithdraw;
+
+  // Coming from a landing-page product link (?type=MMF) — scroll to that
+  // product and, if there's exactly one match and the member can invest,
+  // open the invest dialog for it automatically.
+  useEffect(() => {
+    if (!highlightType) return;
+    highlightRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const matches = data.products.filter((p) => p.type === highlightType);
+    if (canInvest && matches.length === 1) {
+      setSelected(matches[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightType]);
 
   const activeTotal = data.investments
     .filter((i) => i.status === 'ACTIVE')
@@ -148,7 +165,11 @@ export function InvestClient({ data }: { data: Data }) {
         ) : (
           <div className="grid sm:grid-cols-2 gap-4">
             {data.products.map((p) => (
-              <Card key={p.id} className="rounded-2xl shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md hover:border-primary/30">
+              <Card
+                key={p.id}
+                ref={p.type === highlightType ? highlightRef : undefined}
+                className={`rounded-2xl shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md hover:border-primary/30 ${p.type === highlightType ? 'ring-2 ring-primary border-primary/40' : ''}`}
+              >
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg">{p.name}</CardTitle>

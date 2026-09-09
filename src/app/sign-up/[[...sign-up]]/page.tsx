@@ -3,6 +3,7 @@
 import { Suspense } from 'react';
 import { SignUp } from '@clerk/nextjs';
 import { PostAuthRedirect } from '@/components/PostAuthRedirect';
+import { CaptureAuthRedirect } from '@/components/CaptureAuthRedirect';
 
 // Uses Clerk's own hosted sign-up UI directly rather than a custom
 // phone-OTP flow — that custom flow depended on phone verification
@@ -16,6 +17,7 @@ export default function Page() {
     <div className="flex justify-center items-center min-h-screen bg-background p-4">
       <SignUp path="/sign-up" fallbackRedirectUrl="/onboarding" />
       <Suspense fallback={null}>
+        <CaptureAuthRedirect />
         <PostAuthRedirect />
       </Suspense>
     </div>

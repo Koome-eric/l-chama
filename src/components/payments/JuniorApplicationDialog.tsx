@@ -35,9 +35,9 @@ async function uploadDoc(file: File, label: string): Promise<string> {
   return json.url as string;
 }
 
-export function JuniorApplicationDialog({ trigger }: { trigger?: React.ReactNode }) {
+export function JuniorApplicationDialog({ trigger, defaultOpen }: { trigger?: React.ReactNode; defaultOpen?: boolean }) {
   const { toast } = useToast();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(!!defaultOpen);
   const [submitting, setSubmitting] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 

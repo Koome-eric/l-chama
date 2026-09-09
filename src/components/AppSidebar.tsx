@@ -112,7 +112,7 @@ export function AppSidebar({
 
   return (
     <>
-      <Sidebar variant="inset" collapsible="icon">
+      <Sidebar variant="inset" collapsible="icon" className="print:hidden">
         <SidebarHeader>
           <Link href="/panel" className="flex items-center gap-2.5 px-1 py-1">
             <Image
@@ -135,7 +135,7 @@ export function AppSidebar({
       </Sidebar>
 
       <SidebarInset>
-        <header className="sticky top-0 z-40 flex h-14 items-center gap-4 border-b bg-background/80 backdrop-blur px-4 sm:px-6">
+        <header className="sticky top-0 z-40 flex h-14 items-center gap-4 border-b bg-background/80 backdrop-blur px-4 sm:px-6 print:hidden">
           <SidebarTrigger className="md:hidden" />
           <div className="ml-auto flex items-center gap-3">
             <UserButton
@@ -145,8 +145,8 @@ export function AppSidebar({
           </div>
         </header>
 
-        <main className="flex-1 bg-muted/40">
-          <div className="mx-auto max-w-7xl p-4 sm:p-6 space-y-6">{children}</div>
+        <main className="flex-1 bg-muted/40 print:bg-white">
+          <div className="mx-auto max-w-7xl p-4 sm:p-6 space-y-6 print:max-w-none print:p-0 print:space-y-0">{children}</div>
         </main>
       </SidebarInset>
     </>

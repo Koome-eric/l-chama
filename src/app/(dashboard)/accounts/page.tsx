@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { prisma } from '@/lib/prisma';
 import { requirePanelAccess } from '@/lib/require-panel-access';
 import { AccountsClient } from './AccountsClient';
@@ -74,7 +75,9 @@ export default async function AccountsPage() {
           with M-Pesa or a Visa card.
         </p>
       </div>
-      <AccountsClient data={data} />
+      <Suspense fallback={null}>
+        <AccountsClient data={data} />
+      </Suspense>
     </div>
   );
 }

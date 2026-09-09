@@ -253,12 +253,20 @@ model LoanRequest {
   purpose String?
   status  LoanRequestStatus @default(PENDING_GUARANTORS)
 
-  // Set by the Team Leader at approval — chama loans start from 3% p.a.,
-  // never lower, so the loan account always gets back at least the
-  // principal plus a bit for the pool.
-  interestRate Float @default(3)
+  // Fixed chama loan formula (not admin-chosen): 2.5% per month of the
+  // loan term, term capped at 6 months, repaid weekly (term months x 4
+  // weeks). See computeLoanTerms() in actions.ts — the single place this
+  // formula is applied, so admin approval never overrides it.
+  months       Int?   // requested/approved term in months, 1-6
+  interestRate Float  @default(2.5) // total % for the whole term (2.5 x months)
 
   repaymentWeeks Int?
+
+  // 2.5% of the loan amount, payable upfront before disbursement —
+  // separate from the weekly interest+principal repayment schedule.
+  processingFee      Float   @default(0)
+  processingFeePaid  Boolean @default(false)
+  processingFeePaidAt DateTime?
 
   decidedById String?
   decidedBy   User?     @relation("LoanDecidedBy", fields: [decidedById], references: [id])
@@ -280,6 +288,10 @@ model LoanGuarantee {
 
   guarantorId String
   guarantor   User   @relation("LoanGuarantor", fields: [guarantorId], references: [id])
+
+  // E-signature: the guarantor types their full legal name to confirm the
+  // guarantee — captured alongside createdAt as the signed timestamp.
+  signatureName String
 
   createdAt DateTime @default(now())
 

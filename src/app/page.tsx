@@ -33,6 +33,46 @@ const FEATURES = [
   },
 ];
 
+// Product rate card — what each L-Chama product offers, at a glance,
+// and which authenticated page it should send a member to.
+const PRODUCTS = [
+  {
+    name: 'MMF',
+    rate: '9% – 13%',
+    description: 'Maximize returns on capital through money market fund investment.',
+    features: 'Daily interest compounding, automated interest generation, and a minimum lock-in of 12 months.',
+    target: '/invest?type=MMF',
+  },
+  {
+    name: 'Savings Account',
+    rate: '5% – 7%',
+    description: 'Flexible, liquidity-focused account for operational group funds.',
+    features: 'Tiered interest rates based on average monthly balance, no lock-in period, and zero monthly ledger fees.',
+    target: '/savings',
+  },
+  {
+    name: 'Junior Account',
+    rate: '6%',
+    description: "High-interest custodial savings designed to secure members' children's future education goals.",
+    features: 'Lock-in savings triggers, automatic parent-to-child recurring standing orders, and milestone rewards.',
+    target: '/accounts?open=junior',
+  },
+  {
+    name: 'Last Expense Cover',
+    rate: null,
+    description: 'Flexible cover limits for groups.',
+    features: 'KES 50,000 to KES 500,000 per member of the group, plus a small additional fee to cover non-members (e.g. spouse and dependents).',
+    target: '/last-respect',
+  },
+  {
+    name: 'L-Chama Micro Loans',
+    rate: '2.5% p.m.',
+    description: 'Internal chama loans — members borrow against their savings with automated interest tracking and instant M-Pesa disbursement.',
+    features: 'Zero paperwork — every decision and approval happens within your L-Chama. KES 50,000 to KES 500,000 per member of the group, plus a small additional fee for non-member borrowers (e.g. spouse and dependents).',
+    target: '/panel?tab=loan-requests',
+  },
+];
+
 export default async function LandingPage() {
   const { userId } = await auth();
 
@@ -56,6 +96,17 @@ export default async function LandingPage() {
       }
     }
   }
+
+  // Signed-out visitor → sign up, carrying the target product through so
+  // CaptureAuthRedirect/PostAuthRedirect land them there once onboarded.
+  // Signed in and fully onboarded → straight to the product. Signed in
+  // but still mid-onboarding → continue onboarding first.
+  const productHref = (target: string) =>
+    !hasAccount
+      ? `/sign-up?redirect_url=${encodeURIComponent(target)}`
+      : alreadyOnboarded
+        ? target
+        : ctaHref;
 
   const activeCampaigns = await prisma.campaign.aggregate({
     where: { status: 'ACTIVE' },
@@ -175,6 +226,43 @@ export default async function LandingPage() {
         </section>
 
         <section className="py-16 md:py-24 bg-fintech-mesh border-y border-border/60">
+          <div className="container mx-auto px-4">
+            <h2 className="text-3xl font-bold font-headline text-center mb-2">
+              Products &amp; Rates
+            </h2>
+            <p className="text-muted-foreground text-center max-w-2xl mx-auto mb-12">
+              Every L-Chama comes with a full suite of products — investment, savings, cover, and
+              credit — all managed from the same dashboard.
+            </p>
+            <div className="grid gap-6 md:grid-cols-2">
+              {PRODUCTS.map((p) => (
+                <Link key={p.name} href={productHref(p.target)} className="group block">
+                  <Card className="rounded-2xl h-full transition-all duration-300 hover:-translate-y-1 hover:shadow-md hover:border-primary/40">
+                    <CardContent className="p-6">
+                      <div className="flex items-start justify-between gap-3">
+                        <h3 className="font-headline font-semibold text-lg group-hover:text-primary transition-colors">
+                          {p.name}
+                        </h3>
+                        {p.rate && (
+                          <span className="shrink-0 rounded-full bg-primary/10 px-3 py-1 text-sm font-bold text-primary">
+                            {p.rate}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{p.description}</p>
+                      <p className="mt-3 text-sm leading-relaxed border-t pt-3">{p.features}</p>
+                      <p className="mt-3 text-sm font-medium text-primary flex items-center gap-1">
+                        Invest now <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                      </p>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="py-16 md:py-24">
           <div className="container mx-auto px-4">
             <div className="grid md:grid-cols-2 gap-10 items-center">
               <div>

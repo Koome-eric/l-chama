@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
 
+const POST_AUTH_REDIRECT_KEY = 'lchama_post_auth_redirect';
+
 export function PostAuthRedirect() {
   const { user, isLoaded } = useUser();
   const router = useRouter();
@@ -37,6 +39,16 @@ export function PostAuthRedirect() {
 
         if (data.isOwner && data.teamApprovalStatus !== 'APPROVED') {
           router.replace('/onboarding/pending');
+          return;
+        }
+
+        // Fully onboarded — if they clicked a specific product on the
+        // landing page before signing up/in, send them straight there
+        // instead of the generic dashboard.
+        const target = typeof window !== 'undefined' ? sessionStorage.getItem(POST_AUTH_REDIRECT_KEY) : null;
+        if (target) {
+          sessionStorage.removeItem(POST_AUTH_REDIRECT_KEY);
+          router.replace(target);
           return;
         }
 
