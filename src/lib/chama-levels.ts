@@ -10,6 +10,7 @@ export type ChamaLevelKey =
   | "NYOTA"
   | "PEPEA"
   | "ALPHA"
+  | "BETA"
   | "JULIET"
   | "SILVER"
   | "DIAMOND"
@@ -28,6 +29,7 @@ export const CHAMA_LEVELS: ChamaLevel[] = [
   { key: "NYOTA", name: "Nyota", monthlyAmount: 1_000, groupSize: 6 },
   { key: "PEPEA", name: "Pepea", monthlyAmount: 2_000, groupSize: 6 },
   { key: "ALPHA", name: "Alpha", monthlyAmount: 3_000, groupSize: 6 },
+  { key: "BETA", name: "Beta 3000", monthlyAmount: 3_000, groupSize: 6 },
   { key: "JULIET", name: "Juliet", monthlyAmount: 5_000, groupSize: 6 },
   { key: "SILVER", name: "Silver", monthlyAmount: 10_000, groupSize: 6 },
   { key: "DIAMOND", name: "Diamond", monthlyAmount: 20_000, groupSize: 6 },

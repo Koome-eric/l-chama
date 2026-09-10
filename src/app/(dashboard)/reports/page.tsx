@@ -142,8 +142,8 @@ export default async function ReportsPage() {
                 <div>
                   <p className="font-medium">{s.memberName || s.memberEmail}</p>
                   <p className="text-muted-foreground">
-                    {s.periodLabel || s.date || '—'} · Opening {s.openingBalance || '—'} · Interest{' '}
-                    {s.interestEarned || '—'}
+                    {s.periodLabel || s.date || '—'} · Opening {s.openingBalance || '—'} · Deposit{' '}
+                    {s.deposit || '—'} · Payout {s.payout || '—'}
                   </p>
                 </div>
                 {s.closingBalance && <Badge variant="secondary">Closing: {s.closingBalance}</Badge>}

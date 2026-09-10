@@ -10,6 +10,7 @@ const TIER_ACCENT = [
   'from-slate-400/40 to-slate-500/40',
   'from-sky-400/40 to-sky-500/40',
   'from-teal-400/40 to-teal-500/40',
+  'from-cyan-400/40 to-cyan-500/40',
   'from-emerald-400/40 to-emerald-500/40',
   'from-primary/40 to-primary/60',
   'from-violet-400/40 to-violet-500/40',
@@ -23,37 +24,43 @@ function formatCompact(amount: number) {
   return String(amount);
 }
 
+// Continuous marquee: the level list is rendered twice back-to-back in one
+// flex track, which scrolls via a plain CSS animation (translateX 0 → -50%,
+// linear, infinite). With two identical copies the loop point is invisible.
+// Hovering the row pauses it (animation-play-state), and the global
+// prefers-reduced-motion rule in globals.css already freezes all
+// animations, so this respects that automatically.
 export function ChamaLevelsShowcase() {
+  const doubled = [...CHAMA_LEVELS, ...CHAMA_LEVELS];
+
   return (
-    <div
-      className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory sm:grid sm:grid-cols-3 lg:grid-cols-9 sm:overflow-visible sm:pb-0 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-10% 0px' }}
+      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      className="group/marquee overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_5%,black_95%,transparent)]"
     >
-      {CHAMA_LEVELS.map((level, i) => (
-        <motion.div
-          key={level.key}
-          initial={{ opacity: 0, y: 18, scale: 0.94 }}
-          whileInView={{ opacity: 1, y: 0, scale: 1 }}
-          viewport={{ once: true, margin: '-10% 0px' }}
-          transition={{ duration: 0.45, delay: i * 0.06, ease: [0.16, 1, 0.3, 1] }}
-          whileHover={{ y: -4, scale: 1.03 }}
-          className="group relative shrink-0 w-[128px] sm:w-auto snap-start"
-        >
-          <div
-            className={`absolute -inset-px rounded-2xl bg-gradient-to-br ${TIER_ACCENT[i % TIER_ACCENT.length]} opacity-0 group-hover:opacity-100 blur-sm transition-opacity duration-300`}
-          />
-          <div className="relative rounded-2xl border border-border/60 bg-card px-3.5 py-4 text-center transition-colors duration-300 group-hover:border-transparent">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              {level.name}
-            </p>
-            <p className="mt-1.5 font-figures text-lg font-bold font-headline">
-              <span className="text-xs font-normal text-muted-foreground mr-0.5">KES</span>
-              {formatCompact(level.monthlyAmount)}
-              <span className="text-xs font-normal text-muted-foreground">/mo</span>
-            </p>
-            <p className="mt-1 text-[11px] text-muted-foreground">Up to {level.groupSize}</p>
+      <div className="flex w-max gap-4 animate-marquee group-hover/marquee:[animation-play-state:paused]">
+        {doubled.map((level, i) => (
+          <div key={`${level.key}-${i}`} className="group/card relative shrink-0 w-[190px] sm:w-[210px]">
+            <div
+              className={`absolute -inset-px rounded-3xl bg-gradient-to-br ${TIER_ACCENT[i % TIER_ACCENT.length]} opacity-0 group-hover/card:opacity-100 blur-sm transition-opacity duration-300`}
+            />
+            <div className="relative rounded-3xl border border-border/60 bg-card px-6 py-8 text-center transition-colors duration-300 group-hover/card:border-transparent">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                {level.name}
+              </p>
+              <p className="mt-3 font-figures text-3xl font-bold font-headline">
+                <span className="text-sm font-normal text-muted-foreground mr-0.5">KES</span>
+                {formatCompact(level.monthlyAmount)}
+                <span className="text-sm font-normal text-muted-foreground">/mo</span>
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">Minimum {level.groupSize} members</p>
+            </div>
           </div>
-        </motion.div>
-      ))}
-    </div>
+        ))}
+      </div>
+    </motion.div>
   );
 }

@@ -285,7 +285,7 @@ export function OrganisationClient() {
                     {formatKES(level.monthlyAmount)}
                     <span className="text-xs font-normal text-muted-foreground">/mo</span>
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">Up to {level.groupSize} members</p>
+                  <p className="text-xs text-muted-foreground mt-1">Minimum {level.groupSize} members</p>
                 </button>
               );
             })}

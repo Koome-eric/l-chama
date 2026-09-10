@@ -157,6 +157,21 @@
     -webkit-backdrop-filter: blur(16px);
     border: 1px solid hsl(var(--border) / 0.6);
   }
+
+  /* Continuous left-scrolling carousel — the caller renders the track's
+     children twice back-to-back so the -50% translation snaps back to an
+     identical frame and the loop reads as unbroken. */
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  .animate-marquee {
+    animation: marquee 34s linear infinite;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
