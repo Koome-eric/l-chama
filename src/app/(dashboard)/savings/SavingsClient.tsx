@@ -11,9 +11,7 @@ type SavingsEntryRow = {
   periodLabel: string | null;
   openingBalance: string | null;
   deposit: string | null;
-  withdrawal: string | null;
-  monthlyRate: string | null;
-  interestEarned: string | null;
+  payout: string | null;
   closingBalance: string | null;
   notes: string | null;
 };
@@ -66,7 +64,8 @@ export function SavingsClient({ data }: { data: SavingsData }) {
           <CardTitle>Transaction History</CardTitle>
           <CardDescription>
             Each entry carries forward the previous closing balance, adds any deposit, subtracts
-            any withdrawal, then applies interest to the running balance.
+            any payout. No interest is calculated — interest is reserved for members who hold a
+            Ludeva Investment Account.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
@@ -83,9 +82,7 @@ export function SavingsClient({ data }: { data: SavingsData }) {
                   <p className="text-muted-foreground">
                     Opening {e.openingBalance || '—'}
                     {e.deposit ? ` · Deposit ${e.deposit}` : ''}
-                    {e.withdrawal ? ` · Withdrawal ${e.withdrawal}` : ''}
-                    {e.monthlyRate ? ` · Rate ${e.monthlyRate}` : ''}
-                    {e.interestEarned ? ` · Interest ${e.interestEarned}` : ''}
+                    {e.payout ? ` · Payout ${e.payout}` : ''}
                   </p>
                   {e.notes && <p className="text-xs text-muted-foreground/80 mt-0.5">{e.notes}</p>}
                 </div>

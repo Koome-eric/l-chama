@@ -179,9 +179,7 @@ type SavingsRow = {
   date: string | null;
   openingBalance: string | null;
   deposit: string | null;
-  withdrawal: string | null;
-  monthlyRate: string | null;
-  interestEarned: string | null;
+  payout: string | null;
   closingBalance: string | null;
   periodLabel: string | null;
   notes: string | null;
@@ -1582,9 +1580,7 @@ const SAVINGS_FORM_FIELDS: { key: keyof SavingsEntryForm; label: string; placeho
   { key: 'date', label: 'Date', placeholder: '2026-08-01' },
   { key: 'openingBalance', label: 'Opening balance' },
   { key: 'deposit', label: 'Deposit' },
-  { key: 'withdrawal', label: 'Withdrawal' },
-  { key: 'monthlyRate', label: 'Monthly rate', placeholder: '0.7%' },
-  { key: 'interestEarned', label: 'Interest earned' },
+  { key: 'payout', label: 'Payout' },
   { key: 'closingBalance', label: 'Closing balance' },
   { key: 'periodLabel', label: 'Period', placeholder: 'Aug 2026' },
   { key: 'notes', label: 'Notes' },
@@ -1597,9 +1593,7 @@ type SavingsEntryForm = {
   date: string;
   openingBalance: string;
   deposit: string;
-  withdrawal: string;
-  monthlyRate: string;
-  interestEarned: string;
+  payout: string;
   closingBalance: string;
   periodLabel: string;
   notes: string;
@@ -1612,9 +1606,7 @@ const EMPTY_SAVINGS_FORM: SavingsEntryForm = {
   date: '',
   openingBalance: '',
   deposit: '',
-  withdrawal: '',
-  monthlyRate: '',
-  interestEarned: '',
+  payout: '',
   closingBalance: '',
   periodLabel: '',
   notes: '',
@@ -1628,9 +1620,7 @@ function rowToForm(r: SavingsRow): SavingsEntryForm {
     date: r.date ?? '',
     openingBalance: r.openingBalance ?? '',
     deposit: r.deposit ?? '',
-    withdrawal: r.withdrawal ?? '',
-    monthlyRate: r.monthlyRate ?? '',
-    interestEarned: r.interestEarned ?? '',
+    payout: r.payout ?? '',
     closingBalance: r.closingBalance ?? '',
     periodLabel: r.periodLabel ?? '',
     notes: r.notes ?? '',
@@ -1732,7 +1722,7 @@ function SavingsAdminSection({ entries }: { entries: SavingsRow[] }) {
               <CardDescription>
                 Paste a CSV export of the Savings Data tab (header row required:{' '}
                 <code>
-                  memberEmail,memberName,accountNo,date,openingBalance,deposit,withdrawal,monthlyRate,interestEarned,closingBalance,periodLabel,notes
+                  memberEmail,memberName,accountNo,date,openingBalance,deposit,payout,closingBalance,periodLabel,notes
                 </code>
                 ). For automatic syncing, point a Google Sheets Apps Script trigger at{' '}
                 <code>/api/savings/sync</code> instead — same column names, sent as JSON under{' '}
@@ -1744,7 +1734,7 @@ function SavingsAdminSection({ entries }: { entries: SavingsRow[] }) {
         <CardContent className="space-y-3">
           <Textarea
             rows={6}
-            placeholder="memberEmail,memberName,accountNo,date,openingBalance,deposit,withdrawal,monthlyRate,interestEarned,closingBalance,periodLabel,notes"
+            placeholder="memberEmail,memberName,accountNo,date,openingBalance,deposit,payout,closingBalance,periodLabel,notes"
             value={csv}
             onChange={(e) => setCsv(e.target.value)}
             className="font-figures"
@@ -1778,7 +1768,7 @@ function SavingsAdminSection({ entries }: { entries: SavingsRow[] }) {
                   <TableHead className="hidden md:table-cell">Period</TableHead>
                   <TableHead className="hidden lg:table-cell">Opening</TableHead>
                   <TableHead className="hidden lg:table-cell">Deposit</TableHead>
-                  <TableHead className="hidden xl:table-cell">Withdrawal</TableHead>
+                  <TableHead className="hidden xl:table-cell">Payout</TableHead>
                   <TableHead>Closing Bal.</TableHead>
                   <TableHead className="text-right">Action</TableHead>
                 </TableRow>
@@ -1801,7 +1791,7 @@ function SavingsAdminSection({ entries }: { entries: SavingsRow[] }) {
                     </TableCell>
                     <TableCell className="hidden lg:table-cell font-figures text-sm">{r.openingBalance || '—'}</TableCell>
                     <TableCell className="hidden lg:table-cell font-figures text-sm">{r.deposit || '—'}</TableCell>
-                    <TableCell className="hidden xl:table-cell font-figures text-sm">{r.withdrawal || '—'}</TableCell>
+                    <TableCell className="hidden xl:table-cell font-figures text-sm">{r.payout || '—'}</TableCell>
                     <TableCell className="font-figures text-sm">{r.closingBalance || '—'}</TableCell>
                     <TableCell className="text-right space-x-1">
                       <Button size="sm" variant="ghost" onClick={() => openEditDialog(r)}>

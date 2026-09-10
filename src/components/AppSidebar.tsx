@@ -49,7 +49,7 @@ const menuItems = [
   { href: '/savings', label: 'Savings', icon: Coins },
   { href: '/campaigns', label: 'Campaigns', icon: HeartHandshake },
   { href: '/deposit', label: 'Deposit', icon: ArrowDownToLine },
-  { href: '/withdraw', label: 'Withdraw', icon: ArrowUpFromLine },
+  { href: '/withdraw', label: 'Payout', icon: ArrowUpFromLine },
   { href: '/transactions', label: 'Transactions', icon: Repeat },
   { href: '/reports', label: 'Reports', icon: TrendingUp },
 ];

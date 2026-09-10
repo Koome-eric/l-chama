@@ -8,14 +8,17 @@ import { prisma } from '@/lib/prisma';
 // SAVINGS_SYNC_SECRET in the environment and have the Apps Script send
 // it as `x-sync-secret`).
 //
+// No interest fields here — L-Chama savings carry no interest (that's a
+// Ludeva Investment Account feature), so this is a plain running
+// balance: opening + deposit - payout = closing.
+//
 // Expected JSON body:
 // {
 //   "records": [
 //     { "memberEmail": "member@example.com", "memberName": "Jane Doe",
 //       "accountNo": "SAV-0012", "date": "2026-08-01",
-//       "openingBalance": "50000", "deposit": "5000", "withdrawal": "0",
-//       "monthlyRate": "0.7%", "interestEarned": "385",
-//       "closingBalance": "55385", "periodLabel": "Aug 2026", "notes": "" }
+//       "openingBalance": "50000", "deposit": "5000", "payout": "0",
+//       "closingBalance": "55000", "periodLabel": "Aug 2026", "notes": "" }
 //   ]
 // }
 export async function POST(req: NextRequest) {
@@ -44,9 +47,7 @@ export async function POST(req: NextRequest) {
       date: r.date != null ? String(r.date) : null,
       openingBalance: r.openingBalance != null ? String(r.openingBalance) : null,
       deposit: r.deposit != null ? String(r.deposit) : null,
-      withdrawal: r.withdrawal != null ? String(r.withdrawal) : null,
-      monthlyRate: r.monthlyRate != null ? String(r.monthlyRate) : null,
-      interestEarned: r.interestEarned != null ? String(r.interestEarned) : null,
+      payout: r.payout != null ? String(r.payout) : null,
       closingBalance: r.closingBalance != null ? String(r.closingBalance) : null,
       periodLabel: r.periodLabel != null ? String(r.periodLabel) : null,
       notes: r.notes != null ? String(r.notes) : null,

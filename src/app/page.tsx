@@ -8,9 +8,10 @@ import LChamaHeader from '@/components/LChamaHeader';
 import LChamaFooter from '@/components/LChamaFooter';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CHAMA_LEVELS, formatKES } from '@/lib/chama-levels';
 import { HeroReveal, HeroRevealItem } from '@/components/motion/HeroReveal';
 import { CountUp } from '@/components/motion/CountUp';
+import { ChamaLevelsShowcase } from '@/components/ChamaLevelsShowcase';
+import { LandingFAQ } from '@/components/LandingFAQ';
 
 // L-Chama is a community-centric fintech platform that digitizes informal
 // banking systems, enhances contribution management, and streamlines group
@@ -34,8 +35,18 @@ const FEATURES = [
 ];
 
 // Product rate card — what each L-Chama product offers, at a glance,
-// and which authenticated page it should send a member to.
+// and which authenticated page it should send a member to. Kept to
+// exactly these 3 investment products at the client's request — Last
+// Expense Cover and Micro Loans are still fully live in the app (nav,
+// /panel, /last-respect), just not listed as "investment products" here.
 const PRODUCTS = [
+  {
+    name: 'Junior Account',
+    rate: '6%',
+    description: "High-interest custodial savings designed to secure members' children's future education goals.",
+    features: 'Lock-in savings triggers, automatic parent-to-child recurring standing orders, and milestone rewards.',
+    target: '/accounts?open=junior',
+  },
   {
     name: 'MMF',
     rate: '9% – 13%',
@@ -49,13 +60,6 @@ const PRODUCTS = [
     description: 'Flexible, liquidity-focused account for operational group funds.',
     features: 'Tiered interest rates based on average monthly balance, no lock-in period, and zero monthly ledger fees.',
     target: '/savings',
-  },
-  {
-    name: 'Junior Account',
-    rate: '6%',
-    description: "High-interest custodial savings designed to secure members' children's future education goals.",
-    features: 'Lock-in savings triggers, automatic parent-to-child recurring standing orders, and milestone rewards.',
-    target: '/accounts?open=junior',
   },
   {
     name: 'Last Expense Cover',
@@ -303,33 +307,20 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        <section className="py-16 md:py-24">
+        <section className="py-10 md:py-14">
           <div className="container mx-auto px-4">
-            <h2 className="text-3xl font-bold font-headline text-center mb-2">
+            <h2 className="text-2xl font-bold font-headline text-center mb-1.5">
               Choose your chama level
             </h2>
-            <p className="text-muted-foreground text-center max-w-xl mx-auto mb-12">
+            <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto mb-8">
               Every chama picks a monthly contribution level at setup. Members contribute the
               same amount, month to month.
             </p>
-            <div className="grid sm:grid-cols-3 gap-4">
-              {CHAMA_LEVELS.map((level) => (
-                <Card key={level.key} className="rounded-2xl">
-                  <CardContent className="p-5">
-                    <h3 className="font-headline font-semibold text-lg">{level.name}</h3>
-                    <p className="mt-1 text-2xl font-bold text-primary">
-                      {formatKES(level.monthlyAmount)}
-                      <span className="text-sm font-normal text-muted-foreground">/mo</span>
-                    </p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Up to {level.groupSize} members
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <ChamaLevelsShowcase />
           </div>
         </section>
+
+        <LandingFAQ />
 
         <section className="py-16 md:py-24 border-t border-border">
           <div className="container mx-auto px-4">

@@ -438,9 +438,7 @@ function parseSavingsCsv(csvText: string) {
       date: get('date'),
       openingBalance: get('openingbalance'),
       deposit: get('deposit'),
-      withdrawal: get('withdrawal'),
-      monthlyRate: get('monthlyrate') || get('rate'),
-      interestEarned: get('interestearned') || get('interest'),
+      payout: get('payout') || get('withdrawal'),
       closingBalance: get('closingbalance') || get('closing_balance') || get('closingbal'),
       periodLabel: get('periodlabel') || get('period'),
       notes: get('notes'),
@@ -503,9 +501,7 @@ export type SavingsEntryInput = {
   date?: string;
   openingBalance?: string;
   deposit?: string;
-  withdrawal?: string;
-  monthlyRate?: string;
-  interestEarned?: string;
+  payout?: string;
   closingBalance?: string;
   periodLabel?: string;
   notes?: string;

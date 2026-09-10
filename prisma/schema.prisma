@@ -632,13 +632,13 @@ model MemberReport {
 
 // Savings Account entries, fed from a dedicated "Savings Data" sheet in
 // the same Excel workbook Ludeva already uses for Investments (separate
-// tab, separate columns). Unlike Investments (per-transaction: interest
-// = principal x rate on the amount in that row), Savings uses a running
-// balance: each entry carries forward the previous closing balance, adds
-// a deposit, subtracts a withdrawal, then applies interest to the
-// running balance. Pushed in via the same Apps-Script-to-webhook pattern
-// as MemberReport (see /api/savings/sync), or added/corrected by hand
-// from the admin Savings screen.
+// tab, separate columns). L-Chama savings carry no interest — interest
+// is reserved for members who hold a Ludeva Investment Account, not a
+// normal L-Chama savings feature — so this is a plain running balance:
+// each entry carries forward the previous closing balance, adds a
+// deposit, subtracts a payout. Pushed in via the same
+// Apps-Script-to-webhook pattern as MemberReport (see /api/savings/sync),
+// or added/corrected by hand from the admin Savings screen.
 model SavingsEntry {
   id     String @id @default(cuid())
   teamId String?
@@ -651,9 +651,7 @@ model SavingsEntry {
   date           String?
   openingBalance String?
   deposit        String?
-  withdrawal     String?
-  monthlyRate    String?
-  interestEarned String?
+  payout         String?
   closingBalance String?
   periodLabel    String?
   notes          String?

@@ -33,7 +33,23 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Wallet, HandCoins, FileText } from 'lucide-react';
+import {
+  Wallet,
+  HandCoins,
+  FileText,
+  PiggyBank,
+  Trophy,
+  Flame,
+  TrendingUp,
+  Users,
+  Sparkles,
+  Clock,
+  ShieldCheck,
+  CheckCircle2,
+  XCircle,
+  Landmark,
+  UserPlus,
+} from 'lucide-react';
 import Link from 'next/link';
 import {
   adjustLoanAccountBalance,
@@ -44,7 +60,7 @@ import {
   markRepaymentPaid,
 } from './actions';
 import { formatKES } from '@/lib/chama-levels';
-import { TeamMembersSection } from '@/components/panel/TeamMembersSection';
+import { cn } from '@/lib/utils';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { CountUp } from '@/components/motion/CountUp';
 import type { ChamaPermissions } from '@/lib/chama';
@@ -99,6 +115,15 @@ type TeamData = {
   invites: Invite[];
   loanAccount: { balance: number };
   loanRequests: LoanRequestData[];
+  savingsSummary: {
+    totalChamaFunds: number;
+    totalPayout: number;
+    totalBalance: number;
+    entryCount: number;
+    leaderboard: { name: string; totalDeposits: number; totalPayout: number; entryCount: number; lastDate: string | null }[];
+    periodSeries: { label: string; amount: number }[];
+    milestone: { next: number; prev: number; progress: number };
+  };
 };
 
 const OBJECTIVE_LABELS: Record<string, string> = {
@@ -134,9 +159,9 @@ export function PanelClient({
   currentUserId: string;
   defaultTab?: string;
 }) {
-  const initialTab = ['members', 'loan-account', 'loan-requests'].includes(defaultTab ?? '')
+  const initialTab = ['overview', 'savings-account', 'loan-account', 'loan-requests'].includes(defaultTab ?? '')
     ? (defaultTab as string)
-    : 'members';
+    : 'overview';
 
   return (
     <div className="space-y-4">
@@ -151,13 +176,17 @@ export function PanelClient({
       )}
       <Tabs key={initialTab} defaultValue={initialTab} className="space-y-6">
         <TabsList>
-          <TabsTrigger value="members">Members</TabsTrigger>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="savings-account">Savings Account</TabsTrigger>
           <TabsTrigger value="loan-account">Loan Account</TabsTrigger>
           <TabsTrigger value="loan-requests">Loan Requests</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="members">
-          <TeamMembersSection team={team} currentUserId={currentUserId} />
+        <TabsContent value="overview">
+          <OverviewTab team={team} />
+        </TabsContent>
+        <TabsContent value="savings-account">
+          <SavingsAccountTab team={team} />
         </TabsContent>
         <TabsContent value="loan-account">
           <LoanAccountTab team={team} />
@@ -171,8 +200,366 @@ export function PanelClient({
 }
 
 // ─────────────────────────────────────────────
+// Overview — the chama's landing tab. Used to be a raw members list
+// (full member management already lives on its own page at /team), so
+// this is now a fintech-style gamified analytics dashboard instead:
+// hero KPIs, a milestone bar, the loan pipeline breakdown, and a top-3
+// contributor snapshot — all computed from the real numbers already on
+// `team` (savingsSummary, loanAccount, loanRequests), nothing mocked.
+// ─────────────────────────────────────────────
+const LOAN_STATUS_META: Record<
+  LoanRequestData['status'],
+  { label: string; icon: typeof Clock; color: string }
+> = {
+  PENDING_GUARANTORS: { label: 'Needs guarantors', icon: ShieldCheck, color: 'text-amber-600' },
+  PENDING_ADMIN: { label: 'Awaiting approval', icon: Clock, color: 'text-amber-600' },
+  ACTIVE: { label: 'Active', icon: TrendingUp, color: 'text-primary' },
+  REPAID: { label: 'Repaid', icon: CheckCircle2, color: 'text-emerald-600' },
+  REJECTED: { label: 'Rejected', icon: XCircle, color: 'text-destructive' },
+};
+
+function OverviewTab({ team }: { team: TeamData }) {
+  const { totalBalance, entryCount, leaderboard, milestone } = team.savingsSummary;
+  const totalMembers = team.members.length + 1; // +1 for the owner
+  const pendingInvites = team.invites.filter((i) => i.status === 'PENDING').length;
+
+  const activeLoans = team.loanRequests.filter((r) => r.status === 'ACTIVE');
+  const activeLoanTotal = activeLoans.reduce((sum, r) => sum + r.amount, 0);
+
+  const pipelineCounts = team.loanRequests.reduce(
+    (acc, r) => {
+      acc[r.status] = (acc[r.status] ?? 0) + 1;
+      return acc;
+    },
+    {} as Partial<Record<LoanRequestData['status'], number>>
+  );
+  const pipelineOrder: LoanRequestData['status'][] = [
+    'PENDING_GUARANTORS',
+    'PENDING_ADMIN',
+    'ACTIVE',
+    'REPAID',
+    'REJECTED',
+  ];
+
+  const topThree = leaderboard.slice(0, 3);
+  const rankBadge = ['🥇', '🥈', '🥉'];
+  const topContribution = Math.max(1, ...leaderboard.map((m) => m.totalDeposits));
+
+  return (
+    <div className="space-y-6">
+      {/* Hero KPI cards */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Card className="rounded-2xl shadow-sm overflow-hidden relative border-primary/30 bg-primary/5">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/15 via-transparent to-transparent" />
+          <CardContent className="p-5 relative">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Users className="h-4 w-4 text-primary" /> Members
+            </div>
+            <p className="mt-2 text-3xl font-bold font-figures text-primary">
+              <CountUp value={totalMembers} />
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {pendingInvites > 0 ? `${pendingInvites} invite${pendingInvites === 1 ? '' : 's'} pending` : 'All active'}
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl shadow-sm overflow-hidden relative border-emerald-500/20">
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 via-transparent to-transparent" />
+          <CardContent className="p-5 relative">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <PiggyBank className="h-4 w-4 text-emerald-600" /> Chama Balance
+            </div>
+            <p className="mt-2 text-3xl font-bold font-figures">
+              KES <CountUp value={totalBalance} />
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">{entryCount} savings entries logged</p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl shadow-sm overflow-hidden relative border-amber-500/20">
+          <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 via-transparent to-transparent" />
+          <CardContent className="p-5 relative">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Landmark className="h-4 w-4 text-amber-600" /> Loan Account
+            </div>
+            <p className="mt-2 text-3xl font-bold font-figures">
+              KES <CountUp value={team.loanAccount.balance} />
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">Available for approved loans</p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl shadow-sm overflow-hidden relative border-sky-500/20">
+          <div className="absolute inset-0 bg-gradient-to-br from-sky-500/10 via-transparent to-transparent" />
+          <CardContent className="p-5 relative">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <HandCoins className="h-4 w-4 text-sky-600" /> Active Loans
+            </div>
+            <p className="mt-2 text-3xl font-bold font-figures">
+              <CountUp value={activeLoans.length} />
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {activeLoans.length > 0 ? `KES ${formatKES(activeLoanTotal).replace('KES', '').trim()} out` : 'None outstanding'}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Milestone progress — gamified next-target ladder */}
+      <Card className="rounded-2xl shadow-sm">
+        <CardContent className="p-5">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Trophy className="h-4 w-4 text-amber-500" /> Next milestone: {formatKES(milestone.next)}
+            </div>
+            <span className="text-xs font-figures text-muted-foreground">{milestone.progress}%</span>
+          </div>
+          <div className="h-3 w-full rounded-full bg-muted overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-primary to-emerald-500 transition-all duration-700"
+              style={{ width: `${milestone.progress}%` }}
+            />
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {formatKES(milestone.prev)} reached · {formatKES(Math.max(0, milestone.next - totalBalance))} to go
+          </p>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-6 lg:grid-cols-5">
+        {/* Loan pipeline breakdown */}
+        <Card className="rounded-2xl shadow-sm lg:col-span-3">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" /> Loan Pipeline
+            </CardTitle>
+            <CardDescription>{team.loanRequests.length} request{team.loanRequests.length === 1 ? '' : 's'} all-time</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {team.loanRequests.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">No loan requests yet.</p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                {pipelineOrder.map((status) => {
+                  const meta = LOAN_STATUS_META[status];
+                  const count = pipelineCounts[status] ?? 0;
+                  const Icon = meta.icon;
+                  return (
+                    <div key={status} className="rounded-xl border p-3 text-center">
+                      <Icon className={cn('h-4 w-4 mx-auto', meta.color)} />
+                      <p className="mt-1.5 text-xl font-bold font-figures">{count}</p>
+                      <p className="text-[10px] text-muted-foreground leading-tight">{meta.label}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Top contributors snapshot */}
+        <Card className="rounded-2xl shadow-sm lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Flame className="h-4 w-4 text-orange-500" /> Top Contributors
+            </CardTitle>
+            <CardDescription>Ranked by total deposited</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {topThree.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">No savings entries yet.</p>
+            ) : (
+              topThree.map((m, i) => (
+                <div key={m.name + i} className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold">
+                    {rankBadge[i] ?? i + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium truncate">{m.name}</span>
+                      <span className="text-xs font-figures text-muted-foreground shrink-0">{formatKES(m.totalDeposits)}</span>
+                    </div>
+                    <div className="mt-1 h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-primary transition-all duration-700"
+                        style={{ width: `${Math.max(4, (m.totalDeposits / topContribution) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+            {pendingInvites > 0 && (
+              <div className="flex items-center gap-2 pt-2 mt-1 border-t text-xs text-muted-foreground">
+                <UserPlus className="h-3.5 w-3.5" /> {pendingInvites} invite{pendingInvites === 1 ? '' : 's'} awaiting response
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // Loan Account — visible to everyone, only the owner funds it
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// Savings Account — a modern, gamified analytics dashboard for the
+// chama's savings: animated KPI cards, a funds-growth chart, a
+// milestone progress bar, and a contributor leaderboard with streak
+// badges. No interest anywhere — interest is a Ludeva Investment
+// Account feature, not part of normal L-Chama savings. Visible to
+// every member; fed from the Savings Data sheet via /api/savings/sync,
+// or entered by the admin.
+// ─────────────────────────────────────────────
+function SavingsAccountTab({ team }: { team: TeamData }) {
+  const { totalChamaFunds, totalPayout, totalBalance, entryCount, leaderboard, periodSeries, milestone } =
+    team.savingsSummary;
+
+  const maxPeriodAmount = Math.max(1, ...periodSeries.map((p) => p.amount));
+  const topContribution = Math.max(1, ...leaderboard.map((m) => m.totalDeposits));
+  const rankBadge = ['🥇', '🥈', '🥉'];
+
+  return (
+    <div className="space-y-6">
+      {/* Hero KPI cards */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Card className="rounded-2xl shadow-sm overflow-hidden relative border-emerald-500/20">
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 via-transparent to-transparent" />
+          <CardContent className="p-5 relative">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Wallet className="h-4 w-4 text-emerald-600" /> Total Chama Funds
+            </div>
+            <p className="mt-2 text-3xl font-bold font-figures">
+              KES <CountUp value={totalChamaFunds} />
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">All deposits ever made</p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl shadow-sm overflow-hidden relative border-amber-500/20">
+          <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 via-transparent to-transparent" />
+          <CardContent className="p-5 relative">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <HandCoins className="h-4 w-4 text-amber-600" /> Total Payout
+            </div>
+            <p className="mt-2 text-3xl font-bold font-figures">
+              KES <CountUp value={totalPayout} />
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">All payouts ever made</p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl shadow-sm overflow-hidden relative border-primary/30 bg-primary/5">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/15 via-transparent to-transparent" />
+          <CardContent className="p-5 relative">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <PiggyBank className="h-4 w-4 text-primary" /> Total Balance
+            </div>
+            <p className="mt-2 text-3xl font-bold font-figures text-primary">
+              KES <CountUp value={totalBalance} />
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">Funds minus payouts</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {entryCount === 0 ? (
+        <Card className="rounded-2xl shadow-sm">
+          <CardContent className="p-10 text-center text-sm text-muted-foreground">
+            No savings entries yet — the dashboard fills in automatically once your admin pushes
+            data from the Savings Data sheet, or adds an entry by hand.
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* Milestone progress — gamified next-target ladder */}
+          <Card className="rounded-2xl shadow-sm">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Trophy className="h-4 w-4 text-amber-500" /> Next milestone: {formatKES(milestone.next)}
+                </div>
+                <span className="text-xs font-figures text-muted-foreground">{milestone.progress}%</span>
+              </div>
+              <div className="h-3 w-full rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-primary to-emerald-500 transition-all duration-700"
+                  style={{ width: `${milestone.progress}%` }}
+                />
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {formatKES(milestone.prev)} reached · {formatKES(Math.max(0, milestone.next - totalBalance))} to go
+              </p>
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-6 lg:grid-cols-5">
+            {/* Funds growth chart */}
+            <Card className="rounded-2xl shadow-sm lg:col-span-3">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-primary" /> Funds Growth
+                </CardTitle>
+                <CardDescription>Deposits per period, most recent {periodSeries.length} shown</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-end gap-2 h-40">
+                  {periodSeries.map((p) => (
+                    <div key={p.label} className="flex-1 flex flex-col items-center gap-1.5 group">
+                      <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity font-figures">
+                        {formatKES(p.amount)}
+                      </span>
+                      <div
+                        className="w-full rounded-t-md bg-gradient-to-t from-primary to-emerald-400 transition-all duration-700"
+                        style={{ height: `${Math.max(4, (p.amount / maxPeriodAmount) * 100)}%` }}
+                      />
+                      <span className="text-[10px] text-muted-foreground truncate max-w-full">{p.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Contributor leaderboard */}
+            <Card className="rounded-2xl shadow-sm lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Flame className="h-4 w-4 text-orange-500" /> Top Contributors
+                </CardTitle>
+                <CardDescription>Ranked by total deposited</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {leaderboard.map((m, i) => (
+                  <div key={m.name + i} className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold">
+                      {rankBadge[i] ?? i + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-medium truncate">{m.name}</span>
+                        <span className="text-xs font-figures text-muted-foreground shrink-0">{formatKES(m.totalDeposits)}</span>
+                      </div>
+                      <div className="mt-1 h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-primary transition-all duration-700"
+                          style={{ width: `${Math.max(4, (m.totalDeposits / topContribution) * 100)}%` }}
+                        />
+                      </div>
+                      {m.entryCount >= 3 && (
+                        <span className="mt-1 inline-flex items-center gap-1 text-[10px] text-orange-600">
+                          <Flame className="h-2.5 w-2.5" /> {m.entryCount}-entry streak
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function LoanAccountTab({ team }: { team: TeamData }) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();

@@ -26,9 +26,7 @@ export default async function SavingsPage() {
         periodLabel: e.periodLabel,
         openingBalance: e.openingBalance,
         deposit: e.deposit,
-        withdrawal: e.withdrawal,
-        monthlyRate: e.monthlyRate,
-        interestEarned: e.interestEarned,
+        payout: e.payout,
         closingBalance: e.closingBalance,
         notes: e.notes,
       })),
@@ -39,8 +37,9 @@ export default async function SavingsPage() {
       <div>
         <h1 className="font-headline text-2xl font-semibold">Savings Account</h1>
         <p className="text-muted-foreground">
-          Your Ludeva Savings Account — a running balance separate from your Investments, updated
-          each period by Ludeva from your deposits, withdrawals, and interest.
+          Your L-Chama Savings Account — a running balance separate from your Investments,
+          updated each period from your deposits and payouts. No interest is calculated here;
+          interest is reserved for members who hold a Ludeva Investment Account.
         </p>
       </div>
       <SavingsClient data={data} />
