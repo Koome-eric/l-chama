@@ -19,7 +19,10 @@ export default async function AccountsPage() {
       include: { product: true },
     }),
     prisma.payment.findMany({
-      where: { userId: user.id },
+      // Personal-account payments only — a chama loan-account deposit
+      // (teamId set, memberAccountId null) belongs to /deposit's own
+      // history instead, not this page's.
+      where: { userId: user.id, memberAccountId: { not: null } },
       include: { memberAccount: { include: { product: true } } },
       orderBy: { createdAt: 'desc' },
       take: 20,
@@ -51,7 +54,7 @@ export default async function AccountsPage() {
     })),
     payments: payments.map((p) => ({
       id: p.id,
-      productName: p.memberAccount.product.name,
+      productName: p.memberAccount?.product.name ?? 'Account',
       channel: p.channel,
       amount: p.amount,
       status: p.status,

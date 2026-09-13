@@ -82,6 +82,7 @@ import { SearchBox, FilterPill } from '@/components/admin/SectionToolbar';
 import {
   approveOrganisation,
   rejectOrganisation,
+  setTeamLudevaMembership,
   verifyCampaign,
   unverifyCampaign,
   createInvestmentProduct,
@@ -121,6 +122,7 @@ type TeamRow = {
   submittedAt: string;
   rejectionReason: string | null;
   isDiaspora: boolean;
+  isLudevaMember: boolean;
   objectives: string[];
   membersRunningSME: number | null;
   membersEmployed: number | null;
@@ -736,6 +738,18 @@ function OrganisationsAdminSection({ teams }: { teams: TeamRow[] }) {
     });
   };
 
+  const handleToggleLudevaMember = (id: string, value: boolean) => {
+    startTransition(async () => {
+      try {
+        await setTeamLudevaMembership(id, value);
+        toast({ title: value ? 'Marked as Ludeva member chama' : 'Unmarked as Ludeva member chama' });
+        window.location.reload();
+      } catch (err: any) {
+        toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      }
+    });
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -777,6 +791,7 @@ function OrganisationsAdminSection({ teams }: { teams: TeamRow[] }) {
                     <CardTitle className="flex flex-wrap items-center gap-2 text-base">
                       {t.name}
                       {t.isDiaspora && <Badge variant="secondary">Diaspora Chama</Badge>}
+                      {t.isLudevaMember && <Badge className="bg-primary text-primary-foreground">Ludeva Member</Badge>}
                     </CardTitle>
                     <CardDescription>
                       {t.ownerName} {t.ownerEmail ? `· ${t.ownerEmail}` : ''} {t.ownerPhone ? `· ${t.ownerPhone}` : ''}
@@ -822,6 +837,23 @@ function OrganisationsAdminSection({ teams }: { teams: TeamRow[] }) {
                   </div>
                 )}
               </dl>
+
+              <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-4">
+                <div>
+                  <p className="text-sm font-medium">Ludeva Plc member chama</p>
+                  <p className="text-xs text-muted-foreground">
+                    Member chamas withdraw by email (no in-app flow, no fee) instead of the standard 10% withdrawal fee.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant={t.isLudevaMember ? 'default' : 'outline'}
+                  disabled={isPending}
+                  onClick={() => handleToggleLudevaMember(t.id, !t.isLudevaMember)}
+                >
+                  {t.isLudevaMember ? 'Member — click to unset' : 'Mark as Ludeva member'}
+                </Button>
+              </div>
 
               {t.approvalStatus === 'PENDING_APPROVAL' && (
                 <div className="flex flex-wrap gap-2 border-t border-border/60 pt-4">

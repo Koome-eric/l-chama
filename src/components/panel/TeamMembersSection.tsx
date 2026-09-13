@@ -31,7 +31,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Users, UserPlus, Trash2, ShieldCheck, Settings2 } from 'lucide-react';
+import { Users, UserPlus, Trash2, ShieldCheck, Settings2, MessageCircle } from 'lucide-react';
 import {
   inviteChamaMember,
   revokeChamaInvite,
@@ -126,6 +126,17 @@ export function TeamMembersSection({
       () => toast({ title: 'Link copied', description: 'Share it with your invitee directly.' }),
       () => toast({ title: 'Could not copy', description: url, variant: 'destructive' })
     );
+  };
+
+  // Opens WhatsApp (web or the app) with the message pre-filled — it's
+  // sent from whoever clicks this, using their own WhatsApp number, not
+  // some app-owned business number. Works for both a specific invitee's
+  // number (if we ever collect one) or, as here, a general share where
+  // the admin picks the recipient themselves inside WhatsApp.
+  const handleShareWhatsApp = (token: string) => {
+    const url = `${window.location.origin}/invite/${token}`;
+    const message = `You're invited to join ${team.name} on L-Chama! Tap this link to accept: ${url}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
   };
 
   const handleRevoke = (inviteId: string) => {
@@ -342,6 +353,9 @@ export function TeamMembersSection({
                     <TableCell className="text-right space-x-1">
                       <Button size="sm" variant="outline" onClick={() => handleCopyLink(inv.token)}>
                         Copy Link
+                      </Button>
+                      <Button size="sm" variant="outline" className="gap-1.5" onClick={() => handleShareWhatsApp(inv.token)}>
+                        <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => handleRevoke(inv.id)}>
                         Revoke

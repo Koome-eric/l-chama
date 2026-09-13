@@ -181,6 +181,24 @@ export async function rejectOrganisation(teamId: string, reason?: string) {
   return { success: true };
 }
 
+// Whether a chama is one of Ludeva Plc's own member chamas — set here
+// only, never by the chama itself. Ludeva-member chamas withdraw by
+// emailing lchama@ludevaplc.co.ke / invst@ludevaplc.co.ke instead of the
+// in-app 3-signatory flow, and pay no platform withdrawal fee (see
+// src/lib/withdrawals.ts). Everyone else defaults to non-member (fee-
+// paying, in-app flow) — this only needs setting for the exception.
+export async function setTeamLudevaMembership(teamId: string, isLudevaMember: boolean) {
+  await requireAdmin();
+
+  const team = await prisma.team.findUnique({ where: { id: teamId } });
+  if (!team) throw new Error('Organisation not found.');
+
+  await prisma.team.update({ where: { id: teamId }, data: { isLudevaMember } });
+
+  revalidatePath('/admin');
+  return { success: true };
+}
+
 export async function verifyCampaign(campaignId: string) {
   await requireAdmin();
 
@@ -567,34 +585,56 @@ export async function deleteSavingsEntry(entryId: string) {
 export async function resolvePayment(paymentId: string, status: 'SUCCESS' | 'FAILED' | 'CANCELLED', note?: string) {
   await requireAdmin();
 
-  const payment = await prisma.payment.findUnique({ where: { id: paymentId }, include: { memberAccount: { include: { product: true } }, user: true } });
+  const payment = await prisma.payment.findUnique({
+    where: { id: paymentId },
+    include: { memberAccount: { include: { product: true } }, team: true, user: true },
+  });
   if (!payment) throw new Error('Payment not found.');
   if (payment.status !== 'PENDING') throw new Error('This payment has already been resolved.');
 
+  // A payment credits either a personal MemberAccount (/accounts) or a
+  // chama's shared LoanAccount (/deposit) — see prisma/schema.prisma.
+  const target = payment.memberAccount ? payment.memberAccount.product.name : payment.team ? `${payment.team.name}'s loan account` : 'your account';
+
   if (status === 'SUCCESS') {
-    await prisma.$transaction([
-      prisma.payment.update({ where: { id: paymentId }, data: { status, note: note?.trim() || undefined } }),
-      prisma.memberAccount.update({
-        where: { id: payment.memberAccountId },
-        data: { balance: { increment: payment.amount } },
-      }),
-    ]);
+    if (payment.memberAccountId) {
+      await prisma.$transaction([
+        prisma.payment.update({ where: { id: paymentId }, data: { status, note: note?.trim() || undefined } }),
+        prisma.memberAccount.update({
+          where: { id: payment.memberAccountId },
+          data: { balance: { increment: payment.amount } },
+        }),
+      ]);
+    } else if (payment.teamId) {
+      await prisma.$transaction([
+        prisma.payment.update({ where: { id: paymentId }, data: { status, note: note?.trim() || undefined } }),
+        prisma.loanAccount.upsert({
+          where: { teamId: payment.teamId },
+          create: { teamId: payment.teamId, balance: Math.max(0, payment.amount) },
+          update: { balance: { increment: payment.amount } },
+        }),
+      ]);
+      await syncChamaToLudeva(payment.teamId);
+    } else {
+      await prisma.payment.update({ where: { id: paymentId }, data: { status, note: note?.trim() || undefined } });
+    }
     await notifyUser(
       payment.userId,
       'Payment confirmed',
-      `Your KES ${payment.amount.toLocaleString()} payment to ${payment.memberAccount.product.name} was confirmed and credited.`
+      `Your KES ${payment.amount.toLocaleString()} payment to ${target} was confirmed and credited.`
     );
   } else {
     await prisma.payment.update({ where: { id: paymentId }, data: { status, note: note?.trim() || undefined } });
     await notifyUser(
       payment.userId,
       'Payment not completed',
-      `Your KES ${payment.amount.toLocaleString()} payment to ${payment.memberAccount.product.name} could not be confirmed.${note ? ` ${note}` : ''}`
+      `Your KES ${payment.amount.toLocaleString()} payment to ${target} could not be confirmed.${note ? ` ${note}` : ''}`
     );
   }
 
   revalidatePath('/admin');
   revalidatePath('/accounts');
+  revalidatePath('/deposit');
   return { success: true };
 }
 

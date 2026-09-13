@@ -132,6 +132,15 @@ model Team {
   // chamas need diaspora-specific support.
   isDiaspora Boolean @default(false)
 
+  // Set by a platform admin only (see /admin → Organisations), never by
+  // the chama itself. A Ludeva-member chama withdraws by emailing
+  // lchama@ludevaplc.co.ke / invst@ludevaplc.co.ke instead of the in-app
+  // 3-signatory flow, and pays no platform withdrawal fee — that flow
+  // and its flat fee (see PLATFORM_WITHDRAWAL_FEE_RATE) are for external
+  // / non-member chamas only. Defaults to false (external) since that's
+  // every chama that signs up on this platform on its own.
+  isLudevaMember Boolean @default(false)
+
   // ── Onboarding questions answered by the Team Leader at signup ──
   // What is this chama saving towards? Multi-select, stored as the
   // ChamaObjective enum values below.
@@ -149,6 +158,8 @@ model Team {
   lastRespectClaims       LastRespectClaim[]
 
   approvalStatus OrganisationApprovalStatus @default(PENDING_APPROVAL)
+  privacyPolicyAccepted Boolean @default(false)
+  termsAcceptedAt      DateTime?
   submittedAt    DateTime                   @default(now())
   decidedById    String?
   decidedBy      User?                      @relation("TeamDecidedBy", fields: [decidedById], references: [id])
@@ -171,6 +182,7 @@ model Team {
   memberReports   MemberReport[]
   savingsEntries  SavingsEntry[]
   withdrawals     WithdrawalRequest[]
+  loanDeposits    Payment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -569,13 +581,22 @@ enum PaymentStatus {
   CANCELLED
 }
 
+// A payment INTO the platform — either topping up a personal
+// MemberAccount (/accounts) or a chama's shared LoanAccount (/deposit).
+// Exactly one of memberAccountId/teamId is set, matching which page it
+// came from. See src/lib/payment-resolution.ts for how it's resolved.
 model Payment {
   id String @id @default(cuid())
 
   userId          String
   user            User           @relation(fields: [userId], references: [id])
-  memberAccountId String
-  memberAccount   MemberAccount  @relation(fields: [memberAccountId], references: [id])
+  memberAccountId String?
+  memberAccount   MemberAccount? @relation(fields: [memberAccountId], references: [id])
+  // Set instead of memberAccountId for a deposit into a chama's shared
+  // LoanAccount (the /deposit page) rather than a personal MemberAccount
+  // (the /accounts page). Exactly one of the two is set.
+  teamId          String?
+  team            Team?          @relation(fields: [teamId], references: [id])
 
   channel PaymentChannel
   amount  Float

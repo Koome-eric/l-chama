@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowUpFromLine, CheckCircle2, XCircle, Clock, ShieldCheck } from 'lucide-react';
+import { ArrowUpFromLine, CheckCircle2, XCircle, Clock, ShieldCheck, Mail } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -33,6 +33,38 @@ const STATUS_META: Record<string, { label: string; variant: 'default' | 'seconda
 export function WithdrawClient({ state, canRequest }: { state: WithdrawState; canRequest: boolean }) {
   const router = useRouter();
   const { toast } = useToast();
+
+  if (state.isLudevaMember) {
+    return (
+      <div className="space-y-6 max-w-3xl">
+        <div>
+          <h1 className="font-headline text-2xl font-bold flex items-center gap-2">
+            <ArrowUpFromLine className="h-6 w-6 text-primary" /> Withdraw
+          </h1>
+        </div>
+
+        <Card className="rounded-2xl">
+          <CardContent className="p-6">
+            <p className="text-sm text-muted-foreground">Available balance</p>
+            <p className="text-3xl font-bold text-gold">{formatKES(state.availableBalance)}</p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border-primary/30 bg-primary/5">
+          <CardContent className="p-6 space-y-2">
+            <p className="font-headline font-semibold flex items-center gap-2">
+              <Mail className="h-4 w-4 text-primary" /> {state.team.name} is a Ludeva Plc member chama
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Withdrawals for Ludeva member chamas aren't requested in-app and carry no platform fee. Have a member
+              email <a href={`mailto:${state.ludevaMemberWithdrawalContact.split(' or ')[0]}`} className="underline">lchama@ludevaplc.co.ke</a>{' '}
+              or <a href="mailto:invst@ludevaplc.co.ke" className="underline">invst@ludevaplc.co.ke</a> to request one.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-3xl">

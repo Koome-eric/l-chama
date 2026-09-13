@@ -24,6 +24,10 @@ export async function finalizePaymentByReference(
   if (payment.status !== 'PENDING') return payment; // already resolved — idempotent
 
   if (status === 'SUCCESS') {
+    if (!payment.memberAccountId || !payment.memberAccount) {
+      return prisma.payment.update({ where: { id: payment.id }, data: { status, note } });
+    }
+
     const [, updated] = await prisma.$transaction([
       prisma.memberAccount.update({
         where: { id: payment.memberAccountId },
@@ -42,10 +46,11 @@ export async function finalizePaymentByReference(
   }
 
   const updated = await prisma.payment.update({ where: { id: payment.id }, data: { status, note } });
+  const paymentTarget = payment.memberAccount?.product.name ?? 'your account';
   await notifyUser(
     payment.userId,
     'Payment not completed',
-    `Your KES ${payment.amount.toLocaleString()} payment to ${payment.memberAccount.product.name} could not be confirmed.${note ? ` ${note}` : ''}`
+    `Your KES ${payment.amount.toLocaleString()} payment to ${paymentTarget} could not be confirmed.${note ? ` ${note}` : ''}`
   );
   revalidatePath('/accounts');
   revalidatePath('/admin');

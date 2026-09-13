@@ -11,14 +11,20 @@ import type { SignatoryRole, WithdrawalScope } from '@prisma/client';
 /*  Same rule for both: the Admin (creator/owner), Secretary, and   */
 /*  Treasurer each get one vote; a payout only fires once all three */
 /*  have APPROVED, and any single REJECTED kills the request.       */
-/*  Campaign payouts take the platform's flat 4.9% fee; chama payouts */
-/*  take the same 4.9% — one unified withdrawal fee platform-wide.  */
+/*  Campaign payouts take the platform's flat 10% fee; chama payouts   */
+/*  take the same 10% — but only for external/non-member chamas. A    */
+/*  Ludeva-member chama (Team.isLudevaMember) never reaches this        */
+/*  engine at all — it withdraws by emailing lchama@ludevaplc.co.ke /  */
+/*  invst@ludevaplc.co.ke instead, so createWithdrawalRequest refuses  */
+/*  to open an in-app request for one (see the CHAMA branch below).    */
 /*  The rate itself lives in src/lib/withdrawal-fee.ts (re-exported  */
 /*  below) so client components can read it without importing this  */
 /*  server-only file.                                                */
 /* ────────────────────────────────────────────────────────────── */
 
 export { PLATFORM_WITHDRAWAL_FEE_RATE };
+
+const LUDEVA_MEMBER_WITHDRAWAL_EMAILS = 'lchama@ludevaplc.co.ke or invst@ludevaplc.co.ke';
 
 const ROLE_LABEL: Record<SignatoryRole, string> = {
   ADMIN: 'Admin',
@@ -31,7 +37,7 @@ type Signatories = { adminId: string; secretaryId: string | null; treasurerId: s
 async function getPoolContext(
   scope: WithdrawalScope,
   scopeId: string
-): Promise<{ signatories: Signatories; availableBalance: number; label: string }> {
+): Promise<{ signatories: Signatories; availableBalance: number; label: string; isLudevaMember: boolean }> {
   if (scope === 'CAMPAIGN') {
     const campaign = await prisma.campaign.findUnique({ where: { id: scopeId } });
     if (!campaign) throw new Error('Campaign not found.');
@@ -39,6 +45,7 @@ async function getPoolContext(
       signatories: { adminId: campaign.creatorId, secretaryId: campaign.secretaryId, treasurerId: campaign.treasurerId },
       availableBalance: campaign.raisedAmount - campaign.withdrawnAmount,
       label: campaign.title,
+      isLudevaMember: false,
     };
   }
 
@@ -48,6 +55,7 @@ async function getPoolContext(
     signatories: { adminId: team.ownerId, secretaryId: team.secretaryId, treasurerId: team.treasurerId },
     availableBalance: team.loanAccount?.balance ?? 0,
     label: team.name,
+    isLudevaMember: team.isLudevaMember,
   };
 }
 
@@ -60,13 +68,15 @@ function roleOf(signatories: Signatories, userId: string): SignatoryRole | null 
 
 /** Everything a UI needs to render "who are the 3 signatories, and where does this request stand". */
 export async function getSignatoryStatus(scope: WithdrawalScope, scopeId: string, userId: string) {
-  const { signatories, availableBalance, label } = await getPoolContext(scope, scopeId);
+  const { signatories, availableBalance, label, isLudevaMember } = await getPoolContext(scope, scopeId);
   return {
     label,
     availableBalance,
     myRole: roleOf(signatories, userId),
     signatoriesComplete: !!signatories.secretaryId && !!signatories.treasurerId,
     signatories,
+    isLudevaMember,
+    ludevaMemberWithdrawalContact: LUDEVA_MEMBER_WITHDRAWAL_EMAILS,
   };
 }
 
@@ -84,7 +94,12 @@ export async function createWithdrawalRequest(input: {
     throw new Error('Enter a valid Safaricom number to pay out to, e.g. 07XX XXX XXX.');
   }
 
-  const { signatories, availableBalance, label } = await getPoolContext(input.scope, input.scopeId);
+  const { signatories, availableBalance, label, isLudevaMember } = await getPoolContext(input.scope, input.scopeId);
+  if (isLudevaMember) {
+    throw new Error(
+      `${label} is a Ludeva Plc member chama — withdrawals aren't requested in-app. A member should email ${LUDEVA_MEMBER_WITHDRAWAL_EMAILS} instead.`
+    );
+  }
   if (!signatories.secretaryId || !signatories.treasurerId) {
     throw new Error(
       `Assign a Secretary and a Treasurer for ${label} first — all three signatories must approve a withdrawal.`

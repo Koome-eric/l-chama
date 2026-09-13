@@ -30,7 +30,7 @@ export default async function AdminPage() {
     prisma.user.count(),
     prisma.loanAccount.aggregate({ _sum: { balance: true } }),
     prisma.payment.findMany({
-      include: { user: true, memberAccount: { include: { product: true } } },
+      include: { user: true, memberAccount: { include: { product: true } }, team: true },
       orderBy: { createdAt: 'desc' },
       take: 200,
     }),
@@ -58,6 +58,7 @@ export default async function AdminPage() {
     submittedAt: t.submittedAt.toISOString(),
     rejectionReason: t.rejectionReason,
     isDiaspora: t.isDiaspora,
+    isLudevaMember: t.isLudevaMember,
     objectives: t.objectives,
     membersRunningSME: t.membersRunningSME,
     membersEmployed: t.membersEmployed,
@@ -124,7 +125,7 @@ export default async function AdminPage() {
   const paymentData = payments.map((p: (typeof payments)[number]) => ({
     id: p.id,
     memberName: p.user.fullName || p.user.email || p.user.phone || 'Unknown',
-    productName: p.memberAccount.product.name,
+    productName: p.memberAccount ? p.memberAccount.product.name : p.team ? `${p.team.name} (loan account deposit)` : '—',
     channel: p.channel,
     amount: p.amount,
     status: p.status,

@@ -100,6 +100,7 @@ export default async function ChamaPanelPage({
     id: ctx.team.id,
     name: ctx.team.name,
     photoUrl: ctx.team.photoUrl,
+    isLudevaMember: ctx.team.isLudevaMember,
     isOwner: ctx.isOwner,
     permissions: ctx.permissions,
     levelName: ctx.team.levelName,

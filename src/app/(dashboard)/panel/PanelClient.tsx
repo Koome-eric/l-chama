@@ -108,6 +108,7 @@ type TeamData = {
   id: string;
   name: string;
   photoUrl: string | null;
+  isLudevaMember: boolean;
   isOwner: boolean;
   permissions: ChamaPermissions;
   levelName: string | null;
@@ -672,14 +673,26 @@ function LoanAccountTab({ team }: { team: TeamData }) {
           <p className="text-sm text-muted-foreground mt-1">Available for approved loans</p>
         </div>
 
-        <LoanAccountPayoutPreview availableBalance={team.loanAccount.balance} />
+        <LoanAccountPayoutPreview availableBalance={team.loanAccount.balance} isLudevaMember={team.isLudevaMember} />
       </CardContent>
     </Card>
   );
 }
 
-function LoanAccountPayoutPreview({ availableBalance }: { availableBalance: number }) {
+function LoanAccountPayoutPreview({ availableBalance, isLudevaMember }: { availableBalance: number; isLudevaMember: boolean }) {
   const [amount, setAmount] = useState('');
+
+  if (isLudevaMember) {
+    return (
+      <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 space-y-1">
+        <p className="text-sm font-medium">Free — no withdrawal fee for Ludeva member chamas</p>
+        <p className="text-xs text-muted-foreground">
+          A member can email lchama@ludevaplc.co.ke or invst@ludevaplc.co.ke to request a withdrawal.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-2xl border p-4 space-y-3">
       <div>

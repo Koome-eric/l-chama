@@ -74,6 +74,7 @@ export type ChamaContext = {
     id: string;
     name: string;
     photoUrl: string | null;
+    isLudevaMember: boolean;
     ownerId: string;
     owner: User;
     levelKey: string | null;
