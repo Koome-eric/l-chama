@@ -57,10 +57,15 @@ export function PaymentDialog({
     startTransition(async () => {
       try {
         const res = await initiateCardPayment({ productId, amount: value });
-        toast({ title: 'Card request sent', description: res.message });
+        if (res.authorizationUrl) {
+          // Hand off to Paystack's hosted checkout; it redirects back to
+          // /api/payments/paystack/callback -> /accounts when done.
+          window.location.href = res.authorizationUrl;
+          return;
+        }
+        toast({ title: 'Card payment', description: res.message });
         setOpen(false);
         setAmount('');
-        window.location.reload();
       } catch (err: any) {
         toast({ title: 'Error', description: err.message, variant: 'destructive' });
       }
@@ -115,7 +120,7 @@ export function PaymentDialog({
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              You'll get a prompt on your phone to enter your M-Pesa PIN once this is live.
+              You'll get a prompt on your phone to enter your M-Pesa PIN.
             </p>
             <DialogFooter className="pt-1">
               <Button onClick={handleMpesa} disabled={isPending || !amount || !phone} className="w-full gap-2">
@@ -136,7 +141,7 @@ export function PaymentDialog({
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              You'll be sent to a secure checkout page to enter your Visa card details once this is live.
+              You'll be sent to a secure checkout page to enter your Visa card details.
               We never collect your card number directly.
             </p>
             <DialogFooter className="pt-1">

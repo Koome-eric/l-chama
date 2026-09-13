@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 import { auth, clerkClient } from '@clerk/nextjs/server';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 
@@ -61,38 +62,56 @@ export async function completeProfile(input: ProfileInput) {
 
   const existing = await prisma.user.findUnique({ where: { clerkId } });
 
-  if (!existing) {
-    await prisma.user.create({
-      data: {
-        clerkId,
-        email: email || undefined,
-        phone: phone || undefined,
-        firstName: d.firstName.trim(),
-        lastName: d.lastName.trim(),
-        fullName,
-        idNumber: d.idNumber.trim(),
-        gender: d.gender,
-        country: d.country,
-        region: d.region.trim(),
-        profileCompleted: true,
-      },
-    });
-  } else {
-    await prisma.user.update({
-      where: { id: existing.id },
-      data: {
-        email: email || existing.email,
-        phone: phone || existing.phone,
-        firstName: d.firstName.trim(),
-        lastName: d.lastName.trim(),
-        fullName,
-        idNumber: d.idNumber.trim(),
-        gender: d.gender,
-        country: d.country,
-        region: d.region.trim(),
-        profileCompleted: true,
-      },
-    });
+  // email and phone are unique on User — surface a clear message instead
+  // of letting an unhandled Prisma error crash the render (which is all
+  // Next.js shows in production: a generic "Server Components render"
+  // box with no detail).
+  try {
+    if (!existing) {
+      await prisma.user.create({
+        data: {
+          clerkId,
+          email: email || undefined,
+          phone: phone || undefined,
+          firstName: d.firstName.trim(),
+          lastName: d.lastName.trim(),
+          fullName,
+          idNumber: d.idNumber.trim(),
+          gender: d.gender,
+          country: d.country,
+          region: d.region.trim(),
+          profileCompleted: true,
+        },
+      });
+    } else {
+      await prisma.user.update({
+        where: { id: existing.id },
+        data: {
+          email: email || existing.email,
+          phone: phone || existing.phone,
+          firstName: d.firstName.trim(),
+          lastName: d.lastName.trim(),
+          fullName,
+          idNumber: d.idNumber.trim(),
+          gender: d.gender,
+          country: d.country,
+          region: d.region.trim(),
+          profileCompleted: true,
+        },
+      });
+    }
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      const target = Array.isArray(err.meta?.target) ? err.meta?.target.join(', ') : String(err.meta?.target ?? '');
+      if (target.includes('email')) {
+        throw new Error('That email address is already registered to another account. Try signing in instead, or use a different email.');
+      }
+      if (target.includes('phone')) {
+        throw new Error('That phone number is already registered to another account. Try signing in instead, or use a different number.');
+      }
+      throw new Error('Some of these details are already registered to another account.');
+    }
+    throw err;
   }
 
   revalidatePath('/onboarding/profile');

@@ -9,6 +9,8 @@ import { formatKES } from '@/lib/chama-levels';
 import { daysLeft, progressPct } from '@/lib/campaigns';
 import { DonateDialog } from '../CampaignsClient';
 import { CloseCampaignButton } from './CloseCampaignButton';
+import { ShareCampaignCard, CampaignWithdrawSection, CampaignCoverImage } from './CampaignManageClient';
+import { getCampaignWithdrawState } from '../actions';
 
 export default async function CampaignDetailPage({
   params,
@@ -23,6 +25,7 @@ export default async function CampaignDetailPage({
     include: {
       creator: true,
       donations: {
+        where: { status: 'SUCCESS' },
         include: { donor: true },
         orderBy: { createdAt: 'desc' },
         take: 20,
@@ -35,11 +38,16 @@ export default async function CampaignDetailPage({
   const pct = progressPct(campaign.raisedAmount, campaign.targetAmount);
   const remaining = daysLeft(campaign.deadline);
   const isCreator = campaign.creatorId === user.id;
+  const withdrawState = await getCampaignWithdrawState(campaign.id);
 
   return (
     <div className="space-y-6 max-w-4xl">
       <div className="rounded-2xl overflow-hidden border border-border/60">
-        {campaign.imageUrl ? (
+        {isCreator ? (
+          <div className="p-4">
+            <CampaignCoverImage campaignId={campaign.id} imageUrl={campaign.imageUrl} />
+          </div>
+        ) : campaign.imageUrl ? (
           <div className="relative h-56 w-full bg-muted">
             <Image src={campaign.imageUrl} alt={campaign.title} fill className="object-cover" unoptimized />
           </div>
@@ -93,7 +101,7 @@ export default async function CampaignDetailPage({
                     <li key={d.id} className="flex items-start justify-between gap-3 text-sm">
                       <div>
                         <p className="font-medium">
-                          {d.anonymous ? 'Anonymous' : d.donor.fullName || d.donor.email || 'Supporter'}
+                          {d.anonymous ? 'Anonymous' : d.donor?.fullName || d.donor?.email || d.guestName || 'Supporter'}
                         </p>
                         {d.message && <p className="text-muted-foreground text-xs mt-0.5">{d.message}</p>}
                       </div>
@@ -142,6 +150,10 @@ export default async function CampaignDetailPage({
               </CardContent>
             </Card>
           )}
+
+          {campaign.status === 'ACTIVE' && <ShareCampaignCard campaignId={campaign.id} />}
+
+          <CampaignWithdrawSection state={withdrawState} />
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   Card,
@@ -16,6 +17,7 @@ import { formatKES } from '@/lib/chama-levels';
 import { CountUp } from '@/components/motion/CountUp';
 import { PaymentDialog } from '@/components/payments/PaymentDialog';
 import { JuniorApplicationDialog } from '@/components/payments/JuniorApplicationDialog';
+import { useToast } from '@/hooks/use-toast';
 
 type ProductType = 'STOCK' | 'SAVINGS' | 'JUNIOR';
 
@@ -93,6 +95,26 @@ export function AccountsClient({
 }) {
   const searchParams = useSearchParams();
   const openJunior = searchParams.get('open') === 'junior';
+  const { toast } = useToast();
+
+  // After a Paystack card checkout redirect (see
+  // /api/payments/paystack/callback), let the member know how it went.
+  useEffect(() => {
+    const payment = searchParams.get('payment');
+    if (!payment) return;
+    if (payment === 'success') {
+      toast({ title: 'Payment confirmed', description: 'Your card payment was successful and your account has been credited.' });
+    } else if (payment === 'failed') {
+      toast({ title: 'Payment not completed', description: 'Your card payment did not go through. You can try again.', variant: 'destructive' });
+    } else if (payment === 'error') {
+      toast({ title: 'Could not confirm payment', description: 'We could not verify that payment. If money left your account, contact support.', variant: 'destructive' });
+    }
+    const url = new URL(window.location.href);
+    url.searchParams.delete('payment');
+    window.history.replaceState({}, '', url.toString());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   const accountByProductId = new Map(data.accounts.map((a) => [a.productId, a]));
   const latestJuniorApp = data.juniorApplications[0];
 

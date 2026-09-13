@@ -54,6 +54,16 @@ const config: Config = {
           DEFAULT: "hsl(var(--chama-green))",
           foreground: "hsl(var(--chama-green-foreground))",
         },
+
+        // Registered as a real theme color (not just the hand-rolled
+        // .text-gold/.bg-gold utilities in globals.css) so every Tailwind
+        // color utility variant — fill-gold, stroke-gold/40, border-gold/40,
+        // from-gold/5, etc. — works, not just the couple of classes that
+        // happened to be hand-written.
+        gold: {
+          DEFAULT: "hsl(var(--gold))",
+          foreground: "hsl(var(--gold-foreground))",
+        },
       },
 
       borderRadius: {

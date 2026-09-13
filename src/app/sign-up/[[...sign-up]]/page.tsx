@@ -14,8 +14,15 @@ import { CaptureAuthRedirect } from '@/components/CaptureAuthRedirect';
 // in the way. Mirrors /sign-in's pattern exactly.
 export default function Page() {
   return (
-    <div className="flex justify-center items-center min-h-screen bg-background p-4">
+    <div className="flex flex-col justify-center items-center min-h-screen bg-background p-4 gap-4">
       <SignUp path="/sign-up" fallbackRedirectUrl="/onboarding" />
+      <p className="text-xs text-muted-foreground text-center max-w-sm">
+        By creating an account you agree to our{' '}
+        <a href="/privacy" className="underline hover:text-foreground">
+          Privacy Policy
+        </a>
+        .
+      </p>
       <Suspense fallback={null}>
         <CaptureAuthRedirect />
         <PostAuthRedirect />

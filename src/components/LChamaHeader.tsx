@@ -22,6 +22,15 @@ export default function LChamaHeader() {
           />
         </Link>
 
+        <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-muted-foreground">
+          <Link href="/contact" className="hover:text-foreground transition-colors">
+            Contact
+          </Link>
+          <Link href="/privacy" className="hover:text-foreground transition-colors">
+            Privacy Policy
+          </Link>
+        </nav>
+
         <div className="flex items-center gap-3">
           {isSignedIn ? (
             <Button asChild size="sm">

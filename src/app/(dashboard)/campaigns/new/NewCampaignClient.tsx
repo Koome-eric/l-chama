@@ -17,6 +17,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { CAMPAIGN_CATEGORIES } from '@/lib/campaigns';
 import { createCampaign } from '../actions';
+import { ImageUploadField } from '@/components/uploads/ImageUploadField';
 
 export function NewCampaignClient() {
   const router = useRouter();
@@ -141,11 +142,15 @@ export function NewCampaignClient() {
               placeholder="Number of people this helps"
             />
           </div>
-          <div>
-            <Label htmlFor="imageUrl">Image URL (optional)</Label>
-            <Input id="imageUrl" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..." />
-          </div>
         </div>
+
+        <ImageUploadField
+          label="Cover Image (optional)"
+          value={imageUrl}
+          onChange={setImageUrl}
+          folder="campaigns"
+          uploadLabel="cover"
+        />
 
         {error && <p className="text-sm text-destructive">{error}</p>}
 

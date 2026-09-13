@@ -10,6 +10,8 @@ import {
   Users,
   Clock,
   MapPin,
+  Smartphone,
+  CreditCard,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,11 +28,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { formatKES } from '@/lib/chama-levels';
 import { daysLeft, progressPct } from '@/lib/campaigns';
-import { donateToCampaign } from './actions';
+import { donateToCampaign } from '@/app/give/actions';
 
 type CampaignCard = {
   id: string;
@@ -186,16 +188,21 @@ export function DonateDialog({ campaignId, campaignTitle }: { campaignId: string
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState('');
+  const [phone, setPhone] = useState('');
   const [message, setMessage] = useState('');
   const [anonymous, setAnonymous] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  const handleDonate = () => {
+  const handleDonate = (method: 'mpesa' | 'card') => {
     const value = Number(amount);
     startTransition(async () => {
       try {
-        await donateToCampaign({ campaignId, amount: value, message, anonymous });
-        toast({ title: 'Thank you for your donation!', description: `${formatKES(value)} to ${campaignTitle}.` });
+        const res = await donateToCampaign({ campaignId, amount: value, method, phone, message, anonymous });
+        if (res.mode === 'redirect' && res.authorizationUrl) {
+          window.location.href = res.authorizationUrl;
+          return;
+        }
+        toast({ title: 'M-Pesa request sent', description: res.message });
         setOpen(false);
         setAmount('');
         setMessage('');
@@ -246,12 +253,50 @@ export function DonateDialog({ campaignId, campaignTitle }: { campaignId: string
             />
             Donate anonymously
           </label>
+
+          <Tabs defaultValue="mpesa">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="mpesa" className="gap-1.5">
+                <Smartphone className="h-3.5 w-3.5" /> M-Pesa
+              </TabsTrigger>
+              <TabsTrigger value="card" className="gap-1.5">
+                <CreditCard className="h-3.5 w-3.5" /> Visa Card
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="mpesa" className="space-y-3 pt-2">
+              <div>
+                <Label htmlFor="donatePhone">M-Pesa Number</Label>
+                <Input
+                  id="donatePhone"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="07XX XXX XXX"
+                />
+              </div>
+              <Button
+                onClick={() => handleDonate('mpesa')}
+                disabled={isPending || !amount || Number(amount) <= 0 || !phone}
+                className="w-full gap-2"
+              >
+                <Smartphone className="h-4 w-4" /> {isPending ? 'Sending…' : 'Pay with M-Pesa'}
+              </Button>
+            </TabsContent>
+
+            <TabsContent value="card" className="space-y-3 pt-2">
+              <p className="text-xs text-muted-foreground">
+                You'll be sent to a secure checkout page to enter your Visa card details.
+              </p>
+              <Button
+                onClick={() => handleDonate('card')}
+                disabled={isPending || !amount || Number(amount) <= 0}
+                className="w-full gap-2"
+              >
+                <CreditCard className="h-4 w-4" /> {isPending ? 'Redirecting…' : 'Pay with Visa Card'}
+              </Button>
+            </TabsContent>
+          </Tabs>
         </div>
-        <DialogFooter>
-          <Button onClick={handleDonate} disabled={isPending || !amount || Number(amount) <= 0}>
-            {isPending ? 'Processing…' : 'Confirm Donation'}
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

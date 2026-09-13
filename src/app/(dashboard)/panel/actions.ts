@@ -14,6 +14,7 @@ import {
   type ChamaPermissions,
 } from '@/lib/chama';
 import { syncChamaToLudeva } from '@/lib/ludeva-sync';
+import { createWithdrawalRequest, decideWithdrawalRequest, getSignatoryStatus } from '@/lib/withdrawals';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 // The domain in this address MUST be a domain verified in the Resend
@@ -445,6 +446,125 @@ export async function markRepaymentPaid(repaymentId: string) {
   }
 
   await syncChamaToLudeva(ctx.team.id);
+
+  revalidatePath('/panel');
+  return { success: true };
+}
+
+/* ────────────────────────────────────────────────────────────── */
+/*     3-SIGNATORY WITHDRAWAL — Admin (Chama creator) + Secretary   */
+/*                        + Treasurer                               */
+/*                                                                   */
+/*  Same rule and engine as campaign withdrawals (see                */
+/*  src/lib/withdrawals.ts) — the pool here is the chama's           */
+/*  LoanAccount balance instead of a campaign's donations, and       */
+/*  there's no platform fee on a chama's own money moving out.       */
+/* ────────────────────────────────────────────────────────────── */
+
+// Only the owner assigns signatories — same "Admin" role a chama's
+// creator already implicitly has everywhere else in this file.
+export async function setChamaSignatories(input: { secretaryMembershipId?: string; treasurerMembershipId?: string }) {
+  const user = await getCurrentDbUser();
+  const ctx = await getChamaContext(user);
+  if (!ctx) throw new Error('You are not part of a chama.');
+  if (!ctx.isOwner) throw new Error('Only the chama creator (Admin) can assign signatories.');
+
+  const resolve = (membershipId?: string) => {
+    if (!membershipId) return undefined;
+    const member = ctx.team.members.find((m) => m.id === membershipId);
+    if (!member) throw new Error('That member was not found in this chama.');
+    return member.userId;
+  };
+
+  const secretaryId = resolve(input.secretaryMembershipId);
+  const treasurerId = resolve(input.treasurerMembershipId);
+  if (secretaryId && treasurerId && secretaryId === treasurerId) {
+    throw new Error('Secretary and Treasurer must be two different members.');
+  }
+
+  await prisma.team.update({
+    where: { id: ctx.team.id },
+    data: {
+      secretaryId: secretaryId ?? undefined,
+      treasurerId: treasurerId ?? undefined,
+    },
+  });
+
+  revalidatePath('/panel');
+  revalidatePath('/withdraw');
+  return { success: true };
+}
+
+export async function requestChamaWithdrawal(input: { amount: number; destinationPhone: string; reason?: string }) {
+  const user = await getCurrentDbUser();
+  const ctx = await getChamaContext(user);
+  if (!ctx) throw new Error('You are not part of a chama.');
+
+  await createWithdrawalRequest({
+    scope: 'CHAMA',
+    scopeId: ctx.team.id,
+    requestedById: user.id,
+    amount: input.amount,
+    destinationPhone: input.destinationPhone,
+    reason: input.reason,
+  });
+
+  revalidatePath('/withdraw');
+  return { success: true };
+}
+
+export async function decideChamaWithdrawal(input: {
+  withdrawalRequestId: string;
+  decision: 'APPROVED' | 'REJECTED';
+  comment?: string;
+}) {
+  const user = await getCurrentDbUser();
+  const result = await decideWithdrawalRequest({
+    withdrawalRequestId: input.withdrawalRequestId,
+    userId: user.id,
+    decision: input.decision,
+    comment: input.comment,
+  });
+  revalidatePath('/withdraw');
+  return result;
+}
+
+export async function getChamaWithdrawState() {
+  const user = await getCurrentDbUser();
+  const ctx = await getChamaContext(user);
+  if (!ctx) throw new Error('You are not part of a chama.');
+
+  const [status, requests] = await Promise.all([
+    getSignatoryStatus('CHAMA', ctx.team.id, user.id),
+    prisma.withdrawalRequest.findMany({
+      where: { teamId: ctx.team.id },
+      include: { approvals: { include: { approver: true } }, requestedBy: true },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    }),
+  ]);
+
+  return {
+    team: { id: ctx.team.id, name: ctx.team.name },
+    myUserId: user.id,
+    isOwner: ctx.isOwner,
+    members: ctx.team.members.map((m) => ({ id: m.id, userId: m.userId, name: m.user.fullName || m.user.email || m.user.phone })),
+    secretary: ctx.team.secretary ? { userId: ctx.team.secretaryId!, name: ctx.team.secretary.fullName || ctx.team.secretary.email } : null,
+    treasurer: ctx.team.treasurer ? { userId: ctx.team.treasurerId!, name: ctx.team.treasurer.fullName || ctx.team.treasurer.email } : null,
+    ...status,
+    requests,
+  };
+}
+
+// Owner-only — the chama's profile photo, shown across the app wherever
+// the chama is listed (panel, team page).
+export async function updateChamaPhoto(photoUrl: string) {
+  const user = await getCurrentDbUser();
+  const ctx = await getChamaContext(user);
+  if (!ctx) throw new Error('You are not part of a chama.');
+  if (!ctx.isOwner) throw new Error('Only the chama creator (Admin) can change the chama photo.');
+
+  await prisma.team.update({ where: { id: ctx.team.id }, data: { photoUrl: photoUrl || null } });
 
   revalidatePath('/panel');
   return { success: true };

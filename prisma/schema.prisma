@@ -62,6 +62,17 @@ model User {
   donationsMade    Donation[] @relation("DonationDonor")
   teamInvestmentsMade TeamInvestment[] @relation("TeamInvestmentInitiator")
 
+  // ── Signatory roles — see WithdrawalRequest below. A chama's Admin is
+  // just its owner; a campaign's Admin is just its creator. Secretary and
+  // Treasurer are each a single additional member the Admin designates. ──
+  secretaryOfTeams     Team[]     @relation("TeamSecretary")
+  treasurerOfTeams     Team[]     @relation("TeamTreasurer")
+  secretaryOfCampaigns Campaign[] @relation("CampaignSecretary")
+  treasurerOfCampaigns Campaign[] @relation("CampaignTreasurer")
+
+  withdrawalsRequested WithdrawalRequest[]  @relation("WithdrawalRequestedBy")
+  withdrawalApprovals  WithdrawalApproval[] @relation("WithdrawalApprover")
+
   // Personal Ludeva accounts (Shares/Savings/Junior) — separate from a
   // chama's pooled TeamInvestment, these belong to the member directly.
   memberAccounts MemberAccount[]
@@ -97,6 +108,7 @@ enum ChamaObjective {
 model Team {
   id      String @id @default(cuid())
   name    String
+  photoUrl String?
   ownerId String @unique
   owner   User   @relation("TeamOwner", fields: [ownerId], references: [id])
 
@@ -143,6 +155,14 @@ model Team {
   decidedAt      DateTime?
   rejectionReason String?
 
+  // ── Withdrawal signatories (see WithdrawalRequest) — the owner is the
+  // implicit Admin signatory; these two are member-assigned. Pooled-fund
+  // withdrawals need all three signing off before money moves. ──
+  secretaryId String?
+  secretary   User?   @relation("TeamSecretary", fields: [secretaryId], references: [id])
+  treasurerId String?
+  treasurer   User?   @relation("TeamTreasurer", fields: [treasurerId], references: [id])
+
   members         TeamMembership[]
   invites         TeamInvite[]
   loanAccount     LoanAccount?
@@ -150,6 +170,7 @@ model Team {
   investments     TeamInvestment[]
   memberReports   MemberReport[]
   savingsEntries  SavingsEntry[]
+  withdrawals     WithdrawalRequest[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -401,7 +422,8 @@ model Campaign {
   location    String
 
   targetAmount   Float
-  raisedAmount   Float          @default(0)
+  raisedAmount   Float          @default(0) // only ever incremented by a SUCCESS donation
+  withdrawnAmount Float         @default(0) // sum of PAID withdrawals — see WithdrawalRequest
   backersCount   Int            @default(0)
   beneficiaries  Int?
   imageUrl       String?
@@ -412,7 +434,17 @@ model Campaign {
   creatorId String
   creator   User   @relation("CampaignCreator", fields: [creatorId], references: [id])
 
-  donations Donation[]
+  // ── Withdrawal signatories (see WithdrawalRequest) — the creator is the
+  // implicit Admin signatory; these two are creator-assigned. A payout of
+  // donated funds needs all three signing off, same rule as a chama's
+  // pooled funds. ──
+  secretaryId String?
+  secretary   User?   @relation("CampaignSecretary", fields: [secretaryId], references: [id])
+  treasurerId String?
+  treasurer   User?   @relation("CampaignTreasurer", fields: [treasurerId], references: [id])
+
+  donations   Donation[]
+  withdrawals WithdrawalRequest[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -517,11 +549,13 @@ model MemberAccount {
 
 // ─────────────────────────────────────────────
 // A payment attempt against a personal MemberAccount, over M-Pesa
-// (STK push) or a Visa card. No gateway is wired yet — this is the
-// ledger + UI flow, created PENDING and settled by an admin from
-// /admin until Daraja / a card processor is connected. When that
-// happens, the real gateway's webhook should call the same
-// resolvePayment() path admins use today.
+// (STK push) or a Visa card. Both are processed through Paystack (see
+// src/lib/paystack.ts) — created PENDING, then flipped to SUCCESS/
+// FAILED by Paystack's webhook (src/app/api/payments/paystack/webhook)
+// once the STK push/card checkout completes. `reference` is the id
+// Paystack tracks the transaction under (we set it equal to this row's
+// own id at creation). An admin can still resolve a stuck PENDING
+// payment manually from /admin as a fallback.
 // ─────────────────────────────────────────────
 enum PaymentChannel {
   MPESA
@@ -666,21 +700,128 @@ model SavingsEntry {
 // funding) rather than run through a real payment gateway — see the
 // README note on this. donorName/anonymous let a signed-in donor choose
 // how they're displayed on the campaign's donor list.
+// A contribution to a Campaign. Anyone with the campaign's public link
+// can give without an L Chama account — donorId is only set when a
+// signed-in member gives; a guest's name/phone (for the receipt/ledger)
+// is stored in guestName/guestPhone instead. Created PENDING and moved
+// to SUCCESS/FAILED by the same Paystack webhook that resolves Payment
+// rows (src/lib/donation-resolution.ts) — only a SUCCESS donation
+// increments the campaign's raisedAmount/backersCount, so the progress
+// bar never counts money that didn't actually arrive.
 model Donation {
   id         String   @id @default(cuid())
   campaignId String
   campaign   Campaign @relation(fields: [campaignId], references: [id])
 
-  donorId   String
-  donor     User    @relation("DonationDonor", fields: [donorId], references: [id])
+  donorId   String?
+  donor     User?   @relation("DonationDonor", fields: [donorId], references: [id])
   anonymous Boolean @default(false)
+
+  // Set for guest (non-member) donors instead of donorId.
+  guestName  String?
+  guestPhone String?
 
   amount  Float
   message String?
 
+  channel   PaymentChannel @default(MPESA)
+  status    PaymentStatus  @default(PENDING)
+  reference String?        @unique // Paystack transaction reference
+
   createdAt DateTime @default(now())
 
   @@map("donation")
+}
+
+// ─────────────────────────────────────────────
+// Three-signatory fund withdrawals — the same rule for both scopes a
+// pool of money can live in on this platform:
+//   - CAMPAIGN: a fundraising campaign's raised donations.
+//   - CHAMA:    a chama's pooled LoanAccount balance.
+// Each scope has exactly three signatories: an Admin (the campaign's
+// creator, or the chama's owner), a Secretary, and a Treasurer (the
+// latter two assigned by the Admin — see Campaign.secretary/treasurer
+// and Team.secretary/treasurer). A withdrawal only pays out once all
+// three have APPROVED; any single REJECTED stops it. The requester's
+// own signatory vote is recorded as APPROVED automatically when they
+// open the request — see src/lib/withdrawals.ts.
+// ─────────────────────────────────────────────
+enum WithdrawalScope {
+  CAMPAIGN
+  CHAMA
+}
+
+enum SignatoryRole {
+  ADMIN
+  SECRETARY
+  TREASURER
+}
+
+enum ApprovalDecision {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum WithdrawalStatus {
+  AWAITING_APPROVALS // still needs one or more of the 3 signatures
+  REJECTED           // any signatory rejected it
+  PROCESSING         // fully approved, payout in flight via Paystack Transfer
+  PAID               // payout confirmed
+  FAILED             // payout attempt failed — see failureReason; an admin can retry/pay out manually
+}
+
+model WithdrawalRequest {
+  id    String          @id @default(cuid())
+  scope WithdrawalScope
+
+  campaignId String?
+  campaign   Campaign? @relation(fields: [campaignId], references: [id])
+  teamId     String?
+  team       Team?     @relation(fields: [teamId], references: [id])
+
+  requestedById String
+  requestedBy   User   @relation("WithdrawalRequestedBy", fields: [requestedById], references: [id])
+
+  amount    Float // gross amount requested, deducted from the pool on PAID
+  feeAmount Float @default(0) // platform fee — flat 4.9%, campaign or chama alike
+  netAmount Float // amount actually sent out (amount - feeAmount)
+
+  destinationPhone String // M-Pesa number the payout is sent to
+  reason           String?
+
+  status WithdrawalStatus @default(AWAITING_APPROVALS)
+
+  approvals WithdrawalApproval[]
+
+  payoutReference String? @unique // Paystack transfer reference, once initiated
+  failureReason   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("withdrawalrequest")
+}
+
+model WithdrawalApproval {
+  id                  String            @id @default(cuid())
+  withdrawalRequestId String
+  withdrawalRequest   WithdrawalRequest @relation(fields: [withdrawalRequestId], references: [id])
+
+  role       SignatoryRole
+  approverId String
+  approver   User          @relation("WithdrawalApprover", fields: [approverId], references: [id])
+
+  decision  ApprovalDecision @default(PENDING)
+  comment   String?
+  decidedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  // One vote per role per request — the same person can't sign as both
+  // Secretary and Treasurer even if they somehow ended up holding both.
+  @@unique([withdrawalRequestId, role])
+  @@map("withdrawalapproval")
 }
 
 // Password-based admin accounts, managed by the super admin (the

@@ -73,6 +73,7 @@ export type ChamaContext = {
   team: {
     id: string;
     name: string;
+    photoUrl: string | null;
     ownerId: string;
     owner: User;
     levelKey: string | null;
@@ -91,6 +92,13 @@ export type ChamaContext = {
     invites: Array<
       { id: string; email: string; token: string; status: string; expiresAt: Date; createdAt: Date } & ChamaPermissions
     >;
+    // ── Withdrawal signatories — see src/lib/withdrawals.ts. The owner is
+    // the implicit Admin signatory; these two are owner-assigned from the
+    // member list. ──
+    secretaryId: string | null;
+    secretary: User | null;
+    treasurerId: string | null;
+    treasurer: User | null;
   };
   isOwner: boolean;
   membershipId: string | null;
@@ -102,6 +110,8 @@ export async function getChamaContext(user: User): Promise<ChamaContext | null> 
     where: { ownerId: user.id },
     include: {
       owner: true,
+      secretary: true,
+      treasurer: true,
       members: { include: { user: true } },
       invites: { where: { status: "PENDING" } },
     },
@@ -122,6 +132,8 @@ export async function getChamaContext(user: User): Promise<ChamaContext | null> 
       team: {
         include: {
           owner: true,
+          secretary: true,
+          treasurer: true,
           members: { include: { user: true } },
           invites: { where: { status: "PENDING" } },
         },

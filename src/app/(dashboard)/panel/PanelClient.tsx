@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Card,
   CardContent,
@@ -58,8 +59,12 @@ import {
   markProcessingFeePaid,
   decideLoanRequest,
   markRepaymentPaid,
+  updateChamaPhoto,
 } from './actions';
 import { formatKES } from '@/lib/chama-levels';
+import { PLATFORM_WITHDRAWAL_FEE_RATE } from '@/lib/withdrawal-fee';
+import { PayoutCalculator } from '@/components/payments/PayoutCalculator';
+import { ImageUploadField } from '@/components/uploads/ImageUploadField';
 import { cn } from '@/lib/utils';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { CountUp } from '@/components/motion/CountUp';
@@ -102,6 +107,7 @@ type LoanRequestData = {
 type TeamData = {
   id: string;
   name: string;
+  photoUrl: string | null;
   isOwner: boolean;
   permissions: ChamaPermissions;
   levelName: string | null;
@@ -247,6 +253,8 @@ function OverviewTab({ team }: { team: TeamData }) {
 
   return (
     <div className="space-y-6">
+      {(team.isOwner || team.photoUrl) && <ChamaPhotoCard team={team} />}
+
       {/* Hero KPI cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="rounded-2xl shadow-sm overflow-hidden relative border-primary/30 bg-primary/5">
@@ -395,6 +403,40 @@ function OverviewTab({ team }: { team: TeamData }) {
           </CardContent>
         </Card>
       </div>
+    </div>
+  );
+}
+
+function ChamaPhotoCard({ team }: { team: TeamData }) {
+  const { toast } = useToast();
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
+  const save = (url: string) => {
+    startTransition(async () => {
+      try {
+        await updateChamaPhoto(url);
+        toast({ title: url ? 'Chama photo updated' : 'Chama photo removed' });
+        router.refresh();
+      } catch (err: any) {
+        toast({ title: 'Could not update photo', description: err.message, variant: 'destructive' });
+      }
+    });
+  };
+
+  if (!team.isOwner) {
+    // Read-only for non-owners — just show it, no upload control.
+    return (
+      <div className="h-40 w-full overflow-hidden rounded-2xl border bg-muted">
+        {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary R2 URL */}
+        <img src={team.photoUrl!} alt={team.name} className="h-full w-full object-cover" />
+      </div>
+    );
+  }
+
+  return (
+    <div className={isPending ? 'opacity-60 pointer-events-none' : undefined}>
+      <ImageUploadField label="Chama Photo" value={team.photoUrl ?? ''} onChange={save} folder="chamas" uploadLabel="photo" />
     </div>
   );
 }
@@ -622,13 +664,52 @@ function LoanAccountTab({ team }: { team: TeamData }) {
           </Dialog>
         )}
       </CardHeader>
-      <CardContent>
-        <p className="font-figures text-4xl font-bold text-primary">
-          KES <CountUp value={team.loanAccount.balance} />
-        </p>
-        <p className="text-sm text-muted-foreground mt-1">Available for approved loans</p>
+      <CardContent className="space-y-4">
+        <div>
+          <p className="font-figures text-4xl font-bold text-primary">
+            KES <CountUp value={team.loanAccount.balance} />
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">Available for approved loans</p>
+        </div>
+
+        <LoanAccountPayoutPreview availableBalance={team.loanAccount.balance} />
       </CardContent>
     </Card>
+  );
+}
+
+function LoanAccountPayoutPreview({ availableBalance }: { availableBalance: number }) {
+  const [amount, setAmount] = useState('');
+  return (
+    <div className="rounded-2xl border p-4 space-y-3">
+      <div>
+        <p className="text-sm font-medium">Withdrawal payout calculator</p>
+        <p className="text-xs text-muted-foreground">
+          Preview what a withdrawal would net after the platform's flat {(PLATFORM_WITHDRAWAL_FEE_RATE * 100).toFixed(1)}%
+          fee. Requesting a real withdrawal (with the required 3-signatory approval) happens on the{' '}
+          <Link href="/withdraw" className="underline">
+            Withdraw
+          </Link>{' '}
+          page.
+        </p>
+      </div>
+      <div>
+        <Label htmlFor="loanPayoutPreview">Amount (KES)</Label>
+        <Input
+          id="loanPayoutPreview"
+          type="number"
+          min={1}
+          max={availableBalance}
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder={`Up to ${availableBalance.toLocaleString()}`}
+        />
+      </div>
+      {Number(amount) > 0 && <PayoutCalculator amount={Number(amount)} />}
+      <Button asChild size="sm" variant="outline">
+        <Link href="/withdraw">Go to Withdraw</Link>
+      </Button>
+    </div>
   );
 }
 

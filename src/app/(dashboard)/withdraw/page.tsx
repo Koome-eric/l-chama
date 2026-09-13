@@ -1,16 +1,12 @@
-import { ArrowUpFromLine } from 'lucide-react';
 import { requirePanelAccess } from '@/lib/require-panel-access';
-import { ComingSoon } from '@/components/ComingSoon';
+import { hasPermission } from '@/lib/chama';
+import { getChamaWithdrawState } from '../panel/actions';
+import { WithdrawClient } from './WithdrawClient';
 
 export default async function WithdrawPage() {
-  await requirePanelAccess('/withdraw');
+  const { ctx } = await requirePanelAccess('/withdraw');
+  const canWithdraw = hasPermission(ctx, 'canWithdraw') || ctx.isOwner;
+  const state = await getChamaWithdrawState();
 
-  return (
-    <ComingSoon
-      icon={ArrowUpFromLine}
-      title="Withdraw"
-      description="Move funds out of your chama's loan account."
-      note="Self-service withdrawals are coming soon — for now, speak with your Team Leader about disbursing funds."
-    />
-  );
+  return <WithdrawClient state={state} canRequest={canWithdraw} />;
 }

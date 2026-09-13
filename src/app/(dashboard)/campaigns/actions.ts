@@ -5,6 +5,7 @@ import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { CAMPAIGN_CATEGORIES } from '@/lib/campaigns';
+import { createWithdrawalRequest, decideWithdrawalRequest, getSignatoryStatus } from '@/lib/withdrawals';
 
 const CreateCampaignSchema = z.object({
   title: z.string().min(4, 'Enter a campaign title.'),
@@ -62,50 +63,6 @@ export async function createCampaign(input: CreateCampaignInput) {
   return { success: true, campaignId: campaign.id };
 }
 
-// Donations are recorded manually (no live payment gateway wired up yet
-// — same placeholder pattern as the chama loan account's manual
-// funding). Each donation increments the campaign's raised total and
-// backer count atomically.
-export async function donateToCampaign(input: {
-  campaignId: string;
-  amount: number;
-  message?: string;
-  anonymous?: boolean;
-}) {
-  const user = await getCurrentDbUser();
-
-  if (!Number.isFinite(input.amount) || input.amount <= 0) {
-    throw new Error('Enter a valid donation amount.');
-  }
-
-  const campaign = await prisma.campaign.findUnique({ where: { id: input.campaignId } });
-  if (!campaign) throw new Error('Campaign not found.');
-  if (campaign.status !== 'ACTIVE') throw new Error('This campaign is no longer accepting donations.');
-
-  await prisma.$transaction([
-    prisma.donation.create({
-      data: {
-        campaignId: input.campaignId,
-        donorId: user.id,
-        amount: input.amount,
-        message: input.message?.trim() || undefined,
-        anonymous: !!input.anonymous,
-      },
-    }),
-    prisma.campaign.update({
-      where: { id: input.campaignId },
-      data: {
-        raisedAmount: { increment: input.amount },
-        backersCount: { increment: 1 },
-      },
-    }),
-  ]);
-
-  revalidatePath('/campaigns');
-  revalidatePath(`/campaigns/${input.campaignId}`);
-  return { success: true };
-}
-
 export async function closeCampaign(campaignId: string) {
   const user = await getCurrentDbUser();
   const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
@@ -115,5 +72,140 @@ export async function closeCampaign(campaignId: string) {
   await prisma.campaign.update({ where: { id: campaignId }, data: { status: 'CLOSED' } });
   revalidatePath('/campaigns');
   revalidatePath(`/campaigns/${campaignId}`);
+  return { success: true };
+}
+
+/* ────────────────────────────────────────────────────────────── */
+/*     3-SIGNATORY WITHDRAWAL — Admin (creator) + Secretary +       */
+/*                        Treasurer                                 */
+/*                                                                   */
+/*  Donations (the actual giving) are handled in                    */
+/*  src/app/give/actions.ts — no sign-in required there, since       */
+/*  anyone with the campaign's share link can give. Everything below*/
+/*  is creator/signatory-only account management.                   */
+/* ────────────────────────────────────────────────────────────── */
+
+/** Look up a registered L Chama user by phone or email, to assign as a signatory. */
+export async function findUserForSignatory(query: string) {
+  const q = query.trim();
+  if (!q) throw new Error('Enter a phone number or email.');
+  const user = await prisma.user.findFirst({
+    where: { OR: [{ phone: q }, { email: q.toLowerCase() }] },
+    select: { id: true, fullName: true, phone: true, email: true },
+  });
+  if (!user) throw new Error('No L Chama member found with that phone/email — they need an account first.');
+  return user;
+}
+
+export async function setCampaignSignatories(input: { campaignId: string; secretaryId?: string; treasurerId?: string }) {
+  const user = await getCurrentDbUser();
+  const campaign = await prisma.campaign.findUnique({ where: { id: input.campaignId } });
+  if (!campaign) throw new Error('Campaign not found.');
+  if (campaign.creatorId !== user.id) throw new Error('Only the campaign creator (Admin) can assign signatories.');
+
+  if (input.secretaryId === user.id || input.treasurerId === user.id) {
+    throw new Error('The creator is already the Admin signatory — pick two other people for Secretary and Treasurer.');
+  }
+  if (input.secretaryId && input.treasurerId && input.secretaryId === input.treasurerId) {
+    throw new Error('Secretary and Treasurer must be two different people.');
+  }
+
+  await prisma.campaign.update({
+    where: { id: input.campaignId },
+    data: {
+      secretaryId: input.secretaryId ?? undefined,
+      treasurerId: input.treasurerId ?? undefined,
+    },
+  });
+
+  revalidatePath(`/campaigns/${input.campaignId}`);
+  return { success: true };
+}
+
+export async function requestCampaignWithdrawal(input: {
+  campaignId: string;
+  amount: number;
+  destinationPhone: string;
+  reason?: string;
+}) {
+  const user = await getCurrentDbUser();
+  await createWithdrawalRequest({
+    scope: 'CAMPAIGN',
+    scopeId: input.campaignId,
+    requestedById: user.id,
+    amount: input.amount,
+    destinationPhone: input.destinationPhone,
+    reason: input.reason,
+  });
+  revalidatePath(`/campaigns/${input.campaignId}`);
+  return { success: true };
+}
+
+export async function decideCampaignWithdrawal(input: {
+  withdrawalRequestId: string;
+  campaignId: string;
+  decision: 'APPROVED' | 'REJECTED';
+  comment?: string;
+}) {
+  const user = await getCurrentDbUser();
+  const result = await decideWithdrawalRequest({
+    withdrawalRequestId: input.withdrawalRequestId,
+    userId: user.id,
+    decision: input.decision,
+    comment: input.comment,
+  });
+  revalidatePath(`/campaigns/${input.campaignId}`);
+  return result;
+}
+
+export async function getCampaignSignatoryStatus(campaignId: string) {
+  const user = await getCurrentDbUser();
+  return getSignatoryStatus('CAMPAIGN', campaignId, user.id);
+}
+
+export async function getCampaignWithdrawState(campaignId: string) {
+  const user = await getCurrentDbUser();
+  const campaign = await prisma.campaign.findUnique({
+    where: { id: campaignId },
+    include: { creator: true, secretary: true, treasurer: true },
+  });
+  if (!campaign) throw new Error('Campaign not found.');
+
+  const [status, requests] = await Promise.all([
+    getSignatoryStatus('CAMPAIGN', campaignId, user.id),
+    prisma.withdrawalRequest.findMany({
+      where: { campaignId },
+      include: { approvals: { include: { approver: true } }, requestedBy: true },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    }),
+  ]);
+
+  return {
+    campaignId,
+    myUserId: user.id,
+    isCreator: campaign.creatorId === user.id,
+    admin: { userId: campaign.creatorId, name: campaign.creator.fullName || campaign.creator.email || 'Creator' },
+    secretary: campaign.secretary
+      ? { userId: campaign.secretaryId!, name: campaign.secretary.fullName || campaign.secretary.email || 'Secretary' }
+      : null,
+    treasurer: campaign.treasurer
+      ? { userId: campaign.treasurerId!, name: campaign.treasurer.fullName || campaign.treasurer.email || 'Treasurer' }
+      : null,
+    ...status,
+    requests,
+  };
+}
+
+export async function updateCampaignImage(campaignId: string, imageUrl: string) {
+  const user = await getCurrentDbUser();
+  const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
+  if (!campaign) throw new Error('Campaign not found.');
+  if (campaign.creatorId !== user.id) throw new Error('Only the campaign creator can change the cover image.');
+
+  await prisma.campaign.update({ where: { id: campaignId }, data: { imageUrl: imageUrl || null } });
+
+  revalidatePath(`/campaigns/${campaignId}`);
+  revalidatePath('/campaigns');
   return { success: true };
 }

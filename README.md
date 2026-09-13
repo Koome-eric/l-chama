@@ -88,9 +88,39 @@ the Clerk dashboard, it'll just work here with no code changes needed.
      **new** Clerk project (not the Ludeva one)
    - `RESEND_API_KEY` — can reuse the same Resend account, but consider a
      dedicated sending domain/subdomain for deliverability
+   - `PAYSTACK_SECRET_KEY` — from the Paystack dashboard (Settings →
+     API Keys & Webhooks). After deploying, set that dashboard's
+     webhook URL to `{NEXT_PUBLIC_APP_URL}/api/payments/paystack/webhook`
+     — see "Payments" below.
 2. `npm install`
 3. `npm run db:push` — pushes the schema to your new database
 4. `npm run dev` — runs on port 9003 by default
+
+## Payments
+
+`/accounts` lets a member fund a `MemberAccount` (STOCK, SAVINGS, or
+JUNIOR) via M-Pesa or Visa card, both processed through
+[Paystack](https://paystack.com):
+
+- **M-Pesa** (`initiateMpesaPayment` in `accounts/actions.ts`) uses
+  Paystack's Charge API to push an STK prompt straight to the member's
+  phone — no redirect.
+- **Visa card** (`initiateCardPayment`) uses Paystack's hosted
+  checkout — the member is redirected to `authorization_url` and back
+  to `/api/payments/paystack/callback` when done.
+
+Either way a `Payment` row is created `PENDING` and only ever moves to
+`SUCCESS`/`FAILED` once Paystack confirms it — via the webhook at
+`/api/payments/paystack/webhook` (the source of truth; set this URL
+in the Paystack dashboard), with the checkout callback redirect above
+as a faster fallback for the UI. `src/lib/payment-resolution.ts`
+credits the member's `MemberAccount` balance idempotently, so a
+webhook retry or a race between the webhook and the callback never
+double-credits. `/admin` → Payments can still resolve a payment
+manually as a last resort if one is ever stuck `PENDING`.
+
+Only `PAYSTACK_SECRET_KEY` is required — no other setup needed once
+the webhook URL above is registered in the Paystack dashboard.
 
 ## Deploying
 

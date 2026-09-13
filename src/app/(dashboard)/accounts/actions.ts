@@ -4,6 +4,7 @@ import { currentUser } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { notifyUser } from '@/lib/notifications';
+import { chargeMpesa, initializeCardTransaction, toPaystackPhone } from '@/lib/paystack';
 
 async function getCurrentDbUser() {
   const clerkUser = await currentUser();
@@ -28,26 +29,30 @@ async function getOrCreateMemberAccount(userId: string, productId: string) {
 /* ────────────────────────────────────────────────────────────── */
 /*                     M-PESA / VISA CARD PAYMENTS                 */
 /*                                                                   */
-/*  No gateway is wired up yet. Each of these creates a PENDING     */
-/*  Payment row and, for now, an admin resolves it manually from    */
-/*  /admin → Payments (credits the MemberAccount on SUCCESS). To    */
-/*  go live:                                                        */
-/*   - MPESA: call Safaricom's Daraja STK Push here with `phone`    */
-/*     and `amount`, store the CheckoutRequestID as `reference`,    */
-/*     and have Daraja's callback URL resolve the payment instead   */
-/*     of an admin.                                                 */
-/*   - VISA_CARD: create a hosted checkout session with your card   */
-/*     processor (Stripe/Flutterwave/Pesapal), store its session/   */
-/*     reference id, and redirect the member to it — then let the   */
-/*     processor's webhook resolve the payment.                     */
+/*  Both channels go through Paystack (see src/lib/paystack.ts):    */
+/*   - MPESA: Paystack's Charge API triggers an STK push straight   */
+/*     to the member's phone — no redirect.                         */
+/*   - VISA_CARD: Paystack's hosted checkout — the member is        */
+/*     redirected to `authorization_url` and back to                */
+/*     /api/payments/paystack/callback when done.                   */
+/*  Either way the Payment row is created PENDING and only ever     */
+/*  moves to SUCCESS/FAILED via Paystack's webhook (or the callback */
+/*  redirect as a faster fallback) — see payment-resolution.ts. An  */
+/*  admin can still resolve a payment manually from /admin as a     */
+/*  fallback if a webhook is ever missed.                           */
 /* ────────────────────────────────────────────────────────────── */
+
+/** Paystack requires an email; not every member has one on file. */
+function paystackEmailFor(user: { id: string; email: string | null }) {
+  return user.email ?? `${user.id}@lchama-users.ludevaplc.co.ke`;
+}
 
 export async function initiateMpesaPayment(input: { productId: string; amount: number; phone: string }) {
   const user = await getCurrentDbUser();
 
   if (!Number.isFinite(input.amount) || input.amount <= 0) throw new Error('Enter a valid amount.');
-  const phone = input.phone.trim();
-  if (!/^(?:\+?254|0)7\d{8}$/.test(phone) && !/^(?:\+?254|0)1\d{8}$/.test(phone)) {
+  const rawPhone = input.phone.trim();
+  if (!/^(?:\+?254|0)7\d{8}$/.test(rawPhone) && !/^(?:\+?254|0)1\d{8}$/.test(rawPhone)) {
     throw new Error('Enter a valid Safaricom number, e.g. 07XX XXX XXX.');
   }
 
@@ -59,22 +64,48 @@ export async function initiateMpesaPayment(input: { productId: string; amount: n
       memberAccountId: account.id,
       channel: 'MPESA',
       amount: input.amount,
-      phone,
+      phone: rawPhone,
       status: 'PENDING',
     },
   });
+  // Reference doubles as our own id so the webhook/callback can look the
+  // Payment row back up without any extra bookkeeping.
+  await prisma.payment.update({ where: { id: payment.id }, data: { reference: payment.id } });
+
+  try {
+    const charge = await chargeMpesa({
+      email: paystackEmailFor(user),
+      amountKes: input.amount,
+      phone: toPaystackPhone(rawPhone),
+      reference: payment.id,
+      metadata: { paymentId: payment.id, productId: input.productId, userId: user.id },
+    });
+
+    if (charge.status === 'failed') {
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: { status: 'FAILED', note: charge.display_text ?? 'Paystack declined the charge.' },
+      });
+      throw new Error(charge.display_text || 'The M-Pesa charge could not be started. Please try again.');
+    }
+  } catch (err: any) {
+    // Don't leave an orphaned PENDING row if Paystack rejected the request outright.
+    await prisma.payment
+      .update({ where: { id: payment.id }, data: { status: 'FAILED', note: String(err.message ?? '').slice(0, 200) } })
+      .catch(() => {});
+    throw new Error(err.message || 'Could not start the M-Pesa payment. Please try again.');
+  }
 
   revalidatePath('/accounts');
   return {
     success: true,
     paymentId: payment.id,
-    message: `We've logged a request to pay KES ${input.amount.toLocaleString()} via M-Pesa from ${phone}. Once M-Pesa is connected, you'll get a real STK push here — for now our team will confirm and credit your account.`,
+    message: `Check your phone (${rawPhone}) for an M-Pesa prompt and enter your PIN to complete the KES ${input.amount.toLocaleString()} payment.`,
   };
 }
 
 export async function initiateCardPayment(input: { productId: string; amount: number }) {
   const user = await getCurrentDbUser();
-
   if (!Number.isFinite(input.amount) || input.amount <= 0) throw new Error('Enter a valid amount.');
 
   const account = await getOrCreateMemberAccount(user.id, input.productId);
@@ -88,12 +119,33 @@ export async function initiateCardPayment(input: { productId: string; amount: nu
       status: 'PENDING',
     },
   });
+  await prisma.payment.update({ where: { id: payment.id }, data: { reference: payment.id } });
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9003';
+
+  let authorizationUrl: string;
+  try {
+    const init = await initializeCardTransaction({
+      email: paystackEmailFor(user),
+      amountKes: input.amount,
+      reference: payment.id,
+      callbackUrl: `${appUrl}/api/payments/paystack/callback`,
+      metadata: { paymentId: payment.id, productId: input.productId, userId: user.id },
+    });
+    authorizationUrl = init.authorization_url;
+  } catch (err: any) {
+    await prisma.payment
+      .update({ where: { id: payment.id }, data: { status: 'FAILED', note: String(err.message ?? '').slice(0, 200) } })
+      .catch(() => {});
+    throw new Error(err.message || 'Could not start the card payment. Please try again.');
+  }
 
   revalidatePath('/accounts');
   return {
     success: true,
     paymentId: payment.id,
-    message: `We've logged a request to pay KES ${input.amount.toLocaleString()} by card. Once card payments are connected you'll be sent to a secure checkout — for now our team will confirm and credit your account.`,
+    authorizationUrl,
+    message: 'Redirecting you to a secure checkout…',
   };
 }
 

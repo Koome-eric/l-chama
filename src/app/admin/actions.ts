@@ -555,11 +555,13 @@ export async function deleteSavingsEntry(entryId: string) {
 
 // ─────────────────────────────────────────────
 // Payments — M-Pesa / Visa card requests logged from a member's
-// /accounts page. No gateway is wired up yet, so an admin resolves
-// these manually: SUCCESS credits the member's MemberAccount balance,
-// FAILED/CANCELLED just record the outcome. Once Daraja/a card
-// processor is connected, their webhook should call this same credit
-// logic instead of an admin click.
+// /accounts page. These are now resolved automatically by Paystack's
+// webhook (see src/app/api/payments/paystack/webhook/route.ts and
+// src/lib/payment-resolution.ts) as soon as the STK push/card checkout
+// completes. This manual resolver stays as an admin fallback for a
+// payment that's stuck PENDING (e.g. a missed webhook) — SUCCESS
+// credits the member's MemberAccount balance the same way, FAILED/
+// CANCELLED just record the outcome.
 // ─────────────────────────────────────────────
 
 export async function resolvePayment(paymentId: string, status: 'SUCCESS' | 'FAILED' | 'CANCELLED', note?: string) {

@@ -23,8 +23,11 @@ export default function LChamaFooter() {
           >
             Ludeva MMF
           </a>
-          <a href="mailto:hello@lchama.co.ke" className="hover:text-foreground">
+          <a href="/contact" className="hover:text-foreground">
             Contact
+          </a>
+          <a href="/privacy" className="hover:text-foreground">
+            Privacy Policy
           </a>
           <a href="/sign-in" className="hover:text-foreground">
             Sign In

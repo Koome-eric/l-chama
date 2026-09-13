@@ -99,6 +99,7 @@ export default async function ChamaPanelPage({
   const data = {
     id: ctx.team.id,
     name: ctx.team.name,
+    photoUrl: ctx.team.photoUrl,
     isOwner: ctx.isOwner,
     permissions: ctx.permissions,
     levelName: ctx.team.levelName,
