@@ -100,9 +100,9 @@ export function CampaignWithdrawSection({ state }: { state: WithdrawState }) {
         <>
           <p className="text-xs text-muted-foreground">
             Your withdrawal fee rate: <span className="font-semibold text-foreground">{(state.myWithdrawalFeeRate * 100).toFixed(1)}%</span>
-            {state.myWithdrawalFeeRate > 0.05 && (
+            {state.myWithdrawalFeeRate > 0 && (
               <>
-                {' '}— existing Ludeva Plc members pay 5%.{' '}
+                {' '}— Ludeva Plc members withdraw toll free.{' '}
                 <Link href="/profile" className="underline">
                   Add your Ludeva membership number
                 </Link>{' '}

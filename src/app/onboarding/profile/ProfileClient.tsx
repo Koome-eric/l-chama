@@ -169,7 +169,7 @@ export function ProfileClient({ defaultEmail }: { defaultEmail?: string }) {
             <span>
               I'm an existing Ludeva Plc member
               <span className="block text-xs text-muted-foreground mt-0.5">
-                Confirmed Ludeva members pay a lower 5% withdrawal fee (7.5% otherwise).
+                Confirmed Ludeva members withdraw toll free (5% otherwise).
               </span>
             </span>
           </label>

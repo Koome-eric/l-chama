@@ -53,15 +53,11 @@ model User {
   profileCompleted    Boolean @default(false)
   onboardingCompleted Boolean @default(false)
 
-  // Self-claimed at onboarding (required only if the person says they're
-  // an existing Ludeva Plc member), then confirmed or rejected by a
-  // platform admin (see /admin) before it counts toward anything. Drives
-  // the withdrawal fee rate for external-chama and campaign withdrawals
-  // — see src/lib/withdrawal-fee.ts. NONE means "didn't claim to be a
-  // member" (most new sign-ups), not "checked and found not to be one".
-  ludevaMemberNumber           String?
-  ludevaMembershipStatus       LudevaMembershipStatus @default(NONE)
-  ludevaMembershipDecidedAt    DateTime?
+  // Self-claimed at onboarding, then confirmed or rejected by a platform
+  // admin before the membership discount applies to withdrawals.
+  ludevaMemberNumber             String?
+  ludevaMembershipStatus         LudevaMembershipStatus @default(NONE)
+  ludevaMembershipDecidedAt      DateTime?
   ludevaMembershipRejectionReason String?
 
   ownedTeam      Team?           @relation("TeamOwner")
@@ -176,6 +172,8 @@ model Team {
   lastRespectClaims       LastRespectClaim[]
 
   approvalStatus OrganisationApprovalStatus @default(PENDING_APPROVAL)
+  privacyPolicyAccepted Boolean @default(false)
+  termsAcceptedAt      DateTime?
   submittedAt    DateTime                   @default(now())
   decidedById    String?
   decidedBy      User?                      @relation("TeamDecidedBy", fields: [decidedById], references: [id])
@@ -684,6 +682,7 @@ model MemberReport {
   team   Team?  @relation(fields: [teamId], references: [id])
 
   memberEmail String
+  memberPhone String?
   memberName  String?
 
   date        String?
@@ -716,6 +715,7 @@ model SavingsEntry {
   team   Team?  @relation(fields: [teamId], references: [id])
 
   memberEmail String
+  memberPhone String?
   memberName  String?
   accountNo   String?
 
@@ -821,7 +821,7 @@ model WithdrawalRequest {
   requestedBy   User   @relation("WithdrawalRequestedBy", fields: [requestedById], references: [id])
 
   amount    Float // gross amount requested, deducted from the pool on PAID
-  feeAmount Float @default(0) // platform fee — flat 5%, campaign or non-member chama alike
+  feeAmount Float @default(0) // platform fee — flat 4.9%, campaign or chama alike
   netAmount Float // amount actually sent out (amount - feeAmount)
 
   destinationPhone String // M-Pesa number the payout is sent to

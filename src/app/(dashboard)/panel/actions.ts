@@ -15,6 +15,7 @@ import {
 } from '@/lib/chama';
 import { syncChamaToLudeva } from '@/lib/ludeva-sync';
 import { createWithdrawalRequest, decideWithdrawalRequest, getSignatoryStatus } from '@/lib/withdrawals';
+import { phoneLookupVariants } from '@/lib/phone';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 // The domain in this address MUST be a domain verified in the Resend
@@ -141,6 +142,69 @@ export async function inviteChamaMember(email: string, permissions?: Partial<Cha
 
   revalidatePath('/panel');
   return { success: true, acceptUrl, emailSent, emailError };
+}
+
+// Adds someone who already has an L-CHAMA account straight onto the chama,
+// with no invite link to send or accept — the alternative to
+// inviteChamaMember() for when the admin knows the person is already
+// signed up (they just haven't joined this chama yet). Looked up by email
+// or phone, same identifiers the Sheets sync uses. Only works for existing
+// accounts: someone who hasn't signed up at all still needs a real invite,
+// since a User row requires a Clerk identity.
+export async function addExistingChamaMember(identifier: string, permissions?: Partial<ChamaPermissions>) {
+  const admin = await getCurrentDbUser();
+  const ctx = await getChamaContext(admin);
+  if (!ctx) throw new Error('You are not part of a chama.');
+  if (!hasPermission(ctx, 'canInvite')) throw new Error('You do not have permission to add members.');
+  if (ctx.team.approvalStatus !== 'APPROVED') {
+    throw new Error('Your organisation must be approved before you can add members.');
+  }
+
+  const clean = identifier?.trim();
+  if (!clean) throw new Error('Enter the member\'s email address or phone number.');
+
+  const isEmail = clean.includes('@');
+  const target = await prisma.user.findFirst({
+    where: isEmail
+      ? { email: clean.toLowerCase() }
+      : { phone: { in: phoneLookupVariants(clean) } },
+  });
+
+  if (!target) {
+    throw new Error(
+      "No L-CHAMA account found with that email or phone number yet. They'll need to sign up first — " +
+        'send them an invite link instead so they can create one and join in the same step.'
+    );
+  }
+  if (target.id === admin.id) throw new Error("You can't add yourself.");
+
+  const alreadyOwnsOrBelongs = await prisma.teamMembership.findUnique({ where: { userId: target.id } });
+  const ownsAnother = await prisma.team.findUnique({ where: { ownerId: target.id } });
+  if (alreadyOwnsOrBelongs || ownsAnother) {
+    const alreadyOnThisOne =
+      ownsAnother?.id === ctx.team.id || alreadyOwnsOrBelongs?.teamId === ctx.team.id;
+    throw new Error(
+      alreadyOnThisOne ? 'This person is already on the chama.' : 'This person already belongs to another chama.'
+    );
+  }
+
+  const grant = permissionsFrom({ ...DEFAULT_INVITE_PERMISSIONS, ...permissions });
+
+  await prisma.teamMembership.create({
+    data: { teamId: ctx.team.id, userId: target.id, ...grant },
+  });
+
+  await notifyUser(
+    target.id,
+    'Added to a chama',
+    `${admin.fullName || admin.email || admin.phone} added you to ${ctx.team.name} on L-CHAMA.`
+  );
+
+  await syncChamaToLudeva(ctx.team.id);
+
+  revalidatePath('/panel');
+  revalidatePath('/team');
+  return { success: true, memberName: target.fullName || target.email || target.phone };
 }
 
 export async function revokeChamaInvite(inviteId: string) {

@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-// Seeds the default "Links your chama to Ludeva MMF" product so /invest
+// Seeds the default "Links your chama to the MMF" product so /invest
 // isn't empty on a fresh install. Run with `npx prisma db seed` (wired
 // up in package.json's `prisma.seed` field) or `npx tsx prisma/seed.ts`.
 async function main() {
@@ -11,10 +11,10 @@ async function main() {
     update: {},
     create: {
       id: 'ludeva-mmf-default',
-      name: 'Ludeva Money Market Fund',
+      name: 'Money Market Fund',
       type: 'MMF',
       description:
-        "Your chama's pooled fund invested directly into Ludeva's flagship Money Market Fund — the same MMF Ludeva's individual members use.",
+        "Your chama's pooled fund invested directly into our flagship Money Market Fund — the same MMF individual members use.",
       roi: 9,
       roiMax: 13,
       duration: 1,
@@ -24,7 +24,7 @@ async function main() {
     },
   });
 
-  console.log('✅ Seeded Ludeva Money Market Fund product.');
+  console.log('✅ Seeded Money Market Fund product.');
 
   // ── Personal Ludeva accounts (member dashboard → /accounts) ──
   // Fixed ids so re-running this is always safe (upsert), and so the

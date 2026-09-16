@@ -11,12 +11,12 @@
 // Two-tier, based on the withdrawal REQUESTER's own confirmed Ludeva
 // membership (User.ludevaMembershipStatus — see schema.prisma and
 // /onboarding/profile): an existing, admin-verified Ludeva Plc member
-// pays the lower rate; everyone else (never claimed, still pending
-// admin confirmation, or rejected) pays the higher rate. Only a
+// withdraws toll free; everyone else (never claimed, still pending
+// admin confirmation, or rejected) pays the standard flat rate. Only a
 // VERIFIED status counts as "already a member" — PENDING isn't
 // confirmed yet, so it doesn't get the discount.
-export const LUDEVA_MEMBER_WITHDRAWAL_FEE_RATE = 0.05;
-export const NON_MEMBER_WITHDRAWAL_FEE_RATE = 0.075;
+export const LUDEVA_MEMBER_WITHDRAWAL_FEE_RATE = 0;
+export const NON_MEMBER_WITHDRAWAL_FEE_RATE = 0.05;
 
 export type LudevaMembershipStatusLike = 'NONE' | 'PENDING' | 'VERIFIED' | 'REJECTED' | null | undefined;
 

@@ -34,6 +34,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Users, UserPlus, Trash2, ShieldCheck, Settings2, MessageCircle } from 'lucide-react';
 import {
   inviteChamaMember,
+  addExistingChamaMember,
   revokeChamaInvite,
   removeChamaMember,
   leaveChama,
@@ -87,7 +88,9 @@ export function TeamMembersSection({
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [addMode, setAddMode] = useState<'invite' | 'existing'>('invite');
   const [inviteEmail, setInviteEmail] = useState('');
+  const [existingIdentifier, setExistingIdentifier] = useState('');
   const [invitePerms, setInvitePerms] = useState<ChamaPermissions>(DEFAULT_INVITE_PERMISSIONS);
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
   const [editPerms, setEditPerms] = useState<ChamaPermissions>(DEFAULT_INVITE_PERMISSIONS);
@@ -116,6 +119,21 @@ export function TeamMembersSection({
         window.location.reload();
       } catch (err: any) {
         toast({ title: "Couldn't create invite", description: err.message, variant: 'destructive' });
+      }
+    });
+  };
+
+  const handleAddExisting = () => {
+    startTransition(async () => {
+      try {
+        const res = await addExistingChamaMember(existingIdentifier, invitePerms);
+        toast({ title: 'Member added', description: `${res.memberName} is now on the chama.` });
+        setInviteOpen(false);
+        setExistingIdentifier('');
+        setInvitePerms(DEFAULT_INVITE_PERMISSIONS);
+        window.location.reload();
+      } catch (err: any) {
+        toast({ title: "Couldn't add member", description: err.message, variant: 'destructive' });
       }
     });
   };
@@ -226,30 +244,70 @@ export function TeamMembersSection({
                 <DialogHeader>
                   <DialogTitle>Add a chama member</DialogTitle>
                   <DialogDescription>
-                    They'll get an email with a link to accept and join the shared dashboard. Choose what
-                    they can access below — you can change this anytime from the members list.
+                    {addMode === 'invite'
+                      ? "They'll get an email with a link to accept and join the shared dashboard."
+                      : 'For someone who already has an L-CHAMA account — they join immediately, no link to send.'}
+                    {' '}Choose what they can access below — you can change this anytime from the members list.
                   </DialogDescription>
                 </DialogHeader>
+                <div className="flex gap-1 rounded-lg bg-muted p-1 text-sm">
+                  <button
+                    type="button"
+                    onClick={() => setAddMode('invite')}
+                    className={`flex-1 rounded-md py-1.5 font-medium transition-colors ${
+                      addMode === 'invite' ? 'bg-background shadow-sm' : 'text-muted-foreground'
+                    }`}
+                  >
+                    Send Invite Link
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAddMode('existing')}
+                    className={`flex-1 rounded-md py-1.5 font-medium transition-colors ${
+                      addMode === 'existing' ? 'bg-background shadow-sm' : 'text-muted-foreground'
+                    }`}
+                  >
+                    Add Existing Member
+                  </button>
+                </div>
                 <div className="space-y-3">
-                  <div>
-                    <Label htmlFor="inviteEmail">Email address</Label>
-                    <Input
-                      id="inviteEmail"
-                      type="email"
-                      placeholder="member@example.com"
-                      value={inviteEmail}
-                      onChange={(e) => setInviteEmail(e.target.value)}
-                    />
-                  </div>
+                  {addMode === 'invite' ? (
+                    <div>
+                      <Label htmlFor="inviteEmail">Email address</Label>
+                      <Input
+                        id="inviteEmail"
+                        type="email"
+                        placeholder="member@example.com"
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <Label htmlFor="existingIdentifier">Email or phone number</Label>
+                      <Input
+                        id="existingIdentifier"
+                        placeholder="member@example.com or 0712345678"
+                        value={existingIdentifier}
+                        onChange={(e) => setExistingIdentifier(e.target.value)}
+                      />
+                    </div>
+                  )}
                   <div>
                     <Label className="mb-1 block">Role &amp; permissions</Label>
                     <PermissionCheckboxes value={invitePerms} onChange={setInvitePerms} />
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button onClick={handleInvite} disabled={isPending || !inviteEmail.includes('@')}>
-                    {isPending ? 'Sending...' : 'Send Invite'}
-                  </Button>
+                  {addMode === 'invite' ? (
+                    <Button onClick={handleInvite} disabled={isPending || !inviteEmail.includes('@')}>
+                      {isPending ? 'Sending...' : 'Send Invite'}
+                    </Button>
+                  ) : (
+                    <Button onClick={handleAddExisting} disabled={isPending || !existingIdentifier.trim()}>
+                      {isPending ? 'Adding...' : 'Add to Chama'}
+                    </Button>
+                  )}
                 </DialogFooter>
               </DialogContent>
             </Dialog>

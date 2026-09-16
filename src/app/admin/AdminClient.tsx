@@ -2223,10 +2223,10 @@ function JuniorAdminSection({ applications }: { applications: JuniorApplicationR
 
 /* ────────────────────────────────────────────────────────────── */
 /*  Ludeva Membership confirmation — the other half of the           */
-/*  "5% for existing Ludeva members, 7.5% otherwise" withdrawal fee  */
-/*  (see src/lib/withdrawal-fee.ts). A claim submitted at onboarding */
-/*  or /profile sits PENDING until an admin confirms or rejects the  */
-/*  number given here.                                               */
+/*  "toll free for existing Ludeva members, 5% flat otherwise"      */
+/*  withdrawal fee (see src/lib/withdrawal-fee.ts). A claim submitted*/
+/*  at onboarding or /profile sits PENDING until an admin confirms   */
+/*  or rejects the number given here.                                */
 /* ────────────────────────────────────────────────────────────── */
 
 type LudevaMemberFilter = 'PENDING' | 'VERIFIED' | 'REJECTED' | 'ALL';
@@ -2322,8 +2322,8 @@ function LudevaMembersAdminSection({ members }: { members: LudevaMemberRow[] }) 
                   {m.ludevaMembershipStatus === 'PENDING'
                     ? 'Pending confirmation'
                     : m.ludevaMembershipStatus === 'VERIFIED'
-                      ? 'Verified — 5% fee'
-                      : 'Rejected — 7.5% fee'}
+                      ? 'Verified — Toll free'
+                      : 'Rejected — 5% fee'}
                 </Badge>
               </div>
             </CardHeader>

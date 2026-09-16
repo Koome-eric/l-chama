@@ -13,7 +13,11 @@
  *    rows above the header) containing at least:
  *      memberEmail, accountNo, memberName, date, openingBalance, deposit,
  *      withdrawal, monthlyRate, interestEarned, closingBalance,
- *      periodLabel, notes, _pushStatus, _pushedAt
+ *      periodLabel, notes, phoneNumber, _pushStatus, _pushedAt
+ *
+ *    phoneNumber is a second identifier: the app matches a row to a
+ *    member by email first, and falls back to phone if the email on the
+ *    row doesn't resolve to an account (e.g. a phone-only sign-up).
  * 2. Add a "Push Log" tab for the success/failure log.
  * 3. File > Project properties > Script properties, set:
  *      SAVINGS_API_URL   = https://<your-app-domain>/api/savings/sync
@@ -41,6 +45,7 @@ function pushSavingsRows() {
 
     const payload = {
       memberEmail: row[headers.indexOf('memberEmail')],
+      memberPhone: row[headers.indexOf('phoneNumber')],
       accountNo: row[headers.indexOf('accountNo')],
       memberName: row[headers.indexOf('memberName')],
       date: row[headers.indexOf('date')],

@@ -203,12 +203,12 @@ function LudevaMembershipCard({ ludeva }: { ludeva: LudevaInfo }) {
           </p>
           {status !== 'NONE' && (
             <Badge variant={status === 'VERIFIED' ? 'default' : status === 'REJECTED' ? 'destructive' : 'secondary'}>
-              {status === 'VERIFIED' ? 'Verified — 5% fee' : status === 'REJECTED' ? 'Not confirmed' : 'Pending confirmation'}
+              {status === 'VERIFIED' ? 'Verified — Toll free' : status === 'REJECTED' ? 'Not confirmed' : 'Pending confirmation'}
             </Badge>
           )}
         </div>
         <p className="text-sm text-muted-foreground">
-          Confirmed Ludeva Plc members pay a lower 5% withdrawal fee instead of the standard 7.5%.
+          Confirmed Ludeva Plc members withdraw toll free instead of paying the standard 5% withdrawal fee.
         </p>
 
         {status === 'REJECTED' && ludeva.rejectionReason && (

@@ -21,7 +21,7 @@ export default function LChamaFooter() {
             rel="noopener noreferrer"
             className="hover:text-foreground"
           >
-            Ludeva MMF
+            MMF
           </a>
           <a href="/contact" className="hover:text-foreground">
             Contact
