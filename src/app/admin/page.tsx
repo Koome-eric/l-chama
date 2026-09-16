@@ -21,7 +21,7 @@ export default async function AdminPage() {
   // admin) is the only one who can create/edit/delete other admins.
   const isSuperAdmin = viaClerk || isSuperAdminEmail(sessionEmail);
 
-  const [teams, campaigns, products, reports, savingsEntries, totalUsers, pooledFundsAgg, payments, juniorApplications, adminAccounts] = await Promise.all([
+  const [teams, campaigns, products, reports, savingsEntries, totalUsers, pooledFundsAgg, payments, juniorApplications, ludevaMembers, adminAccounts] = await Promise.all([
     prisma.team.findMany({ include: { owner: true }, orderBy: { submittedAt: 'desc' } }),
     prisma.campaign.findMany({ include: { creator: true }, orderBy: { createdAt: 'desc' } }),
     prisma.investmentProduct.findMany({ orderBy: { createdAt: 'desc' } }),
@@ -38,6 +38,11 @@ export default async function AdminPage() {
       include: { guardian: true },
       orderBy: { createdAt: 'desc' },
       take: 100,
+    }),
+    prisma.user.findMany({
+      where: { ludevaMembershipStatus: { not: 'NONE' } },
+      orderBy: { ludevaMembershipDecidedAt: 'desc' },
+      take: 200,
     }),
     prisma.adminAccount.findMany({ orderBy: { createdAt: 'desc' } }),
   ]);
@@ -156,6 +161,17 @@ export default async function AdminPage() {
     createdAt: a.createdAt.toISOString(),
   }));
 
+  const ludevaMemberData = ludevaMembers.map((u: (typeof ludevaMembers)[number]) => ({
+    id: u.id,
+    fullName: u.fullName || u.email || u.phone || 'Unknown',
+    email: u.email,
+    phone: u.phone,
+    ludevaMemberNumber: u.ludevaMemberNumber,
+    ludevaMembershipStatus: u.ludevaMembershipStatus,
+    ludevaMembershipDecidedAt: u.ludevaMembershipDecidedAt ? u.ludevaMembershipDecidedAt.toISOString() : null,
+    ludevaMembershipRejectionReason: u.ludevaMembershipRejectionReason,
+  }));
+
   // ── Aggregate stats for the Overview dashboard ──
   const now = new Date();
   const monthLabels: string[] = [];
@@ -209,6 +225,10 @@ export default async function AdminPage() {
       total: juniorApplications.length,
       pending: juniorApplications.filter((a: (typeof juniorApplications)[number]) => a.status === 'PENDING_REVIEW').length,
     },
+    ludevaMembers: {
+      total: ludevaMembers.length,
+      pending: ludevaMembers.filter((u: (typeof ludevaMembers)[number]) => u.ludevaMembershipStatus === 'PENDING').length,
+    },
     monthlyOrgSubmissions: monthLabels.map((label, i) => ({ label, value: monthCounts[i] })),
   };
 
@@ -222,6 +242,7 @@ export default async function AdminPage() {
         savingsEntries={savingsData}
         payments={paymentData}
         juniorApplications={juniorApplicationData}
+        ludevaMembers={ludevaMemberData}
         stats={stats}
         authMethod={viaClerk ? 'clerk' : 'password'}
         admins={adminAccountData}

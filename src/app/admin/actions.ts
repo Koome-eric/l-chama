@@ -688,3 +688,36 @@ export async function decideJuniorApplication(
   revalidatePath('/accounts');
   return { success: true };
 }
+
+// Confirm or reject a member's self-claimed Ludeva Plc membership
+// number (submitted at onboarding or from /profile). Only a VERIFIED
+// status gets the lower 5% withdrawal fee — see src/lib/withdrawal-fee.ts.
+export async function decideLudevaMembership(userId: string, decision: 'VERIFIED' | 'REJECTED', reason?: string) {
+  await requireAdmin();
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new Error('Member not found.');
+  if (user.ludevaMembershipStatus !== 'PENDING') {
+    throw new Error('This membership claim has already been decided.');
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      ludevaMembershipStatus: decision,
+      ludevaMembershipDecidedAt: new Date(),
+      ludevaMembershipRejectionReason: decision === 'REJECTED' ? reason?.trim() || undefined : null,
+    },
+  });
+
+  await notifyUser(
+    userId,
+    decision === 'VERIFIED' ? 'Ludeva membership confirmed' : 'Ludeva membership not confirmed',
+    decision === 'VERIFIED'
+      ? `Your Ludeva Plc membership number (${user.ludevaMemberNumber}) was confirmed. You now pay the lower 5% withdrawal fee.`
+      : `We could not confirm the Ludeva Plc membership number you provided.${reason ? ` ${reason}` : ''} You'll pay the standard 7.5% withdrawal fee — contact lchama@ludevaplc.co.ke if you believe this is a mistake.`
+  );
+
+  revalidatePath('/admin');
+  return { success: true };
+}

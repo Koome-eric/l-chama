@@ -1,19 +1,24 @@
 'use client';
 
 import { formatKES } from '@/lib/chama-levels';
-import { PLATFORM_WITHDRAWAL_FEE_RATE } from '@/lib/withdrawal-fee';
 
 /* ────────────────────────────────────────────────────────────── */
 /*  Live amount → platform fee → net payout breakdown, shown         */
 /*  wherever someone is about to request a withdrawal (campaign or   */
 /*  chama loan account) so the fee is never a surprise.               */
+/*                                                                    */
+/*  feeRate is passed in rather than imported as a fixed constant —   */
+/*  it depends on the requester's own confirmed Ludeva membership     */
+/*  status (see src/lib/withdrawal-fee.ts), so the caller (which      */
+/*  already knows who's asking) works that out and hands the right   */
+/*  rate down.                                                        */
 /* ────────────────────────────────────────────────────────────── */
 
-export function PayoutCalculator({ amount }: { amount: number }) {
+export function PayoutCalculator({ amount, feeRate }: { amount: number; feeRate: number }) {
   const safeAmount = Number.isFinite(amount) && amount > 0 ? amount : 0;
-  const fee = Math.round(safeAmount * PLATFORM_WITHDRAWAL_FEE_RATE * 100) / 100;
+  const fee = Math.round(safeAmount * feeRate * 100) / 100;
   const net = Math.round((safeAmount - fee) * 100) / 100;
-  const feePct = (PLATFORM_WITHDRAWAL_FEE_RATE * 100).toFixed(1);
+  const feePct = (feeRate * 100).toFixed(1);
 
   return (
     <div className="rounded-xl border overflow-hidden text-sm">

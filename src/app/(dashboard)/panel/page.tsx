@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
 import { getChamaContext } from '@/lib/chama';
+import { withdrawalFeeRateFor } from '@/lib/withdrawal-fee';
 import { PanelClient } from './PanelClient';
 
 export default async function ChamaPanelPage({
@@ -101,6 +102,7 @@ export default async function ChamaPanelPage({
     name: ctx.team.name,
     photoUrl: ctx.team.photoUrl,
     isLudevaMember: ctx.team.isLudevaMember,
+    myWithdrawalFeeRate: withdrawalFeeRateFor(user.ludevaMembershipStatus),
     isOwner: ctx.isOwner,
     permissions: ctx.permissions,
     levelName: ctx.team.levelName,

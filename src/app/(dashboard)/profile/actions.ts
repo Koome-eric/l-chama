@@ -60,3 +60,35 @@ export async function updateProfile(input: UpdateProfileInput) {
   revalidatePath('/profile');
   return { success: true };
 }
+
+// Separate from updateProfile — claiming/re-claiming Ludeva membership
+// resets it to PENDING for an admin to confirm (see /admin → Ludeva
+// Members), so it shouldn't silently happen as a side effect of an
+// unrelated profile edit.
+export async function submitLudevaMembership(ludevaMemberNumber: string) {
+  const { userId: clerkId } = await auth();
+  if (!clerkId) throw new Error('You must be signed in.');
+
+  const number = ludevaMemberNumber.trim();
+  if (number.length < 3) throw new Error('Enter your Ludeva membership number.');
+
+  const existing = await prisma.user.findUnique({ where: { clerkId } });
+  if (!existing) throw new Error('Profile not found.');
+  if (existing.ludevaMembershipStatus === 'VERIFIED') {
+    throw new Error('Your Ludeva membership is already confirmed.');
+  }
+
+  await prisma.user.update({
+    where: { id: existing.id },
+    data: {
+      ludevaMemberNumber: number,
+      ludevaMembershipStatus: 'PENDING',
+      ludevaMembershipDecidedAt: null,
+      ludevaMembershipRejectionReason: null,
+    },
+  });
+
+  revalidatePath('/profile');
+  revalidatePath('/withdraw');
+  return { success: true };
+}

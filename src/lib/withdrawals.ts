@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { notifyUser } from '@/lib/notifications';
 import { createMobileMoneyRecipient, initiateTransfer, toPaystackPhone } from '@/lib/paystack';
-import { PLATFORM_WITHDRAWAL_FEE_RATE } from '@/lib/withdrawal-fee';
+import { withdrawalFeeRateFor } from '@/lib/withdrawal-fee';
 import type { SignatoryRole, WithdrawalScope } from '@prisma/client';
 
 /* ────────────────────────────────────────────────────────────── */
@@ -11,18 +11,14 @@ import type { SignatoryRole, WithdrawalScope } from '@prisma/client';
 /*  Same rule for both: the Admin (creator/owner), Secretary, and   */
 /*  Treasurer each get one vote; a payout only fires once all three */
 /*  have APPROVED, and any single REJECTED kills the request.       */
-/*  Campaign payouts take the platform's flat 10% fee; chama payouts   */
-/*  take the same 10% — but only for external/non-member chamas. A    */
-/*  Ludeva-member chama (Team.isLudevaMember) never reaches this        */
+/*  Campaign and external-chama payouts take a platform fee based on */
+/*  the REQUESTER's own confirmed Ludeva membership — 5% for a       */
+/*  verified member, 7.5% for everyone else (see withdrawal-fee.ts). */
+/*  A Ludeva-member chama (Team.isLudevaMember) never reaches this   */
 /*  engine at all — it withdraws by emailing lchama@ludevaplc.co.ke /  */
 /*  invst@ludevaplc.co.ke instead, so createWithdrawalRequest refuses  */
 /*  to open an in-app request for one (see the CHAMA branch below).    */
-/*  The rate itself lives in src/lib/withdrawal-fee.ts (re-exported  */
-/*  below) so client components can read it without importing this  */
-/*  server-only file.                                                */
 /* ────────────────────────────────────────────────────────────── */
-
-export { PLATFORM_WITHDRAWAL_FEE_RATE };
 
 const LUDEVA_MEMBER_WITHDRAWAL_EMAILS = 'lchama@ludevaplc.co.ke or invst@ludevaplc.co.ke';
 
@@ -68,7 +64,10 @@ function roleOf(signatories: Signatories, userId: string): SignatoryRole | null 
 
 /** Everything a UI needs to render "who are the 3 signatories, and where does this request stand". */
 export async function getSignatoryStatus(scope: WithdrawalScope, scopeId: string, userId: string) {
-  const { signatories, availableBalance, label, isLudevaMember } = await getPoolContext(scope, scopeId);
+  const [{ signatories, availableBalance, label, isLudevaMember }, requester] = await Promise.all([
+    getPoolContext(scope, scopeId),
+    prisma.user.findUnique({ where: { id: userId }, select: { ludevaMembershipStatus: true } }),
+  ]);
   return {
     label,
     availableBalance,
@@ -77,6 +76,9 @@ export async function getSignatoryStatus(scope: WithdrawalScope, scopeId: string
     signatories,
     isLudevaMember,
     ludevaMemberWithdrawalContact: LUDEVA_MEMBER_WITHDRAWAL_EMAILS,
+    // What the requester would pay if they opened a request right now —
+    // lets the UI show the right PayoutCalculator rate before they submit.
+    myWithdrawalFeeRate: withdrawalFeeRateFor(requester?.ludevaMembershipStatus),
   };
 }
 
@@ -94,7 +96,10 @@ export async function createWithdrawalRequest(input: {
     throw new Error('Enter a valid Safaricom number to pay out to, e.g. 07XX XXX XXX.');
   }
 
-  const { signatories, availableBalance, label, isLudevaMember } = await getPoolContext(input.scope, input.scopeId);
+  const [{ signatories, availableBalance, label, isLudevaMember }, requester] = await Promise.all([
+    getPoolContext(input.scope, input.scopeId),
+    prisma.user.findUnique({ where: { id: input.requestedById }, select: { ludevaMembershipStatus: true } }),
+  ]);
   if (isLudevaMember) {
     throw new Error(
       `${label} is a Ludeva Plc member chama — withdrawals aren't requested in-app. A member should email ${LUDEVA_MEMBER_WITHDRAWAL_EMAILS} instead.`
@@ -113,7 +118,8 @@ export async function createWithdrawalRequest(input: {
     throw new Error(`Only KES ${availableBalance.toLocaleString()} is available to withdraw.`);
   }
 
-  const feeAmount = Math.round(input.amount * PLATFORM_WITHDRAWAL_FEE_RATE * 100) / 100;
+  const feeRate = withdrawalFeeRateFor(requester?.ludevaMembershipStatus);
+  const feeAmount = Math.round(input.amount * feeRate * 100) / 100;
   const netAmount = Math.round((input.amount - feeAmount) * 100) / 100;
 
   const request = await prisma.withdrawalRequest.create({

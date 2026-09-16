@@ -6,20 +6,27 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 
-const ProfileSchema = z.object({
-  firstName: z.string().min(1, 'Enter your first name.'),
-  lastName: z.string().min(1, 'Enter your last name.'),
-  idNumber: z.string().min(4, 'Enter a valid ID/passport number.'),
-  email: z.string().email('Enter a valid email.').optional().or(z.literal('')),
-  gender: z.enum(['MALE', 'FEMALE', 'OTHER'], { errorMap: () => ({ message: 'Select a gender.' }) }),
-  country: z.string().min(1, 'Select a country.'),
-  region: z.string().min(1, 'Enter your region/county.'),
-  password: z
-    .string()
-    .min(6, 'Password must be at least 6 characters.')
-    .regex(/[0-9]/, 'Password must contain a number.')
-    .regex(/[a-zA-Z]/, 'Password must contain a letter.'),
-});
+const ProfileSchema = z
+  .object({
+    firstName: z.string().min(1, 'Enter your first name.'),
+    lastName: z.string().min(1, 'Enter your last name.'),
+    idNumber: z.string().min(4, 'Enter a valid ID/passport number.'),
+    email: z.string().email('Enter a valid email.').optional().or(z.literal('')),
+    gender: z.enum(['MALE', 'FEMALE', 'OTHER'], { errorMap: () => ({ message: 'Select a gender.' }) }),
+    country: z.string().min(1, 'Select a country.'),
+    region: z.string().min(1, 'Enter your region/county.'),
+    isExistingLudevaMember: z.boolean().optional(),
+    ludevaMemberNumber: z.string().trim().optional(),
+    password: z
+      .string()
+      .min(6, 'Password must be at least 6 characters.')
+      .regex(/[0-9]/, 'Password must contain a number.')
+      .regex(/[a-zA-Z]/, 'Password must contain a letter.'),
+  })
+  .refine((d) => !d.isExistingLudevaMember || (d.ludevaMemberNumber && d.ludevaMemberNumber.length >= 3), {
+    message: 'Enter your Ludeva membership number.',
+    path: ['ludevaMemberNumber'],
+  });
 
 export type ProfileInput = z.infer<typeof ProfileSchema>;
 
@@ -60,6 +67,10 @@ export async function completeProfile(input: ProfileInput) {
 
   const fullName = `${d.firstName.trim()} ${d.lastName.trim()}`.trim();
 
+  const ludevaFields = d.isExistingLudevaMember
+    ? { ludevaMemberNumber: d.ludevaMemberNumber!.trim(), ludevaMembershipStatus: 'PENDING' as const }
+    : {};
+
   const existing = await prisma.user.findUnique({ where: { clerkId } });
 
   // email and phone are unique on User — surface a clear message instead
@@ -81,6 +92,7 @@ export async function completeProfile(input: ProfileInput) {
           country: d.country,
           region: d.region.trim(),
           profileCompleted: true,
+          ...ludevaFields,
         },
       });
     } else {
@@ -97,6 +109,7 @@ export async function completeProfile(input: ProfileInput) {
           country: d.country,
           region: d.region.trim(),
           profileCompleted: true,
+          ...ludevaFields,
         },
       });
     }

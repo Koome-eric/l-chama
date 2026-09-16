@@ -35,6 +35,8 @@ export function ProfileClient({ defaultEmail }: { defaultEmail?: string }) {
   const [gender, setGender] = useState<'MALE' | 'FEMALE' | 'OTHER' | ''>('');
   const [country, setCountry] = useState('KE');
   const [region, setRegion] = useState('');
+  const [isExistingLudevaMember, setIsExistingLudevaMember] = useState(false);
+  const [ludevaMemberNumber, setLudevaMemberNumber] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -49,6 +51,7 @@ export function ProfileClient({ defaultEmail }: { defaultEmail?: string }) {
     !!gender &&
     !!country &&
     region.trim().length > 0 &&
+    (!isExistingLudevaMember || ludevaMemberNumber.trim().length >= 3) &&
     password.length >= 6 &&
     hasNumber &&
     hasLetter;
@@ -66,6 +69,8 @@ export function ProfileClient({ defaultEmail }: { defaultEmail?: string }) {
           gender,
           country,
           region,
+          isExistingLudevaMember,
+          ludevaMemberNumber: isExistingLudevaMember ? ludevaMemberNumber : undefined,
           password,
         });
         toast({ title: 'Profile complete' });
@@ -151,6 +156,37 @@ export function ProfileClient({ defaultEmail }: { defaultEmail?: string }) {
               <Input id="region" value={region} onChange={(e) => setRegion(e.target.value)} placeholder="Region" />
             )}
           </div>
+        </div>
+
+        <div className="rounded-xl border p-4 space-y-3">
+          <label className="flex items-start gap-2.5 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isExistingLudevaMember}
+              onChange={(e) => setIsExistingLudevaMember(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-input"
+            />
+            <span>
+              I'm an existing Ludeva Plc member
+              <span className="block text-xs text-muted-foreground mt-0.5">
+                Confirmed Ludeva members pay a lower 5% withdrawal fee (7.5% otherwise).
+              </span>
+            </span>
+          </label>
+          {isExistingLudevaMember && (
+            <div>
+              <Label htmlFor="ludevaMemberNumber">Ludeva Membership Number</Label>
+              <Input
+                id="ludevaMemberNumber"
+                value={ludevaMemberNumber}
+                onChange={(e) => setLudevaMemberNumber(e.target.value)}
+                placeholder="e.g. LDV-00123"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                An admin will confirm this number before it takes effect.
+              </p>
+            </div>
+          )}
         </div>
 
         <div>

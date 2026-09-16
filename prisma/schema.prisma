@@ -23,6 +23,13 @@ enum Gender {
   OTHER
 }
 
+enum LudevaMembershipStatus {
+  NONE // didn't claim to be an existing Ludeva Plc member
+  PENDING // claimed membership, number submitted, awaiting admin confirmation
+  VERIFIED // admin confirmed the Ludeva membership number
+  REJECTED // admin could not confirm the claimed number
+}
+
 model User {
   id      String  @id @default(cuid())
   clerkId String  @unique
@@ -45,6 +52,17 @@ model User {
   // flips once they're attached to a team one way or another.
   profileCompleted    Boolean @default(false)
   onboardingCompleted Boolean @default(false)
+
+  // Self-claimed at onboarding (required only if the person says they're
+  // an existing Ludeva Plc member), then confirmed or rejected by a
+  // platform admin (see /admin) before it counts toward anything. Drives
+  // the withdrawal fee rate for external-chama and campaign withdrawals
+  // — see src/lib/withdrawal-fee.ts. NONE means "didn't claim to be a
+  // member" (most new sign-ups), not "checked and found not to be one".
+  ludevaMemberNumber           String?
+  ludevaMembershipStatus       LudevaMembershipStatus @default(NONE)
+  ludevaMembershipDecidedAt    DateTime?
+  ludevaMembershipRejectionReason String?
 
   ownedTeam      Team?           @relation("TeamOwner")
   teamMembership TeamMembership? @relation("TeamMembershipUser")
@@ -158,8 +176,6 @@ model Team {
   lastRespectClaims       LastRespectClaim[]
 
   approvalStatus OrganisationApprovalStatus @default(PENDING_APPROVAL)
-  privacyPolicyAccepted Boolean @default(false)
-  termsAcceptedAt      DateTime?
   submittedAt    DateTime                   @default(now())
   decidedById    String?
   decidedBy      User?                      @relation("TeamDecidedBy", fields: [decidedById], references: [id])
@@ -805,7 +821,7 @@ model WithdrawalRequest {
   requestedBy   User   @relation("WithdrawalRequestedBy", fields: [requestedById], references: [id])
 
   amount    Float // gross amount requested, deducted from the pool on PAID
-  feeAmount Float @default(0) // platform fee — flat 4.9%, campaign or chama alike
+  feeAmount Float @default(0) // platform fee — flat 5%, campaign or non-member chama alike
   netAmount Float // amount actually sent out (amount - feeAmount)
 
   destinationPhone String // M-Pesa number the payout is sent to

@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { CHAMA_LEVELS, formatKES, type ChamaLevelKey } from '@/lib/chama-levels';
 import { registerOrganisation } from './actions';
-import { CheckCircle2, Globe, HeartHandshake, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, Globe, HeartHandshake } from 'lucide-react';
 
 const OBJECTIVES: { key: string; label: string }[] = [
   { key: 'BUY_ASSETS', label: 'Saving to buy assets' },
@@ -46,7 +46,6 @@ export function OrganisationClient() {
   // Last Respect Cover
   const [hasLastRespectCover, setHasLastRespectCover] = useState(false);
   const [lastRespectContribution, setLastRespectContribution] = useState('');
-  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
 
@@ -64,15 +63,10 @@ export function OrganisationClient() {
     objectives.length >= 1 &&
     membersRunningSME !== '' &&
     membersEmployed !== '' &&
-    (!hasLastRespectCover || Number(lastRespectContribution) > 0) &&
-    termsAccepted;
+    (!hasLastRespectCover || Number(lastRespectContribution) > 0);
 
   const handleSubmit = () => {
     if (!levelKey) return;
-    if (!termsAccepted) {
-      setError('You must accept the Privacy Policy and Terms and Conditions.');
-      return;
-    }
     setError(null);
     startTransition(async () => {
       try {
@@ -90,7 +84,6 @@ export function OrganisationClient() {
           membersEmployed: Number(membersEmployed),
           hasLastRespectCover,
           lastRespectContribution: hasLastRespectCover ? Number(lastRespectContribution) : undefined,
-          termsAccepted: true,
         });
         toast({ title: 'Submitted for approval', description: "We'll notify you once it's reviewed." });
         router.push('/onboarding/pending');
@@ -297,32 +290,6 @@ export function OrganisationClient() {
               );
             })}
           </div>
-        </CardContent>
-      </Card>
-
-      <Card className="rounded-2xl shadow-sm">
-        <CardContent className="p-6">
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              className="mt-0.5 h-4 w-4 rounded border-input"
-              checked={termsAccepted}
-              onChange={(e) => setTermsAccepted(e.target.checked)}
-              required
-            />
-            <span className="text-sm">
-              <span className="font-medium flex items-center gap-1.5">
-                <ShieldCheck className="h-4 w-4 text-primary" /> Privacy Policy and Terms and Conditions
-              </span>
-              <span className="text-muted-foreground">
-                I have read and agree to the{' '}
-                <a href="/privacy" target="_blank" rel="noreferrer" className="underline hover:text-foreground">
-                  Privacy Policy
-                </a>{' '}
-                and the L-Chama Terms and Conditions. I understand that my chama application will be reviewed before approval.
-              </span>
-            </span>
-          </label>
         </CardContent>
       </Card>
 

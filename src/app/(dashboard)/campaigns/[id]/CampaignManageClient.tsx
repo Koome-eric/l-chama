@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Share2, Copy, ShieldCheck, ArrowUpFromLine, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,7 +13,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { formatKES } from '@/lib/chama-levels';
-import { PLATFORM_WITHDRAWAL_FEE_RATE } from '@/lib/withdrawal-fee';
 import { PayoutCalculator } from '@/components/payments/PayoutCalculator';
 import {
   findUserForSignatory,
@@ -98,10 +98,23 @@ export function CampaignWithdrawSection({ state }: { state: WithdrawState }) {
 
       {state.myRole ? (
         <>
+          <p className="text-xs text-muted-foreground">
+            Your withdrawal fee rate: <span className="font-semibold text-foreground">{(state.myWithdrawalFeeRate * 100).toFixed(1)}%</span>
+            {state.myWithdrawalFeeRate > 0.05 && (
+              <>
+                {' '}— existing Ludeva Plc members pay 5%.{' '}
+                <Link href="/profile" className="underline">
+                  Add your Ludeva membership number
+                </Link>{' '}
+                to qualify, once confirmed by an admin.
+              </>
+            )}
+          </p>
           <RequestWithdrawalDialog
             campaignId={state.campaignId}
             canRequest={state.signatoriesComplete}
             availableBalance={state.availableBalance}
+            feeRate={state.myWithdrawalFeeRate}
             onDone={refresh}
             toast={toast}
           />
@@ -199,12 +212,14 @@ function RequestWithdrawalDialog({
   campaignId,
   canRequest,
   availableBalance,
+  feeRate,
   onDone,
   toast,
 }: {
   campaignId: string;
   canRequest: boolean;
   availableBalance: number;
+  feeRate: number;
   onDone: () => void;
   toast: ReturnType<typeof useToast>['toast'];
 }) {
@@ -242,7 +257,7 @@ function RequestWithdrawalDialog({
         <DialogHeader>
           <DialogTitle>Request a withdrawal</DialogTitle>
           <DialogDescription>
-            Up to {formatKES(availableBalance)} available. A flat {(PLATFORM_WITHDRAWAL_FEE_RATE * 100).toFixed(1)}%
+            Up to {formatKES(availableBalance)} available. A flat {(feeRate * 100).toFixed(1)}%
             platform fee applies. Your own sign-off is recorded automatically — the other two signatories still need
             to approve.
           </DialogDescription>
@@ -252,7 +267,7 @@ function RequestWithdrawalDialog({
             <Label htmlFor="cwdAmount">Amount (KES)</Label>
             <Input id="cwdAmount" type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} />
           </div>
-          {Number(amount) > 0 && <PayoutCalculator amount={Number(amount)} />}
+          {Number(amount) > 0 && <PayoutCalculator amount={Number(amount)} feeRate={feeRate} />}
           <div>
             <Label htmlFor="cwdPhone">Pay out to (M-Pesa number)</Label>
             <Input id="cwdPhone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="07XX XXX XXX" />

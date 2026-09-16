@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { auth } from '@clerk/nextjs/server';
-import { ArrowRight, ShieldCheck, HeartHandshake, ClipboardCheck, Landmark } from 'lucide-react';
+import { ArrowRight, ShieldCheck, HeartHandshake, ClipboardCheck, Landmark, Percent, Clock, Headset, FileCheck2 } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { getChamaContext } from '@/lib/chama';
 import LChamaHeader from '@/components/LChamaHeader';
@@ -72,9 +72,25 @@ const PRODUCTS = [
     name: 'L-Chama Micro Loans',
     rate: '2.5% p.m.',
     description: 'Internal chama loans — members borrow against their savings with automated interest tracking and instant M-Pesa disbursement.',
-    features: 'Zero paperwork — every decision and approval happens within your L-Chama. KES 50,000 to KES 500,000 per member of the group, plus a small additional fee for non-member borrowers (e.g. spouse and dependents).',
+    features: '2.5% one-off processing fee on the loan amount, repayment over up to 6 months, and disbursement as soon as your chama officials approve it.',
     target: '/panel?tab=loan-requests',
   },
+];
+
+// L-Chama Loans terms — kept as plain data (not prose) specifically so
+// the platform fee is never buried in a paragraph; see the dedicated
+// "L-Chama Loans" section below.
+const LOAN_TERMS = [
+  { label: 'Interest Rate', value: '2.5% per month' },
+  { label: 'Processing Fee', value: '2.5% one-off, on the total loan amount' },
+  { label: 'Repayment Term', value: 'Up to 6 months' },
+];
+
+const LOAN_BENEFITS = [
+  { icon: ShieldCheck, text: 'Fund security guarantees, with a full audit trail on a shared dashboard.' },
+  { icon: FileCheck2, text: 'Automated payment processing and quick disbursement once your chama officials approve.' },
+  { icon: Clock, text: '24-hour advance notice for standard withdrawals.' },
+  { icon: Headset, text: '24/7 dedicated L-Chama customer support.' },
 ];
 
 export default async function LandingPage() {
@@ -262,6 +278,82 @@ export default async function LandingPage() {
                   </Card>
                 </Link>
               ))}
+            </div>
+          </div>
+        </section>
+
+        {/* L-Chama Loans — kept as its own detailed section (rather than
+            folded into a product-grid card) specifically so the platform
+            fee is stated plainly, not buried in marketing copy. */}
+        <section className="py-16 md:py-24 border-y border-border/60">
+          <div className="container mx-auto px-4">
+            <div className="grid lg:grid-cols-2 gap-10 items-start">
+              <div>
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 mb-4">
+                  <Landmark className="h-5 w-5 text-primary" />
+                </div>
+                <h2 className="text-3xl font-bold font-headline">L-Chama Loans</h2>
+                <p className="mt-3 text-muted-foreground">
+                  Borrow against your chama's own pooled savings — every decision happens inside your L-Chama,
+                  with no external paperwork.
+                </p>
+
+                <ul className="mt-6 space-y-3">
+                  {LOAN_BENEFITS.map((b) => (
+                    <li key={b.text} className="flex items-start gap-3 text-sm">
+                      <b.icon className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                      <span className="text-muted-foreground">{b.text}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <Button asChild size="lg" className="mt-6">
+                  <Link href={hasAccount ? '/panel?tab=loan-requests' : '/sign-up'}>
+                    Apply for a Loan <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
+
+              <div className="rounded-2xl border bg-card overflow-hidden">
+                <div className="px-6 py-4 border-b bg-muted/40">
+                  <p className="font-headline font-semibold">Loan Terms — External Chamas</p>
+                </div>
+                <dl className="divide-y">
+                  {LOAN_TERMS.map((t) => (
+                    <div key={t.label} className="flex items-center justify-between gap-4 px-6 py-4">
+                      <dt className="text-sm text-muted-foreground">{t.label}</dt>
+                      <dd className="text-sm font-semibold text-right">{t.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+
+                {/* Platform withdrawal fee — deliberately its own highlighted
+                    block, not just another row, per the "as clear as
+                    possible" requirement. */}
+                <div className="px-6 py-5 bg-primary/5 border-t-2 border-primary/30">
+                  <div className="flex items-center gap-2">
+                    <Percent className="h-4 w-4 text-primary shrink-0" />
+                    <p className="font-headline font-semibold">Platform Withdrawal Fee: 5%</p>
+                  </div>
+                  <p className="mt-1.5 text-sm text-muted-foreground">
+                    A flat 5% platform fee applies to all standard withdrawals — including campaign fund
+                    withdrawals — for external chamas (chamas not built directly by Ludeva Plc). There are no other
+                    hidden charges.
+                  </p>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Chamas built directly by Ludeva Plc operate under the Second Cycle Withdrawal Policy and are
+                    exempt from this fee — see{' '}
+                    <Link href="/privacy" className="underline hover:text-primary">
+                      our policies
+                    </Link>{' '}
+                    or{' '}
+                    <Link href="/contact" className="underline hover:text-primary">
+                      contact us
+                    </Link>{' '}
+                    for details.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </section>

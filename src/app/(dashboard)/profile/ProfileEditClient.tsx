@@ -5,6 +5,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { ShieldCheck } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -14,7 +16,7 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { COUNTRIES, KENYA_COUNTIES } from '@/lib/countries';
-import { updateProfile } from './actions';
+import { updateProfile, submitLudevaMembership } from './actions';
 
 const GENDERS = [
   { value: 'MALE', label: 'Male' },
@@ -32,7 +34,13 @@ type Defaults = {
   region: string;
 };
 
-export function ProfileEditClient({ defaults }: { defaults: Defaults }) {
+type LudevaInfo = {
+  memberNumber: string;
+  status: 'NONE' | 'PENDING' | 'VERIFIED' | 'REJECTED';
+  rejectionReason: string | null;
+};
+
+export function ProfileEditClient({ defaults, ludeva }: { defaults: Defaults; ludeva: LudevaInfo }) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
 
@@ -76,6 +84,7 @@ export function ProfileEditClient({ defaults }: { defaults: Defaults }) {
   };
 
   return (
+    <>
     <Card className="rounded-2xl shadow-sm">
       <CardContent className="p-6 space-y-4">
         <div className="grid sm:grid-cols-2 gap-4">
@@ -157,6 +166,71 @@ export function ProfileEditClient({ defaults }: { defaults: Defaults }) {
         <Button size="lg" className="w-full sm:w-auto" disabled={!canSubmit || isPending} onClick={handleSubmit}>
           {isPending ? 'Saving…' : 'Save Changes'}
         </Button>
+      </CardContent>
+    </Card>
+
+    <LudevaMembershipCard ludeva={ludeva} />
+    </>
+  );
+}
+
+function LudevaMembershipCard({ ludeva }: { ludeva: LudevaInfo }) {
+  const { toast } = useToast();
+  const [isPending, startTransition] = useTransition();
+  const [memberNumber, setMemberNumber] = useState(ludeva.memberNumber);
+  const [submitted, setSubmitted] = useState(false);
+
+  const submit = () => {
+    startTransition(async () => {
+      try {
+        await submitLudevaMembership(memberNumber);
+        toast({ title: 'Submitted', description: 'An admin will confirm your Ludeva membership number.' });
+        setSubmitted(true);
+      } catch (err: any) {
+        toast({ title: 'Could not submit', description: err.message, variant: 'destructive' });
+      }
+    });
+  };
+
+  const status = submitted ? 'PENDING' : ludeva.status;
+
+  return (
+    <Card className="rounded-2xl shadow-sm">
+      <CardContent className="p-6 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <p className="font-headline font-semibold flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-primary" /> Ludeva Plc Membership
+          </p>
+          {status !== 'NONE' && (
+            <Badge variant={status === 'VERIFIED' ? 'default' : status === 'REJECTED' ? 'destructive' : 'secondary'}>
+              {status === 'VERIFIED' ? 'Verified — 5% fee' : status === 'REJECTED' ? 'Not confirmed' : 'Pending confirmation'}
+            </Badge>
+          )}
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Confirmed Ludeva Plc members pay a lower 5% withdrawal fee instead of the standard 7.5%.
+        </p>
+
+        {status === 'REJECTED' && ludeva.rejectionReason && (
+          <p className="text-xs text-destructive">Reason: {ludeva.rejectionReason}</p>
+        )}
+
+        {status === 'VERIFIED' ? (
+          <p className="text-sm">Membership number: <span className="font-medium">{ludeva.memberNumber}</span></p>
+        ) : (
+          <div className="space-y-2">
+            <Label htmlFor="ludevaMemberNumberProfile">Ludeva Membership Number</Label>
+            <Input
+              id="ludevaMemberNumberProfile"
+              value={memberNumber}
+              onChange={(e) => setMemberNumber(e.target.value)}
+              placeholder="e.g. LDV-00123"
+            />
+            <Button size="sm" disabled={isPending || memberNumber.trim().length < 3} onClick={submit}>
+              {isPending ? 'Submitting…' : status === 'PENDING' ? 'Resubmit for confirmation' : 'Submit for confirmation'}
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

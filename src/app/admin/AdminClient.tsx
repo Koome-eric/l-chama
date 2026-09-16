@@ -97,6 +97,7 @@ import {
   logoutAdmin,
   resolvePayment,
   decideJuniorApplication,
+  decideLudevaMembership,
   createAdminAccount,
   updateAdminAccount,
   deleteAdminAccount,
@@ -215,6 +216,17 @@ type JuniorApplicationRow = {
   createdAt: string;
 };
 
+type LudevaMemberRow = {
+  id: string;
+  fullName: string;
+  email: string | null;
+  phone: string | null;
+  ludevaMemberNumber: string | null;
+  ludevaMembershipStatus: 'NONE' | 'PENDING' | 'VERIFIED' | 'REJECTED';
+  ludevaMembershipDecidedAt: string | null;
+  ludevaMembershipRejectionReason: string | null;
+};
+
 type AdminRow = {
   id: string;
   email: string;
@@ -239,10 +251,11 @@ type Stats = {
   savings: { total: number; matched: number };
   payments: { total: number; pending: number };
   juniorApplications: { total: number; pending: number };
+  ludevaMembers: { total: number; pending: number };
   monthlyOrgSubmissions: { label: string; value: number }[];
 };
 
-type Section = 'overview' | 'organisations' | 'campaigns' | 'products' | 'reports' | 'savings' | 'payments' | 'junior' | 'admins';
+type Section = 'overview' | 'organisations' | 'campaigns' | 'products' | 'reports' | 'savings' | 'payments' | 'junior' | 'ludeva-members' | 'admins';
 
 const TYPE_LABEL: Record<ProductType, string> = {
   MMF: 'Money Market Fund',
@@ -279,6 +292,7 @@ function useNavItems(stats: Stats, isSuperAdmin: boolean) {
     { id: 'products' as Section, label: 'Investment Products', icon: PiggyBank, badge: 0 },
     { id: 'payments' as Section, label: 'Payments', icon: Wallet, badge: stats.payments.pending },
     { id: 'junior' as Section, label: 'Junior Accounts', icon: Baby, badge: stats.juniorApplications.pending },
+    { id: 'ludeva-members' as Section, label: 'Ludeva Members', icon: ShieldCheck, badge: stats.ludevaMembers.pending },
     { id: 'reports' as Section, label: 'Member Reports', icon: FileSpreadsheet, badge: 0 },
     { id: 'savings' as Section, label: 'Savings Accounts', icon: Coins, badge: 0 },
   ];
@@ -295,6 +309,7 @@ const SECTION_META: Record<Section, { title: string; description: string }> = {
   products: { title: 'Investment Products', description: 'Manage the catalog chamas invest their pooled fund into.' },
   payments: { title: 'Payments', description: 'M-Pesa and Visa card requests from member accounts, awaiting confirmation.' },
   junior: { title: 'Junior Accounts', description: "Review Ludeva Junior Account applications and their KYC documents." },
+  'ludeva-members': { title: 'Ludeva Members', description: 'Confirm claimed Ludeva Plc membership numbers — only verified members get the 5% withdrawal fee.' },
   reports: { title: 'Member Reports', description: 'Sync and review performance data from Google Sheets.' },
   savings: { title: 'Savings Accounts', description: 'Sync, correct, or manually add running-balance Savings entries.' },
   admins: { title: 'Admins', description: 'Create, edit and remove the admins who can sign in to this panel.' },
@@ -312,6 +327,7 @@ export function AdminClient({
   savingsEntries,
   payments,
   juniorApplications,
+  ludevaMembers,
   stats,
   authMethod,
   admins,
@@ -325,6 +341,7 @@ export function AdminClient({
   savingsEntries: SavingsRow[];
   payments: PaymentRow[];
   juniorApplications: JuniorApplicationRow[];
+  ludevaMembers: LudevaMemberRow[];
   stats: Stats;
   authMethod: 'clerk' | 'password';
   admins: AdminRow[];
@@ -427,7 +444,7 @@ export function AdminClient({
           <div className="ml-auto flex items-center gap-3">
             {(() => {
               const totalNeedsReview =
-                stats.orgs.pending + stats.campaigns.unverified + stats.payments.pending + stats.juniorApplications.pending;
+                stats.orgs.pending + stats.campaigns.unverified + stats.payments.pending + stats.juniorApplications.pending + stats.ludevaMembers.pending;
               if (totalNeedsReview === 0) return null;
               const target: Section =
                 stats.orgs.pending > 0
@@ -436,7 +453,9 @@ export function AdminClient({
                     ? 'campaigns'
                     : stats.payments.pending > 0
                       ? 'payments'
-                      : 'junior';
+                      : stats.juniorApplications.pending > 0
+                        ? 'junior'
+                        : 'ludeva-members';
               return (
                 <button
                   onClick={() => setSection(target)}
@@ -467,6 +486,7 @@ export function AdminClient({
             {section === 'products' && <ProductsAdminSection products={products} />}
             {section === 'payments' && <PaymentsAdminSection payments={payments} />}
             {section === 'junior' && <JuniorAdminSection applications={juniorApplications} />}
+            {section === 'ludeva-members' && <LudevaMembersAdminSection members={ludevaMembers} />}
             {section === 'reports' && <MemberReportsAdminSection reports={reports} />}
             {section === 'savings' && <SavingsAdminSection entries={savingsEntries} />}
             {section === 'admins' && isSuperAdmin && (
@@ -842,7 +862,7 @@ function OrganisationsAdminSection({ teams }: { teams: TeamRow[] }) {
                 <div>
                   <p className="text-sm font-medium">Ludeva Plc member chama</p>
                   <p className="text-xs text-muted-foreground">
-                    Member chamas withdraw by email (no in-app flow, no fee) instead of the standard 10% withdrawal fee.
+                    Member chamas withdraw by email (no in-app flow, no fee) instead of the standard 5% withdrawal fee.
                   </p>
                 </div>
                 <Button
@@ -2197,6 +2217,148 @@ function JuniorAdminSection({ applications }: { applications: JuniorApplicationR
           )}
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────── */
+/*  Ludeva Membership confirmation — the other half of the           */
+/*  "5% for existing Ludeva members, 7.5% otherwise" withdrawal fee  */
+/*  (see src/lib/withdrawal-fee.ts). A claim submitted at onboarding */
+/*  or /profile sits PENDING until an admin confirms or rejects the  */
+/*  number given here.                                               */
+/* ────────────────────────────────────────────────────────────── */
+
+type LudevaMemberFilter = 'PENDING' | 'VERIFIED' | 'REJECTED' | 'ALL';
+
+function LudevaMembersAdminSection({ members }: { members: LudevaMemberRow[] }) {
+  const { toast } = useToast();
+  const [isPending, startTransition] = useTransition();
+  const [filter, setFilter] = useState<LudevaMemberFilter>('PENDING');
+  const [reasonById, setReasonById] = useState<Record<string, string>>({});
+
+  const counts = {
+    PENDING: members.filter((m) => m.ludevaMembershipStatus === 'PENDING').length,
+    VERIFIED: members.filter((m) => m.ludevaMembershipStatus === 'VERIFIED').length,
+    REJECTED: members.filter((m) => m.ludevaMembershipStatus === 'REJECTED').length,
+    ALL: members.length,
+  };
+
+  const filtered = filter === 'ALL' ? members : members.filter((m) => m.ludevaMembershipStatus === filter);
+
+  const handleDecide = (id: string, decision: 'VERIFIED' | 'REJECTED') => {
+    startTransition(async () => {
+      try {
+        await decideLudevaMembership(id, decision, reasonById[id]);
+        toast({ title: decision === 'VERIFIED' ? 'Membership confirmed' : 'Membership not confirmed' });
+        window.location.reload();
+      } catch (err: any) {
+        toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      }
+    });
+  };
+
+  if (members.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center text-sm text-muted-foreground">
+          No one has claimed Ludeva Plc membership yet.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2">
+        <FilterPill active={filter === 'PENDING'} onClick={() => setFilter('PENDING')}>
+          Pending ({counts.PENDING})
+        </FilterPill>
+        <FilterPill active={filter === 'VERIFIED'} onClick={() => setFilter('VERIFIED')}>
+          Verified ({counts.VERIFIED})
+        </FilterPill>
+        <FilterPill active={filter === 'REJECTED'} onClick={() => setFilter('REJECTED')}>
+          Rejected ({counts.REJECTED})
+        </FilterPill>
+        <FilterPill active={filter === 'ALL'} onClick={() => setFilter('ALL')}>
+          All ({counts.ALL})
+        </FilterPill>
+      </div>
+
+      {filtered.length === 0 && (
+        <Card>
+          <CardContent className="py-12 text-center text-sm text-muted-foreground">
+            No members match this view.
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="space-y-4">
+        {filtered.map((m) => (
+          <Card key={m.id}>
+            <CardHeader className="pb-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <ShieldCheck className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">{m.fullName}</CardTitle>
+                    <CardDescription>
+                      {m.email || m.phone || 'No contact on file'}
+                      {m.ludevaMemberNumber && ` · Claimed number: ${m.ludevaMemberNumber}`}
+                    </CardDescription>
+                  </div>
+                </div>
+                <Badge
+                  variant={
+                    m.ludevaMembershipStatus === 'VERIFIED'
+                      ? 'default'
+                      : m.ludevaMembershipStatus === 'REJECTED'
+                        ? 'destructive'
+                        : 'secondary'
+                  }
+                >
+                  {m.ludevaMembershipStatus === 'PENDING'
+                    ? 'Pending confirmation'
+                    : m.ludevaMembershipStatus === 'VERIFIED'
+                      ? 'Verified — 5% fee'
+                      : 'Rejected — 7.5% fee'}
+                </Badge>
+              </div>
+            </CardHeader>
+            {m.ludevaMembershipStatus === 'PENDING' && (
+              <CardContent className="space-y-3">
+                <div>
+                  <Label htmlFor={`ludeva-reason-${m.id}`} className="text-xs">
+                    Rejection reason (only used if you reject)
+                  </Label>
+                  <Textarea
+                    id={`ludeva-reason-${m.id}`}
+                    rows={2}
+                    value={reasonById[m.id] ?? ''}
+                    onChange={(e) => setReasonById((prev) => ({ ...prev, [m.id]: e.target.value }))}
+                    placeholder="e.g. Number not found in Ludeva's member records"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => handleDecide(m.id, 'VERIFIED')} disabled={isPending} className="gap-1.5">
+                    <CheckCircle2 className="h-4 w-4" /> Confirm number
+                  </Button>
+                  <Button size="sm" variant="destructive" onClick={() => handleDecide(m.id, 'REJECTED')} disabled={isPending} className="gap-1.5">
+                    <XCircle className="h-4 w-4" /> Reject
+                  </Button>
+                </div>
+              </CardContent>
+            )}
+            {m.ludevaMembershipStatus === 'REJECTED' && m.ludevaMembershipRejectionReason && (
+              <CardContent className="pt-0">
+                <p className="text-xs text-muted-foreground">Reason: {m.ludevaMembershipRejectionReason}</p>
+              </CardContent>
+            )}
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }

@@ -62,7 +62,6 @@ import {
   updateChamaPhoto,
 } from './actions';
 import { formatKES } from '@/lib/chama-levels';
-import { PLATFORM_WITHDRAWAL_FEE_RATE } from '@/lib/withdrawal-fee';
 import { PayoutCalculator } from '@/components/payments/PayoutCalculator';
 import { ImageUploadField } from '@/components/uploads/ImageUploadField';
 import { cn } from '@/lib/utils';
@@ -109,6 +108,7 @@ type TeamData = {
   name: string;
   photoUrl: string | null;
   isLudevaMember: boolean;
+  myWithdrawalFeeRate: number;
   isOwner: boolean;
   permissions: ChamaPermissions;
   levelName: string | null;
@@ -673,13 +673,25 @@ function LoanAccountTab({ team }: { team: TeamData }) {
           <p className="text-sm text-muted-foreground mt-1">Available for approved loans</p>
         </div>
 
-        <LoanAccountPayoutPreview availableBalance={team.loanAccount.balance} isLudevaMember={team.isLudevaMember} />
+        <LoanAccountPayoutPreview
+          availableBalance={team.loanAccount.balance}
+          isLudevaMember={team.isLudevaMember}
+          feeRate={team.myWithdrawalFeeRate}
+        />
       </CardContent>
     </Card>
   );
 }
 
-function LoanAccountPayoutPreview({ availableBalance, isLudevaMember }: { availableBalance: number; isLudevaMember: boolean }) {
+function LoanAccountPayoutPreview({
+  availableBalance,
+  isLudevaMember,
+  feeRate,
+}: {
+  availableBalance: number;
+  isLudevaMember: boolean;
+  feeRate: number;
+}) {
   const [amount, setAmount] = useState('');
 
   if (isLudevaMember) {
@@ -698,8 +710,10 @@ function LoanAccountPayoutPreview({ availableBalance, isLudevaMember }: { availa
       <div>
         <p className="text-sm font-medium">Withdrawal payout calculator</p>
         <p className="text-xs text-muted-foreground">
-          Preview what a withdrawal would net after the platform's flat {(PLATFORM_WITHDRAWAL_FEE_RATE * 100).toFixed(1)}%
-          fee. Requesting a real withdrawal (with the required 3-signatory approval) happens on the{' '}
+          Preview what a withdrawal would net after the platform's fee — your rate is{' '}
+          <span className="font-semibold text-foreground">{(feeRate * 100).toFixed(1)}%</span>
+          {feeRate > 0.05 ? ' (existing Ludeva Plc members pay 5% — add your membership number in your profile).' : ' as a confirmed Ludeva Plc member.'}{' '}
+          Requesting a real withdrawal (with the required 3-signatory approval) happens on the{' '}
           <Link href="/withdraw" className="underline">
             Withdraw
           </Link>{' '}
@@ -718,7 +732,7 @@ function LoanAccountPayoutPreview({ availableBalance, isLudevaMember }: { availa
           placeholder={`Up to ${availableBalance.toLocaleString()}`}
         />
       </div>
-      {Number(amount) > 0 && <PayoutCalculator amount={Number(amount)} />}
+      {Number(amount) > 0 && <PayoutCalculator amount={Number(amount)} feeRate={feeRate} />}
       <Button asChild size="sm" variant="outline">
         <Link href="/withdraw">Go to Withdraw</Link>
       </Button>

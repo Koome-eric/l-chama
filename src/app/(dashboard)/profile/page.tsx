@@ -20,6 +20,11 @@ export default async function ProfilePage() {
           country: user.country || 'KE',
           region: user.region || '',
         }}
+        ludeva={{
+          memberNumber: user.ludevaMemberNumber || '',
+          status: user.ludevaMembershipStatus,
+          rejectionReason: user.ludevaMembershipRejectionReason,
+        }}
       />
     </div>
   );
