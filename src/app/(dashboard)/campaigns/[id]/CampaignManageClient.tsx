@@ -26,7 +26,7 @@ import { ImageUploadField } from '@/components/uploads/ImageUploadField';
 
 type WithdrawState = Awaited<ReturnType<typeof getCampaignWithdrawState>>;
 
-const ROLE_LABEL: Record<string, string> = { ADMIN: 'Admin', SECRETARY: 'Secretary', TREASURER: 'Treasurer' };
+const ROLE_LABEL: Record<string, string> = { ADMIN: 'Team Leader', SECRETARY: 'Secretary' };
 const STATUS_META: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' }> = {
   AWAITING_APPROVALS: { label: 'Awaiting approvals', variant: 'secondary' },
   REJECTED: { label: 'Rejected', variant: 'destructive' },
@@ -135,20 +135,16 @@ export function CampaignWithdrawSection({ state }: { state: WithdrawState }) {
 
 function SignatoriesCard({ state, onSaved, toast }: { state: WithdrawState; onSaved: () => void; toast: ReturnType<typeof useToast>['toast'] }) {
   const [secretaryQuery, setSecretaryQuery] = useState('');
-  const [treasurerQuery, setTreasurerQuery] = useState('');
   const [isPending, startTransition] = useTransition();
 
   const save = () => {
     startTransition(async () => {
       try {
         let secretaryId: string | undefined;
-        let treasurerId: string | undefined;
         if (secretaryQuery.trim()) secretaryId = (await findUserForSignatory(secretaryQuery)).id;
-        if (treasurerQuery.trim()) treasurerId = (await findUserForSignatory(treasurerQuery)).id;
-        await setCampaignSignatories({ campaignId: state.campaignId, secretaryId, treasurerId });
+        await setCampaignSignatories({ campaignId: state.campaignId, secretaryId });
         toast({ title: 'Signatories updated' });
         setSecretaryQuery('');
-        setTreasurerQuery('');
         onSaved();
       } catch (err: any) {
         toast({ title: 'Could not update signatories', description: err.message, variant: 'destructive' });
@@ -162,20 +158,16 @@ function SignatoriesCard({ state, onSaved, toast }: { state: WithdrawState; onSa
         <CardTitle className="text-base flex items-center gap-2">
           <ShieldCheck className="h-4 w-4 text-primary" /> Signatories
         </CardTitle>
-        <CardDescription>Withdrawing donated funds needs all three to sign off.</CardDescription>
+        <CardDescription>Withdrawing donated funds needs both to sign off.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         <div className="flex items-center justify-between">
-          <span className="text-muted-foreground">Admin (creator)</span>
+          <span className="text-muted-foreground">Team Leader (creator)</span>
           <span className="font-medium">{state.admin.name}</span>
         </div>
         <div className="flex items-center justify-between">
           <span className="text-muted-foreground">Secretary</span>
           <span className="font-medium">{state.secretary?.name ?? 'Not assigned'}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-muted-foreground">Treasurer</span>
-          <span className="font-medium">{state.treasurer?.name ?? 'Not assigned'}</span>
         </div>
 
         {state.isCreator && (
@@ -186,13 +178,7 @@ function SignatoriesCard({ state, onSaved, toast }: { state: WithdrawState; onSa
               </Label>
               <Input id="secQuery" value={secretaryQuery} onChange={(e) => setSecretaryQuery(e.target.value)} placeholder="0712345678 or name@email.com" />
             </div>
-            <div>
-              <Label htmlFor="treQuery" className="text-xs">
-                Assign Treasurer
-              </Label>
-              <Input id="treQuery" value={treasurerQuery} onChange={(e) => setTreasurerQuery(e.target.value)} placeholder="0712345678 or name@email.com" />
-            </div>
-            <Button size="sm" onClick={save} disabled={isPending || (!secretaryQuery.trim() && !treasurerQuery.trim())}>
+            <Button size="sm" onClick={save} disabled={isPending || !secretaryQuery.trim()}>
               {isPending ? 'Saving…' : 'Save signatories'}
             </Button>
           </div>
@@ -200,7 +186,7 @@ function SignatoriesCard({ state, onSaved, toast }: { state: WithdrawState; onSa
 
         {!state.signatoriesComplete && (
           <p className="text-xs text-amber-600">
-            {state.isCreator ? 'Assign a Secretary and Treasurer above before a withdrawal can be requested.' : 'Waiting for the creator to assign a Secretary and Treasurer.'}
+            {state.isCreator ? 'Assign a Secretary above before a withdrawal can be requested.' : 'Waiting for the creator to assign a Secretary.'}
           </p>
         )}
       </CardContent>
@@ -234,7 +220,7 @@ function RequestWithdrawalDialog({
     startTransition(async () => {
       try {
         await requestCampaignWithdrawal({ campaignId, amount: value, destinationPhone: phone, reason });
-        toast({ title: 'Withdrawal requested', description: 'The other two signatories have been notified.' });
+        toast({ title: 'Withdrawal requested', description: 'The other signatory has been notified.' });
         setOpen(false);
         setAmount('');
         setPhone('');
@@ -258,7 +244,7 @@ function RequestWithdrawalDialog({
           <DialogTitle>Request a withdrawal</DialogTitle>
           <DialogDescription>
             Up to {formatKES(availableBalance)} available. A flat {(feeRate * 100).toFixed(1)}%
-            platform fee applies. Your own sign-off is recorded automatically — the other two signatories still need
+            platform fee applies. Your own sign-off is recorded automatically — the other signatory still needs
             to approve.
           </DialogDescription>
         </DialogHeader>

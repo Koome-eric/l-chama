@@ -76,8 +76,7 @@ export async function closeCampaign(campaignId: string) {
 }
 
 /* ────────────────────────────────────────────────────────────── */
-/*     3-SIGNATORY WITHDRAWAL — Admin (creator) + Secretary +       */
-/*                        Treasurer                                 */
+/*     2-SIGNATORY WITHDRAWAL — Admin (creator) + Secretary          */
 /*                                                                   */
 /*  Donations (the actual giving) are handled in                    */
 /*  src/app/give/actions.ts — no sign-in required there, since       */
@@ -97,24 +96,20 @@ export async function findUserForSignatory(query: string) {
   return user;
 }
 
-export async function setCampaignSignatories(input: { campaignId: string; secretaryId?: string; treasurerId?: string }) {
+export async function setCampaignSignatories(input: { campaignId: string; secretaryId?: string }) {
   const user = await getCurrentDbUser();
   const campaign = await prisma.campaign.findUnique({ where: { id: input.campaignId } });
   if (!campaign) throw new Error('Campaign not found.');
   if (campaign.creatorId !== user.id) throw new Error('Only the campaign creator (Admin) can assign signatories.');
 
-  if (input.secretaryId === user.id || input.treasurerId === user.id) {
-    throw new Error('The creator is already the Admin signatory — pick two other people for Secretary and Treasurer.');
-  }
-  if (input.secretaryId && input.treasurerId && input.secretaryId === input.treasurerId) {
-    throw new Error('Secretary and Treasurer must be two different people.');
+  if (input.secretaryId === user.id) {
+    throw new Error('The creator is already the Admin signatory — pick someone else for Secretary.');
   }
 
   await prisma.campaign.update({
     where: { id: input.campaignId },
     data: {
       secretaryId: input.secretaryId ?? undefined,
-      treasurerId: input.treasurerId ?? undefined,
     },
   });
 
@@ -167,7 +162,7 @@ export async function getCampaignWithdrawState(campaignId: string) {
   const user = await getCurrentDbUser();
   const campaign = await prisma.campaign.findUnique({
     where: { id: campaignId },
-    include: { creator: true, secretary: true, treasurer: true },
+    include: { creator: true, secretary: true },
   });
   if (!campaign) throw new Error('Campaign not found.');
 
@@ -188,9 +183,6 @@ export async function getCampaignWithdrawState(campaignId: string) {
     admin: { userId: campaign.creatorId, name: campaign.creator.fullName || campaign.creator.email || 'Creator' },
     secretary: campaign.secretary
       ? { userId: campaign.secretaryId!, name: campaign.secretary.fullName || campaign.secretary.email || 'Secretary' }
-      : null,
-    treasurer: campaign.treasurer
-      ? { userId: campaign.treasurerId!, name: campaign.treasurer.fullName || campaign.treasurer.email || 'Treasurer' }
       : null,
     ...status,
     requests,

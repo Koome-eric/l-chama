@@ -872,6 +872,30 @@ model AdminAccount {
   fullName     String?
   passwordHash String
 
+  // Per-admin section access, editable by the super admin at any time —
+  // including for admins already created (see updateAdminAccount in
+  // src/app/admin/actions.ts). All default true so a freshly created
+  // admin starts with full access, matching this table's pre-permissions
+  // behavior, unless the super admin chooses to scope them down.
+  canManageOrganisations Boolean @default(true) // approve/reject chama registrations, Ludeva-member flag
+  canManageCampaigns     Boolean @default(true) // verify/unverify fundraising campaigns
+  canManageProducts      Boolean @default(true) // create/edit/toggle investment products
+  canManageMemberReports Boolean @default(true) // sync/delete member performance reports
+  canManageSavings       Boolean @default(true) // sync/create/edit/delete savings entries
+  canManagePayments      Boolean @default(true) // resolve payment status
+  canManageJuniorAccounts Boolean @default(true) // approve/reject Junior Account applications
+  canManageLudevaMembers Boolean @default(true) // verify/reject Ludeva Plc membership claims
+
+  // Distinct from the section permissions above: this is the ability to
+  // manage OTHER admin accounts (see the list, invite new ones, delete
+  // existing ones) — a materially more sensitive capability than the
+  // operational sections, so unlike those it defaults to false for both
+  // existing and newly created admins and can only ever be granted or
+  // revoked by the real super admin (see requireSuperAdmin() in
+  // src/app/admin/actions.ts). It never extends to the super admin
+  // account itself, which isn't a row in this table at all.
+  canManageAdmins Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

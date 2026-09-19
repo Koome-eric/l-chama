@@ -18,8 +18,16 @@ export default async function AdminPage() {
   }
 
   // The super admin (env-configured, or any Clerk-allowlisted platform
-  // admin) is the only one who can create/edit/delete other admins.
+  // admin) can always create/edit/delete other admins. A regular admin can
+  // additionally see/invite/delete other admins (but not edit them, and
+  // never the super admin) if granted canManageAdmins — see
+  // requireAdminManager() in ./actions.ts for the same rule enforced
+  // server-side on every action, not just what's rendered here.
   const isSuperAdmin = viaClerk || isSuperAdminEmail(sessionEmail);
+  const myAccount = !isSuperAdmin && sessionEmail
+    ? await prisma.adminAccount.findUnique({ where: { email: sessionEmail }, select: { canManageAdmins: true } })
+    : null;
+  const canManageOtherAdmins = isSuperAdmin || !!myAccount?.canManageAdmins;
 
   const [teams, campaigns, products, reports, savingsEntries, totalUsers, pooledFundsAgg, payments, juniorApplications, ludevaMembers, adminAccounts] = await Promise.all([
     prisma.team.findMany({ include: { owner: true }, orderBy: { submittedAt: 'desc' } }),
@@ -44,7 +52,11 @@ export default async function AdminPage() {
       orderBy: { ludevaMembershipDecidedAt: 'desc' },
       take: 200,
     }),
-    prisma.adminAccount.findMany({ orderBy: { createdAt: 'desc' } }),
+    // Only fetched for someone who can actually see this data — a regular
+    // admin without canManageAdmins never receives the admin list at all.
+    canManageOtherAdmins
+      ? prisma.adminAccount.findMany({ orderBy: { createdAt: 'desc' } })
+      : Promise.resolve([] as Awaited<ReturnType<typeof prisma.adminAccount.findMany>>),
   ]);
 
   const data = teams.map((t: (typeof teams)[number]) => ({
@@ -159,6 +171,15 @@ export default async function AdminPage() {
     email: a.email,
     fullName: a.fullName,
     createdAt: a.createdAt.toISOString(),
+    canManageOrganisations: a.canManageOrganisations,
+    canManageCampaigns: a.canManageCampaigns,
+    canManageProducts: a.canManageProducts,
+    canManageMemberReports: a.canManageMemberReports,
+    canManageSavings: a.canManageSavings,
+    canManagePayments: a.canManagePayments,
+    canManageJuniorAccounts: a.canManageJuniorAccounts,
+    canManageLudevaMembers: a.canManageLudevaMembers,
+    canManageAdmins: a.canManageAdmins,
   }));
 
   const ludevaMemberData = ludevaMembers.map((u: (typeof ludevaMembers)[number]) => ({
@@ -247,6 +268,7 @@ export default async function AdminPage() {
         authMethod={viaClerk ? 'clerk' : 'password'}
         admins={adminAccountData}
         isSuperAdmin={isSuperAdmin}
+        canManageAdmins={canManageOtherAdmins}
         currentAdminEmail={sessionEmail}
       />
     </SidebarProvider>

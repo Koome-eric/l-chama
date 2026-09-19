@@ -16,15 +16,60 @@ import {
 import { notifyUser } from '@/lib/notifications';
 import { syncChamaToLudeva } from '@/lib/ludeva-sync';
 
+// The 8 operational admin-panel sections that can be individually
+// granted/revoked per admin — see AdminAccount in prisma/schema.prisma.
+// The super admin (env pair or a Clerk-allowlisted platform admin) always
+// has every one of these, regardless of what's stored in the DB, and is
+// never gated by them.
+const ADMIN_PERMISSION_KEYS = [
+  'canManageOrganisations',
+  'canManageCampaigns',
+  'canManageProducts',
+  'canManageMemberReports',
+  'canManageSavings',
+  'canManagePayments',
+  'canManageJuniorAccounts',
+  'canManageLudevaMembers',
+  // Managing OTHER admin accounts (see the list, invite, delete) — kept in
+  // the same permissions record as the sections above so it flows through
+  // requireAdmin()/create/update the same way, but it's handled with extra
+  // care everywhere it's used: only the real super admin can ever grant or
+  // revoke it (see requireSuperAdmin()-gated updateAdminAccount /
+  // updateAdminPermissions below, and the strip in createAdminAccount), and
+  // it never applies to the super admin account, which isn't a row here.
+  'canManageAdmins',
+] as const;
+
+type AdminPermissionKey = (typeof ADMIN_PERMISSION_KEYS)[number];
+type AdminPermissions = Record<AdminPermissionKey, boolean>;
+
+const FULL_PERMISSIONS: AdminPermissions = ADMIN_PERMISSION_KEYS.reduce(
+  (acc, key) => ({ ...acc, [key]: true }),
+  {} as AdminPermissions
+);
+
 async function requireAdmin() {
   const { userId: clerkId } = await auth();
   if (isPlatformAdmin(clerkId)) {
-    return { email: null as string | null, isSuper: true };
+    return { email: null as string | null, isSuper: true, permissions: FULL_PERMISSIONS };
   }
 
   const email = await getAdminSessionEmail();
   if (!email) throw new Error('You are not authorized to review organisations.');
-  return { email, isSuper: isSuperAdminEmail(email) };
+
+  const isSuper = isSuperAdminEmail(email);
+  if (isSuper) {
+    return { email, isSuper: true, permissions: FULL_PERMISSIONS };
+  }
+
+  const account = await prisma.adminAccount.findUnique({ where: { email } });
+  if (!account) throw new Error('You are not authorized to review organisations.');
+
+  const permissions = ADMIN_PERMISSION_KEYS.reduce(
+    (acc, key) => ({ ...acc, [key]: account[key] }),
+    {} as AdminPermissions
+  );
+  return { email, isSuper: false, permissions };
 }
 
 // Admin-account management (create/edit/delete other admins) is reserved
@@ -33,6 +78,32 @@ async function requireAdmin() {
 async function requireSuperAdmin() {
   const ctx = await requireAdmin();
   if (!ctx.isSuper) throw new Error('Only the super admin can manage admin accounts.');
+  return ctx;
+}
+
+// A super admin can delegate "see other admins, invite new ones, delete
+// existing ones" to a regular admin via canManageAdmins — but editing an
+// existing admin's details/permissions (updateAdminAccount,
+// updateAdminPermissions) and granting canManageAdmins itself both stay
+// requireSuperAdmin()-only below, so a delegated admin can never edit a
+// peer or mint another delegate. It never covers the super admin account,
+// which isn't a row in this table and so can't be seen, invited over, or
+// deleted here regardless.
+async function requireAdminManager() {
+  const ctx = await requireAdmin();
+  if (!ctx.isSuper && !ctx.permissions.canManageAdmins) {
+    throw new Error('The super admin has not given your account access to manage other admins.');
+  }
+  return ctx;
+}
+
+// Like requireAdmin(), but also checks the admin has been granted this
+// specific section. The super admin always passes.
+async function requirePermission(key: AdminPermissionKey) {
+  const ctx = await requireAdmin();
+  if (!ctx.isSuper && !ctx.permissions[key]) {
+    throw new Error('The super admin has not given your account access to this section.');
+  }
   return ctx;
 }
 
@@ -59,8 +130,13 @@ export async function loginAdmin(formData: FormData) {
 // other admins who can sign in to /admin with their own email/password.
 // ─────────────────────────────────────────────
 
-export async function createAdminAccount(input: { email: string; password: string; fullName?: string }) {
-  await requireSuperAdmin();
+export async function createAdminAccount(input: {
+  email: string;
+  password: string;
+  fullName?: string;
+  permissions?: Partial<AdminPermissions>;
+}) {
+  const ctx = await requireAdminManager();
 
   const email = input.email.trim().toLowerCase();
   if (!email || !email.includes('@')) throw new Error('Enter a valid email address.');
@@ -72,11 +148,22 @@ export async function createAdminAccount(input: { email: string; password: strin
   const existing = await prisma.adminAccount.findUnique({ where: { email } });
   if (existing) throw new Error('An admin with that email already exists.');
 
+  // A delegated (non-super) admin manager can invite new admins, but can
+  // never hand out canManageAdmins itself — only the real super admin can
+  // create another delegate. Silently drop it rather than error, so the
+  // rest of the invite still goes through with an ordinary admin created.
+  const permissions = { ...(input.permissions ?? {}) };
+  if (!ctx.isSuper) delete permissions.canManageAdmins;
+
   await prisma.adminAccount.create({
     data: {
       email,
       fullName: input.fullName?.trim() || null,
       passwordHash: hashPassword(input.password),
+      // Defaults to full access on the operational sections (matching
+      // schema defaults) unless unchecked; canManageAdmins itself defaults
+      // to false unless the super admin explicitly grants it.
+      ...permissions,
     },
   });
 
@@ -86,7 +173,7 @@ export async function createAdminAccount(input: { email: string; password: strin
 
 export async function updateAdminAccount(
   adminId: string,
-  input: { email: string; password?: string; fullName?: string }
+  input: { email: string; password?: string; fullName?: string; permissions?: Partial<AdminPermissions> }
 ) {
   await requireSuperAdmin();
 
@@ -111,6 +198,10 @@ export async function updateAdminAccount(
       email,
       fullName: input.fullName?.trim() || null,
       ...(input.password ? { passwordHash: hashPassword(input.password) } : {}),
+      // Editable at any time, including for admins created before this
+      // feature existed — that's the whole point of a separate field here
+      // rather than only being settable at creation.
+      ...(input.permissions ?? {}),
     },
   });
 
@@ -118,8 +209,29 @@ export async function updateAdminAccount(
   return { success: true };
 }
 
-export async function deleteAdminAccount(adminId: string) {
+// Dedicated action for flipping just one admin's section access — used by
+// the permission toggles in the admin table, so the super admin doesn't
+// have to open the full edit dialog (and re-enter/skip a password) just to
+// grant or revoke one section.
+export async function updateAdminPermissions(adminId: string, permissions: Partial<AdminPermissions>) {
   await requireSuperAdmin();
+
+  const admin = await prisma.adminAccount.findUnique({ where: { id: adminId } });
+  if (!admin) throw new Error('Admin not found.');
+
+  const data: Partial<AdminPermissions> = {};
+  for (const key of ADMIN_PERMISSION_KEYS) {
+    if (key in permissions) data[key] = !!permissions[key];
+  }
+
+  await prisma.adminAccount.update({ where: { id: adminId }, data });
+
+  revalidatePath('/admin');
+  return { success: true };
+}
+
+export async function deleteAdminAccount(adminId: string) {
+  await requireAdminManager();
 
   await prisma.adminAccount.delete({ where: { id: adminId } });
 
@@ -132,7 +244,7 @@ export async function logoutAdmin() {
 }
 
 export async function approveOrganisation(teamId: string) {
-  await requireAdmin();
+  await requirePermission('canManageOrganisations');
 
   const team = await prisma.team.findUnique({ where: { id: teamId } });
   if (!team) throw new Error('Organisation not found.');
@@ -156,7 +268,7 @@ export async function approveOrganisation(teamId: string) {
 }
 
 export async function rejectOrganisation(teamId: string, reason?: string) {
-  await requireAdmin();
+  await requirePermission('canManageOrganisations');
 
   const team = await prisma.team.findUnique({ where: { id: teamId } });
   if (!team) throw new Error('Organisation not found.');
@@ -184,11 +296,11 @@ export async function rejectOrganisation(teamId: string, reason?: string) {
 // Whether a chama is one of Ludeva Plc's own member chamas — set here
 // only, never by the chama itself. Ludeva-member chamas withdraw by
 // emailing lchama@ludevaplc.co.ke / invst@ludevaplc.co.ke instead of the
-// in-app 3-signatory flow, and pay no platform withdrawal fee (see
+// in-app 2-signatory flow, and pay no platform withdrawal fee (see
 // src/lib/withdrawals.ts). Everyone else defaults to non-member (fee-
 // paying, in-app flow) — this only needs setting for the exception.
 export async function setTeamLudevaMembership(teamId: string, isLudevaMember: boolean) {
-  await requireAdmin();
+  await requirePermission('canManageOrganisations');
 
   const team = await prisma.team.findUnique({ where: { id: teamId } });
   if (!team) throw new Error('Organisation not found.');
@@ -200,7 +312,7 @@ export async function setTeamLudevaMembership(teamId: string, isLudevaMember: bo
 }
 
 export async function verifyCampaign(campaignId: string) {
-  await requireAdmin();
+  await requirePermission('canManageCampaigns');
 
   const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
   if (!campaign) throw new Error('Campaign not found.');
@@ -220,7 +332,7 @@ export async function verifyCampaign(campaignId: string) {
 }
 
 export async function unverifyCampaign(campaignId: string) {
-  await requireAdmin();
+  await requirePermission('canManageCampaigns');
 
   const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
   if (!campaign) throw new Error('Campaign not found.');
@@ -249,7 +361,7 @@ export async function createInvestmentProduct(input: {
   minAmount: number;
   maxAmount?: number | null;
 }) {
-  await requireAdmin();
+  await requirePermission('canManageProducts');
 
   if (!input.name.trim()) throw new Error('Product name is required.');
   if (!Number.isFinite(input.roi) || input.roi < 0) throw new Error('Enter a valid ROI.');
@@ -293,7 +405,7 @@ export async function updateInvestmentProduct(
     maxAmount?: number | null;
   }
 ) {
-  await requireAdmin();
+  await requirePermission('canManageProducts');
 
   const product = await prisma.investmentProduct.findUnique({ where: { id: productId } });
   if (!product) throw new Error('Product not found.');
@@ -325,7 +437,7 @@ export async function updateInvestmentProduct(
 }
 
 export async function toggleInvestmentProductActive(productId: string) {
-  await requireAdmin();
+  await requirePermission('canManageProducts');
 
   const product = await prisma.investmentProduct.findUnique({ where: { id: productId } });
   if (!product) throw new Error('Product not found.');
@@ -380,7 +492,7 @@ function parseMemberReportCsv(csvText: string) {
 }
 
 export async function syncMemberReportsCsv(csvText: string) {
-  await requireAdmin();
+  await requirePermission('canManageMemberReports');
 
   const rows = parseMemberReportCsv(csvText).filter((r) => r.memberEmail);
   if (rows.length === 0) throw new Error('No valid rows found in that CSV.');
@@ -417,7 +529,7 @@ export async function syncMemberReportsCsv(csvText: string) {
 }
 
 export async function deleteMemberReport(reportId: string) {
-  await requireAdmin();
+  await requirePermission('canManageMemberReports');
   await prisma.memberReport.delete({ where: { id: reportId } });
   revalidatePath('/admin');
   revalidatePath('/reports');
@@ -488,7 +600,7 @@ async function matchSavingsRowsToTeams(rows: { memberEmail?: string }[]) {
 }
 
 export async function syncSavingsCsv(csvText: string) {
-  await requireAdmin();
+  await requirePermission('canManageSavings');
 
   const rows = parseSavingsCsv(csvText).filter((r) => r.memberEmail);
   if (rows.length === 0) throw new Error('No valid rows found in that CSV.');
@@ -526,7 +638,7 @@ export type SavingsEntryInput = {
 };
 
 export async function createSavingsEntry(input: SavingsEntryInput) {
-  await requireAdmin();
+  await requirePermission('canManageSavings');
 
   const memberEmail = input.memberEmail.toLowerCase().trim();
   if (!memberEmail) throw new Error('A member email is required.');
@@ -544,7 +656,7 @@ export async function createSavingsEntry(input: SavingsEntryInput) {
 }
 
 export async function updateSavingsEntry(entryId: string, input: SavingsEntryInput) {
-  await requireAdmin();
+  await requirePermission('canManageSavings');
 
   const memberEmail = input.memberEmail.toLowerCase().trim();
   if (!memberEmail) throw new Error('A member email is required.');
@@ -563,7 +675,7 @@ export async function updateSavingsEntry(entryId: string, input: SavingsEntryInp
 }
 
 export async function deleteSavingsEntry(entryId: string) {
-  await requireAdmin();
+  await requirePermission('canManageSavings');
   await prisma.savingsEntry.delete({ where: { id: entryId } });
   revalidatePath('/admin');
   revalidatePath('/reports');
@@ -583,7 +695,7 @@ export async function deleteSavingsEntry(entryId: string) {
 // ─────────────────────────────────────────────
 
 export async function resolvePayment(paymentId: string, status: 'SUCCESS' | 'FAILED' | 'CANCELLED', note?: string) {
-  await requireAdmin();
+  await requirePermission('canManagePayments');
 
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
@@ -650,7 +762,7 @@ export async function decideJuniorApplication(
   decision: 'APPROVED' | 'REJECTED',
   note?: string
 ) {
-  await requireAdmin();
+  await requirePermission('canManageJuniorAccounts');
 
   const application = await prisma.juniorAccountApplication.findUnique({ where: { id: applicationId } });
   if (!application) throw new Error('Application not found.');
@@ -693,7 +805,7 @@ export async function decideJuniorApplication(
 // number (submitted at onboarding or from /profile). Only a VERIFIED
 // status gets the toll-free withdrawal — see src/lib/withdrawal-fee.ts.
 export async function decideLudevaMembership(userId: string, decision: 'VERIFIED' | 'REJECTED', reason?: string) {
-  await requireAdmin();
+  await requirePermission('canManageLudevaMembers');
 
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new Error('Member not found.');

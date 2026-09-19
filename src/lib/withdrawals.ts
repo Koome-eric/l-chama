@@ -8,9 +8,9 @@ import type { SignatoryRole, WithdrawalScope } from '@prisma/client';
 /*  Shared engine behind both:                                      */
 /*   - Campaign withdrawals (a fundraising payout to the organizer) */
 /*   - Chama withdrawals (moving money out of a LoanAccount)        */
-/*  Same rule for both: the Admin (creator/owner), Secretary, and   */
-/*  Treasurer each get one vote; a payout only fires once all three */
-/*  have APPROVED, and any single REJECTED kills the request.       */
+/*  Same rule for both: the Admin (Team Leader/creator/owner) and   */
+/*  Secretary each get one vote; a payout only fires once both have */
+/*  APPROVED, and either REJECTED kills the request.                */
 /*  Campaign and external-chama payouts take a platform fee based on */
 /*  the REQUESTER's own confirmed Ludeva membership — toll free for a */
 /*  verified member, 5% flat for everyone else (see withdrawal-fee.ts). */
@@ -23,7 +23,7 @@ import type { SignatoryRole, WithdrawalScope } from '@prisma/client';
 const LUDEVA_MEMBER_WITHDRAWAL_EMAILS = 'lchama@ludevaplc.co.ke or invst@ludevaplc.co.ke';
 
 const ROLE_LABEL: Record<SignatoryRole, string> = {
-  ADMIN: 'Admin',
+  ADMIN: 'Team Leader',
   SECRETARY: 'Secretary',
   TREASURER: 'Treasurer',
 };
@@ -38,7 +38,11 @@ async function getPoolContext(
     const campaign = await prisma.campaign.findUnique({ where: { id: scopeId } });
     if (!campaign) throw new Error('Campaign not found.');
     return {
-      signatories: { adminId: campaign.creatorId, secretaryId: campaign.secretaryId, treasurerId: campaign.treasurerId },
+      signatories: {
+        adminId: campaign.creatorId,
+        secretaryId: campaign.secretaryId,
+        treasurerId: campaign.treasurerId,
+      },
       availableBalance: campaign.raisedAmount - campaign.withdrawnAmount,
       label: campaign.title,
       isLudevaMember: false,
@@ -48,7 +52,11 @@ async function getPoolContext(
   const team = await prisma.team.findUnique({ where: { id: scopeId }, include: { loanAccount: true } });
   if (!team) throw new Error('Chama not found.');
   return {
-    signatories: { adminId: team.ownerId, secretaryId: team.secretaryId, treasurerId: team.treasurerId },
+    signatories: {
+      adminId: team.ownerId,
+      secretaryId: team.secretaryId,
+      treasurerId: team.treasurerId,
+    },
     availableBalance: team.loanAccount?.balance ?? 0,
     label: team.name,
     isLudevaMember: team.isLudevaMember,
@@ -62,7 +70,7 @@ function roleOf(signatories: Signatories, userId: string): SignatoryRole | null 
   return null;
 }
 
-/** Everything a UI needs to render "who are the 3 signatories, and where does this request stand". */
+/** Everything a UI needs to render "who are the signatories, and where does this request stand". */
 export async function getSignatoryStatus(scope: WithdrawalScope, scopeId: string, userId: string) {
   const [{ signatories, availableBalance, label, isLudevaMember }, requester] = await Promise.all([
     getPoolContext(scope, scopeId),
@@ -107,12 +115,12 @@ export async function createWithdrawalRequest(input: {
   }
   if (!signatories.secretaryId || !signatories.treasurerId) {
     throw new Error(
-      `Assign a Secretary and a Treasurer for ${label} first — all three signatories must approve a withdrawal.`
+      `Assign the Secretary and Treasurer for ${label} first — all three signatories must approve a withdrawal.`
     );
   }
 
   const role = roleOf(signatories, input.requestedById);
-  if (!role) throw new Error('Only the Admin, Secretary, or Treasurer can request a withdrawal.');
+  if (!role) throw new Error('Only the Team Leader or Secretary can request a withdrawal.');
 
   if (input.amount > availableBalance) {
     throw new Error(`Only KES ${availableBalance.toLocaleString()} is available to withdraw.`);
@@ -136,7 +144,12 @@ export async function createWithdrawalRequest(input: {
       approvals: {
         create: (['ADMIN', 'SECRETARY', 'TREASURER'] as const).map((r) => ({
           role: r,
-          approverId: (r === 'ADMIN' ? signatories.adminId : r === 'SECRETARY' ? signatories.secretaryId : signatories.treasurerId)!,
+          approverId:
+            r === 'ADMIN'
+              ? signatories.adminId
+              : r === 'SECRETARY'
+                ? signatories.secretaryId!
+                : signatories.treasurerId!,
           // The requester's own signature is recorded the moment they open the request.
           decision: r === role ? 'APPROVED' : 'PENDING',
           decidedAt: r === role ? new Date() : undefined,
@@ -250,7 +263,7 @@ async function payoutWithdrawal(withdrawalRequestId: string) {
     await notifyUser(
       request.requestedById,
       'Withdrawal paid out',
-      `Your KES ${request.netAmount.toLocaleString()} withdrawal was approved by all three signatories and sent to ${request.destinationPhone}.${request.feeAmount > 0 ? ` (KES ${request.feeAmount.toLocaleString()} platform fee deducted.)` : ''}`
+      `Your KES ${request.netAmount.toLocaleString()} withdrawal was approved by both signatories and sent to ${request.destinationPhone}.${request.feeAmount > 0 ? ` (KES ${request.feeAmount.toLocaleString()} platform fee deducted.)` : ''}`
     );
     return { status: 'PAID' as const };
   } catch (err: any) {

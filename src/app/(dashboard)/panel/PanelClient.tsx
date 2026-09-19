@@ -713,7 +713,7 @@ function LoanAccountPayoutPreview({
           Preview what a withdrawal would net after the platform's fee — your rate is{' '}
           <span className="font-semibold text-foreground">{(feeRate * 100).toFixed(1)}%</span>
           {feeRate > 0 ? ' (Ludeva Plc members withdraw toll free — add your membership number in your profile).' : ' as a confirmed Ludeva Plc member — toll free.'}{' '}
-          Requesting a real withdrawal (with the required 3-signatory approval) happens on the{' '}
+          Requesting a real withdrawal (with the required 2-signatory approval) happens on the{' '}
           <Link href="/withdraw" className="underline">
             Withdraw
           </Link>{' '}

@@ -129,7 +129,7 @@ export default function PrivacyPolicyPage() {
                 <li>
                   <strong className="text-foreground">Authorized Access Only:</strong> Access to member data is
                   strictly restricted to authorized system processes and designated officials (e.g., elected Chama
-                  Treasurers/Chairs) approved by your specific group.
+                  Secretaries/Chairs) approved by your specific group.
                 </li>
                 <li>
                   <strong className="text-foreground">Third-Party Service Providers:</strong> Information is shared

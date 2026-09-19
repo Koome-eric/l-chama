@@ -516,8 +516,8 @@ export async function markRepaymentPaid(repaymentId: string) {
 }
 
 /* ────────────────────────────────────────────────────────────── */
-/*     3-SIGNATORY WITHDRAWAL — Admin (Chama creator) + Secretary   */
-/*                        + Treasurer                               */
+/*     2-SIGNATORY WITHDRAWAL — Admin (Chama creator / Team Leader) */
+/*                        + Secretary                               */
 /*                                                                   */
 /*  Same rule and engine as campaign withdrawals (see                */
 /*  src/lib/withdrawals.ts) — the pool here is the chama's           */
@@ -527,7 +527,7 @@ export async function markRepaymentPaid(repaymentId: string) {
 
 // Only the owner assigns signatories — same "Admin" role a chama's
 // creator already implicitly has everywhere else in this file.
-export async function setChamaSignatories(input: { secretaryMembershipId?: string; treasurerMembershipId?: string }) {
+export async function setChamaSignatories(input: { secretaryMembershipId?: string }) {
   const user = await getCurrentDbUser();
   const ctx = await getChamaContext(user);
   if (!ctx) throw new Error('You are not part of a chama.');
@@ -541,16 +541,11 @@ export async function setChamaSignatories(input: { secretaryMembershipId?: strin
   };
 
   const secretaryId = resolve(input.secretaryMembershipId);
-  const treasurerId = resolve(input.treasurerMembershipId);
-  if (secretaryId && treasurerId && secretaryId === treasurerId) {
-    throw new Error('Secretary and Treasurer must be two different members.');
-  }
 
   await prisma.team.update({
     where: { id: ctx.team.id },
     data: {
       secretaryId: secretaryId ?? undefined,
-      treasurerId: treasurerId ?? undefined,
     },
   });
 
@@ -614,7 +609,6 @@ export async function getChamaWithdrawState() {
     isOwner: ctx.isOwner,
     members: ctx.team.members.map((m) => ({ id: m.id, userId: m.userId, name: m.user.fullName || m.user.email || m.user.phone })),
     secretary: ctx.team.secretary ? { userId: ctx.team.secretaryId!, name: ctx.team.secretary.fullName || ctx.team.secretary.email } : null,
-    treasurer: ctx.team.treasurer ? { userId: ctx.team.treasurerId!, name: ctx.team.treasurer.fullName || ctx.team.treasurer.email } : null,
     ...status,
     requests,
   };

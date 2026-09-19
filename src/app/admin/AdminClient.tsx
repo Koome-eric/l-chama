@@ -100,6 +100,7 @@ import {
   decideLudevaMembership,
   createAdminAccount,
   updateAdminAccount,
+  updateAdminPermissions,
   deleteAdminAccount,
 } from './actions';
 
@@ -232,6 +233,50 @@ type AdminRow = {
   email: string;
   fullName: string | null;
   createdAt: string;
+  canManageOrganisations: boolean;
+  canManageCampaigns: boolean;
+  canManageProducts: boolean;
+  canManageMemberReports: boolean;
+  canManageSavings: boolean;
+  canManagePayments: boolean;
+  canManageJuniorAccounts: boolean;
+  canManageLudevaMembers: boolean;
+  canManageAdmins: boolean;
+};
+
+// Mirrors ADMIN_PERMISSION_KEYS in src/app/admin/actions.ts — kept as a
+// separate list here (with display labels) since a 'use server' file can
+// only export async functions.
+type AdminPermissionKey =
+  | 'canManageOrganisations'
+  | 'canManageCampaigns'
+  | 'canManageProducts'
+  | 'canManageMemberReports'
+  | 'canManageSavings'
+  | 'canManagePayments'
+  | 'canManageJuniorAccounts'
+  | 'canManageLudevaMembers'
+  | 'canManageAdmins';
+
+const ADMIN_PERMISSIONS: { key: AdminPermissionKey; label: string }[] = [
+  { key: 'canManageOrganisations', label: 'Organisations' },
+  { key: 'canManageCampaigns', label: 'Campaigns' },
+  { key: 'canManageProducts', label: 'Investment products' },
+  { key: 'canManageMemberReports', label: 'Member reports' },
+  { key: 'canManageSavings', label: 'Savings' },
+  { key: 'canManagePayments', label: 'Payments' },
+  { key: 'canManageJuniorAccounts', label: 'Junior accounts' },
+  { key: 'canManageLudevaMembers', label: 'Ludeva membership' },
+];
+
+// Kept separate from ADMIN_PERMISSIONS above (rather than just appended)
+// as a visual/behavioral reminder everywhere it's used: this one lets an
+// admin see/invite/delete OTHER admins, so — unlike the operational
+// sections — only the actual super admin can grant, revoke, or even see
+// this toggle. It's never offered in a delegated admin's own create form.
+const ADMIN_MANAGER_PERMISSION: { key: AdminPermissionKey; label: string } = {
+  key: 'canManageAdmins',
+  label: 'Manage other admins',
 };
 
 type Stats = {
@@ -284,7 +329,7 @@ const STATUS_VARIANT: Record<TeamRow['approvalStatus'], 'default' | 'secondary' 
 /*                          NAV CONFIGURATION                      */
 /* ────────────────────────────────────────────────────────────── */
 
-function useNavItems(stats: Stats, isSuperAdmin: boolean) {
+function useNavItems(stats: Stats, isSuperAdmin: boolean, canManageAdmins: boolean) {
   const items = [
     { id: 'overview' as Section, label: 'Overview', icon: LayoutDashboard, badge: 0 },
     { id: 'organisations' as Section, label: 'Organisations', icon: Building2, badge: stats.orgs.pending },
@@ -296,7 +341,10 @@ function useNavItems(stats: Stats, isSuperAdmin: boolean) {
     { id: 'reports' as Section, label: 'Member Reports', icon: FileSpreadsheet, badge: 0 },
     { id: 'savings' as Section, label: 'Savings Accounts', icon: Coins, badge: 0 },
   ];
-  if (isSuperAdmin) {
+  // Visible to the super admin and to any admin granted canManageAdmins
+  // (see/invite/delete other admins) — the section itself then hides
+  // editing controls for anyone who isn't the actual super admin.
+  if (isSuperAdmin || canManageAdmins) {
     items.push({ id: 'admins' as Section, label: 'Admins', icon: Users, badge: 0 });
   }
   return items;
@@ -332,6 +380,7 @@ export function AdminClient({
   authMethod,
   admins,
   isSuperAdmin,
+  canManageAdmins,
   currentAdminEmail,
 }: {
   teams: TeamRow[];
@@ -346,10 +395,11 @@ export function AdminClient({
   authMethod: 'clerk' | 'password';
   admins: AdminRow[];
   isSuperAdmin: boolean;
+  canManageAdmins: boolean;
   currentAdminEmail: string | null;
 }) {
   const [section, setSection] = useState<Section>('overview');
-  const navItems = useNavItems(stats, isSuperAdmin);
+  const navItems = useNavItems(stats, isSuperAdmin, canManageAdmins);
   const router = useRouter();
   const [loggingOut, startLogout] = useTransition();
 
@@ -489,8 +539,8 @@ export function AdminClient({
             {section === 'ludeva-members' && <LudevaMembersAdminSection members={ludevaMembers} />}
             {section === 'reports' && <MemberReportsAdminSection reports={reports} />}
             {section === 'savings' && <SavingsAdminSection entries={savingsEntries} />}
-            {section === 'admins' && isSuperAdmin && (
-              <AdminsAdminSection admins={admins} currentAdminEmail={currentAdminEmail} />
+            {section === 'admins' && (isSuperAdmin || canManageAdmins) && (
+              <AdminsAdminSection admins={admins} currentAdminEmail={currentAdminEmail} isSuperAdmin={isSuperAdmin} />
             )}
           </div>
         </main>
@@ -1274,14 +1324,24 @@ function ProductsAdminSection({ products }: { products: ProductRow[] }) {
 /*                               ADMINS                              */
 /* ────────────────────────────────────────────────────────────── */
 
-const EMPTY_ADMIN_FORM = { email: '', password: '', fullName: '' };
+const EMPTY_ADMIN_FORM = {
+  email: '',
+  password: '',
+  fullName: '',
+  permissions: {
+    ...ADMIN_PERMISSIONS.reduce((acc, p) => ({ ...acc, [p.key]: true }), {} as Record<string, boolean>),
+    [ADMIN_MANAGER_PERMISSION.key]: false,
+  },
+};
 
 function AdminsAdminSection({
   admins,
   currentAdminEmail,
+  isSuperAdmin,
 }: {
   admins: AdminRow[];
   currentAdminEmail: string | null;
+  isSuperAdmin: boolean;
 }) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
@@ -1296,7 +1356,15 @@ function AdminsAdminSection({
 
   const openEdit = (a: AdminRow) => {
     setEditing(a);
-    setForm({ email: a.email, password: '', fullName: a.fullName ?? '' });
+    setForm({
+      email: a.email,
+      password: '',
+      fullName: a.fullName ?? '',
+      permissions: {
+        ...ADMIN_PERMISSIONS.reduce((acc, p) => ({ ...acc, [p.key]: a[p.key] }), {} as Record<string, boolean>),
+        [ADMIN_MANAGER_PERMISSION.key]: a[ADMIN_MANAGER_PERMISSION.key],
+      },
+    });
   };
 
   const handleCreate = () => {
@@ -1306,6 +1374,7 @@ function AdminsAdminSection({
           email: form.email,
           password: form.password,
           fullName: form.fullName || undefined,
+          permissions: form.permissions,
         });
         toast({ title: 'Admin created', description: `${form.email} can now sign in to /admin.` });
         setCreateOpen(false);
@@ -1324,9 +1393,25 @@ function AdminsAdminSection({
           email: form.email,
           password: form.password || undefined,
           fullName: form.fullName || undefined,
+          permissions: form.permissions,
         });
         toast({ title: 'Admin updated' });
         setEditing(null);
+        window.location.reload();
+      } catch (err: any) {
+        toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      }
+    });
+  };
+
+  // Quick per-section toggle straight from the table — lets the super admin
+  // grant/revoke one area for an already-created admin without opening the
+  // full edit dialog.
+  const handleToggle = (a: AdminRow, key: (typeof ADMIN_PERMISSIONS)[number]['key']) => {
+    startTransition(async () => {
+      try {
+        await updateAdminPermissions(a.id, { [key]: !a[key] });
+        toast({ title: 'Permissions updated' });
         window.location.reload();
       } catch (err: any) {
         toast({ title: 'Error', description: err.message, variant: 'destructive' });
@@ -1377,6 +1462,50 @@ function AdminsAdminSection({
         />
         <p className="mt-1 text-xs text-muted-foreground">At least 8 characters.</p>
       </div>
+      <div>
+        <Label>Access</Label>
+        <p className="mb-2 text-xs text-muted-foreground">
+          Sections this admin can manage in this panel. Editable any time, including after creation.
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          {ADMIN_PERMISSIONS.map((p) => (
+            <label key={p.key} className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-input"
+                checked={form.permissions[p.key]}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, permissions: { ...f.permissions, [p.key]: e.target.checked } }))
+                }
+              />
+              {p.label}
+            </label>
+          ))}
+        </div>
+      </div>
+      {isSuperAdmin && (
+        <div>
+          <Label>Admin management</Label>
+          <p className="mb-2 text-xs text-muted-foreground">
+            Lets this admin see, invite, and delete other admins (never the super admin, and they still can't edit
+            an admin's details or permissions — that stays with you).
+          </p>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-input"
+              checked={form.permissions[ADMIN_MANAGER_PERMISSION.key]}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  permissions: { ...f.permissions, [ADMIN_MANAGER_PERMISSION.key]: e.target.checked },
+                }))
+              }
+            />
+            {ADMIN_MANAGER_PERMISSION.label}
+          </label>
+        </div>
+      )}
     </div>
   );
 
@@ -1414,7 +1543,9 @@ function AdminsAdminSection({
             <div>
               <CardTitle className="text-base">Super admin</CardTitle>
               <CardDescription>
-                {currentAdminEmail ?? 'Signed in via Clerk'} — always has full access and can't be edited or removed here.
+                {isSuperAdmin
+                  ? `${currentAdminEmail ?? 'Signed in via Clerk'} — always has full access and can't be edited or removed here.`
+                  : "The super admin always has full access and isn't listed below — it can't be edited or removed."}
               </CardDescription>
             </div>
           </div>
@@ -1435,6 +1566,7 @@ function AdminsAdminSection({
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
+                  <TableHead>Access</TableHead>
                   <TableHead>Added</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -1444,14 +1576,50 @@ function AdminsAdminSection({
                   <TableRow key={a.id}>
                     <TableCell className="font-medium">{a.fullName || '—'}</TableCell>
                     <TableCell className="text-muted-foreground">{a.email}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1 max-w-xs">
+                        {ADMIN_PERMISSIONS.map((p) =>
+                          isSuperAdmin ? (
+                            <button
+                              key={p.key}
+                              type="button"
+                              disabled={isPending}
+                              onClick={() => handleToggle(a, p.key)}
+                              title={a[p.key] ? `Revoke ${p.label}` : `Grant ${p.label}`}
+                              className={`rounded-full border px-2 py-0.5 text-[11px] transition-colors ${
+                                a[p.key]
+                                  ? 'border-primary/30 bg-primary/10 text-primary'
+                                  : 'border-input text-muted-foreground hover:bg-muted'
+                              }`}
+                            >
+                              {p.label}
+                            </button>
+                          ) : a[p.key] ? (
+                            <span
+                              key={p.key}
+                              className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] text-primary"
+                            >
+                              {p.label}
+                            </span>
+                          ) : null
+                        )}
+                        {a[ADMIN_MANAGER_PERMISSION.key] && (
+                          <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700">
+                            {ADMIN_MANAGER_PERMISSION.label}
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-muted-foreground">
                       {new Date(a.createdAt).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button size="sm" variant="outline" className="gap-1.5" onClick={() => openEdit(a)}>
-                          <Pencil className="h-3.5 w-3.5" /> Edit
-                        </Button>
+                        {isSuperAdmin && (
+                          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => openEdit(a)}>
+                            <Pencil className="h-3.5 w-3.5" /> Edit
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"

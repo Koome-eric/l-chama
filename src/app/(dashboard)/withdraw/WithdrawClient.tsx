@@ -20,7 +20,7 @@ import type { getChamaWithdrawState } from '../panel/actions';
 
 type WithdrawState = Awaited<ReturnType<typeof getChamaWithdrawState>>;
 
-const ROLE_LABEL: Record<string, string> = { ADMIN: 'Admin', SECRETARY: 'Secretary', TREASURER: 'Treasurer' };
+const ROLE_LABEL: Record<string, string> = { ADMIN: 'Team Leader', SECRETARY: 'Secretary' };
 
 const STATUS_META: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' }> = {
   AWAITING_APPROVALS: { label: 'Awaiting approvals', variant: 'secondary' },
@@ -73,8 +73,8 @@ export function WithdrawClient({ state, canRequest }: { state: WithdrawState; ca
           <ArrowUpFromLine className="h-6 w-6 text-primary" /> Withdraw
         </h1>
         <p className="text-sm text-muted-foreground">
-          Moving pooled funds out of {state.team.name} needs sign-off from all three signatories: the Admin, the
-          Secretary, and the Treasurer.
+          Moving pooled funds out of {state.team.name} needs sign-off from both signatories: the Team Leader
+          and the Secretary.
         </p>
       </div>
 
@@ -110,7 +110,7 @@ export function WithdrawClient({ state, canRequest }: { state: WithdrawState; ca
         />
       ) : (
         <p className="text-sm text-muted-foreground">
-          Only the Admin, Secretary, or Treasurer can request a withdrawal.
+          Only the Team Leader or Secretary can request a withdrawal.
         </p>
       )}
 
@@ -146,9 +146,6 @@ function SignatoriesCard({
   const [secretaryMembershipId, setSecretaryMembershipId] = useState(
     state.members.find((m) => m.userId === state.secretary?.userId)?.id ?? ''
   );
-  const [treasurerMembershipId, setTreasurerMembershipId] = useState(
-    state.members.find((m) => m.userId === state.treasurer?.userId)?.id ?? ''
-  );
   const [isPending, startTransition] = useTransition();
 
   const save = () => {
@@ -156,7 +153,6 @@ function SignatoriesCard({
       try {
         await setChamaSignatories({
           secretaryMembershipId: secretaryMembershipId || undefined,
-          treasurerMembershipId: treasurerMembershipId || undefined,
         });
         toast({ title: 'Signatories updated' });
         onSaved();
@@ -172,35 +168,20 @@ function SignatoriesCard({
         <CardTitle className="text-base flex items-center gap-2">
           <ShieldCheck className="h-4 w-4 text-primary" /> Signatories
         </CardTitle>
-        <CardDescription>All three must approve before a withdrawal pays out.</CardDescription>
+        <CardDescription>Both must approve before a withdrawal pays out.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">Admin (creator)</span>
-          <span className="font-medium">You{!state.isOwner ? "'re not the Admin" : ''}</span>
+          <span className="text-muted-foreground">Team Leader (creator)</span>
+          <span className="font-medium">You{!state.isOwner ? "'re not the Team Leader" : ''}</span>
         </div>
 
         {state.isOwner ? (
           <>
-            <div className="grid grid-cols-2 gap-3">
+            <div>
               <div>
                 <Label>Secretary</Label>
                 <Select value={secretaryMembershipId} onValueChange={setSecretaryMembershipId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose a member" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {state.members.map((m) => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Treasurer</Label>
-                <Select value={treasurerMembershipId} onValueChange={setTreasurerMembershipId}>
                   <SelectTrigger>
                     <SelectValue placeholder="Choose a member" />
                   </SelectTrigger>
@@ -224,18 +205,14 @@ function SignatoriesCard({
               <span className="text-muted-foreground">Secretary</span>
               <span className="font-medium">{state.secretary?.name ?? 'Not assigned'}</span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Treasurer</span>
-              <span className="font-medium">{state.treasurer?.name ?? 'Not assigned'}</span>
-            </div>
           </div>
         )}
 
         {!state.signatoriesComplete && (
           <p className="text-xs text-amber-600">
             {state.isOwner
-              ? 'Assign a Secretary and Treasurer above before a withdrawal can be requested.'
-              : 'Waiting for the Admin to assign a Secretary and Treasurer.'}
+              ? 'Assign a Secretary above before a withdrawal can be requested.'
+              : 'Waiting for the Team Leader to assign a Secretary.'}
           </p>
         )}
       </CardContent>
@@ -267,7 +244,7 @@ function RequestWithdrawalDialog({
     startTransition(async () => {
       try {
         await requestChamaWithdrawal({ amount: value, destinationPhone: phone, reason });
-        toast({ title: 'Withdrawal requested', description: 'The other two signatories have been notified.' });
+        toast({ title: 'Withdrawal requested', description: 'The other signatory has been notified.' });
         setOpen(false);
         setAmount('');
         setPhone('');
@@ -291,7 +268,7 @@ function RequestWithdrawalDialog({
           <DialogTitle>Request a withdrawal</DialogTitle>
           <DialogDescription>
             Up to {formatKES(availableBalance)} available. A flat {(feeRate * 100).toFixed(1)}%
-            platform fee applies. Your own sign-off is recorded automatically — the other two signatories still need
+            platform fee applies. Your own sign-off is recorded automatically — the other signatory still needs
             to approve before this pays out.
           </DialogDescription>
         </DialogHeader>

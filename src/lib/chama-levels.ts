@@ -26,16 +26,16 @@ export type ChamaLevel = {
 };
 
 export const CHAMA_LEVELS: ChamaLevel[] = [
-  { key: "NYOTA", name: "Nyota", monthlyAmount: 1_000, groupSize: 6 },
-  { key: "PEPEA", name: "Pepea", monthlyAmount: 2_000, groupSize: 6 },
-  { key: "ALPHA", name: "Alpha", monthlyAmount: 3_000, groupSize: 6 },
-  { key: "BETA", name: "Beta", monthlyAmount: 3_000, groupSize: 6 },
-  { key: "JULIET", name: "Juliet", monthlyAmount: 5_000, groupSize: 6 },
-  { key: "SILVER", name: "Silver", monthlyAmount: 10_000, groupSize: 6 },
-  { key: "DIAMOND", name: "Diamond", monthlyAmount: 20_000, groupSize: 6 },
-  { key: "KINGS", name: "Kings", monthlyAmount: 50_000, groupSize: 6 },
-  { key: "WINNERS", name: "Winners", monthlyAmount: 100_000, groupSize: 6 },
-  { key: "CHAMPS", name: "Champs", monthlyAmount: 200_000, groupSize: 6 },
+  { key: "NYOTA", name: "Nyota", monthlyAmount: 1_000, groupSize: 10 },
+  { key: "PEPEA", name: "Pepea", monthlyAmount: 2_000, groupSize: 10 },
+  { key: "ALPHA", name: "Alpha", monthlyAmount: 3_000, groupSize: 10 },
+  { key: "BETA", name: "Beta", monthlyAmount: 3_000, groupSize: 10 },
+  { key: "JULIET", name: "Juliet", monthlyAmount: 5_000, groupSize: 10 },
+  { key: "SILVER", name: "Silver", monthlyAmount: 10_000, groupSize: 10 },
+  { key: "DIAMOND", name: "Diamond", monthlyAmount: 20_000, groupSize: 10 },
+  { key: "KINGS", name: "Kings", monthlyAmount: 50_000, groupSize: 10 },
+  { key: "WINNERS", name: "Winners", monthlyAmount: 100_000, groupSize: 10 },
+  { key: "CHAMPS", name: "Champs", monthlyAmount: 200_000, groupSize: 10 },
 ];
 
 export function getChamaLevel(key: string | null | undefined): ChamaLevel | null {
