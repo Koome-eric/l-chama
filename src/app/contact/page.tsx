@@ -102,6 +102,18 @@ export default function ContactPage() {
 
             <div className="rounded-2xl border bg-card p-6">
               <div className="flex items-start gap-3">
+                <Phone className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium">Diaspora Team Leads</p>
+                  <a href="tel:+19199868786" className="block text-sm text-muted-foreground hover:text-primary transition-colors">
+                    +1 (919) 986-8786
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border bg-card p-6">
+              <div className="flex items-start gap-3">
                 <MapPin className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                 <div>
                   <p className="font-medium">Office</p>

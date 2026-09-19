@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { auth } from '@clerk/nextjs/server';
-import { ArrowRight, ShieldCheck, HeartHandshake, ClipboardCheck, Landmark, Percent, Clock, Headset, FileCheck2 } from 'lucide-react';
+import { ArrowRight, ShieldCheck, HeartHandshake, ClipboardCheck, Landmark, Percent, Clock, Headset, FileCheck2, Banknote, HandCoins, LineChart, Globe2 } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { getChamaContext } from '@/lib/chama';
 import LChamaHeader from '@/components/LChamaHeader';
@@ -91,6 +91,31 @@ const LOAN_BENEFITS = [
   { icon: FileCheck2, text: 'Automated payment processing and quick disbursement once your chama officials approve.' },
   { icon: Clock, text: '24-hour advance notice for standard withdrawals.' },
   { icon: Headset, text: '24/7 dedicated L-Chama customer support.' },
+];
+
+// For chamas whose members are spread across countries and time zones —
+// see /contact's "Diaspora Team Leads" for the human contact side of this.
+const DIASPORA_BENEFITS = [
+  {
+    icon: Banknote,
+    title: 'Multi-Currency Global Gateway & Auto-FX',
+    body: "Fund your chama with the payment rails you already use — ACH/Wire in the USA, SEPA in Europe, Instant Pay/Cards in the UAE and Australia, or M-Pesa/Airtel Money in Africa. Real-time mid-market FX shows exactly what your contribution converts to, and everything reconciles automatically into one clean group balance.",
+  },
+  {
+    icon: HandCoins,
+    title: 'Cross-Border "Cheap Loan" & Guarantee Matrix',
+    body: 'Diaspora members or their local proxies and families can apply for low-interest development or emergency loans. A digital Guarantee Lock lets designated members in different time zones sign off and lock a portion of their savings as collateral with a single tap.',
+  },
+  {
+    icon: LineChart,
+    title: 'Global Investment Portfolio Tracker',
+    body: "Direct plug-ins into high-yield local investment vehicles — MMFs, Treasury Bonds, and vetted real estate — with a live dashboard for portfolio growth, dividends, and each member's share, visible 24/7 wherever you're checking in from.",
+  },
+  {
+    icon: Globe2,
+    title: 'Async Governance & Time-Zone-Friendly Voting',
+    body: "A chama spanning Sydney, Dubai, London, and Nairobi can't all be online at once. Admins set a voting window — say, 48 hours — for loan approvals or investment moves, so members review, ask questions, and vote whenever they wake up.",
+  },
 ];
 
 export default async function LandingPage() {
@@ -395,6 +420,38 @@ export default async function LandingPage() {
                   </CardContent>
                 </Card>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="py-16 md:py-24 bg-fintech-mesh border-y border-border/60">
+          <div className="container mx-auto px-4">
+            <div className="mx-auto mb-4 flex w-fit items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary">
+              <Globe2 className="h-4 w-4" /> Built for the Diaspora
+            </div>
+            <h2 className="text-3xl font-bold font-headline text-center mb-2">
+              Run your chama from anywhere in the world
+            </h2>
+            <p className="text-muted-foreground text-center max-w-2xl mx-auto mb-12">
+              Whether your members are in Dallas, Dubai, London, or Nairobi, L-Chama keeps
+              contributions, loans, and votes on one shared, time-zone-friendly dashboard — no
+              more chasing spreadsheets across group chats.
+            </p>
+            <div className="grid gap-6 md:grid-cols-2">
+              {DIASPORA_BENEFITS.map((b) => (
+                <Card
+                  key={b.title}
+                  className="rounded-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-md hover:border-primary/30"
+                >
+                  <CardContent className="p-6">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
+                      <b.icon className="h-5 w-5 text-primary" />
+                    </div>
+                    <h3 className="mt-3 font-headline font-semibold text-lg">{b.title}</h3>
+                    <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{b.body}</p>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           </div>
         </section>
