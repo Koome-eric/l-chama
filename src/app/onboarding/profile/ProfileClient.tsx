@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { COUNTRIES, KENYA_COUNTIES } from '@/lib/countries';
+import { describeAuthError } from '@/lib/auth-error-messages';
 import { completeProfile } from './actions';
 
 const GENDERS = [
@@ -76,7 +77,7 @@ export function ProfileClient({ defaultEmail }: { defaultEmail?: string }) {
         toast({ title: 'Profile complete' });
         router.push('/onboarding/organisation');
       } catch (err: any) {
-        setError(err.message || 'Something went wrong. Please try again.');
+        setError(describeAuthError(err?.message || err?.errors?.[0]?.longMessage, 'profile'));
       }
     });
   };

@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { CHAMA_LEVELS, formatKES, type ChamaLevelKey } from '@/lib/chama-levels';
+import { describeAuthError } from '@/lib/auth-error-messages';
 import { completeOnboarding } from './actions';
 import { CheckCircle2 } from 'lucide-react';
 
@@ -41,7 +42,11 @@ export function OnboardingClient({
         toast({ title: 'Chama created', description: `${chamaName} is ready to go.` });
         router.replace('/panel');
       } catch (err: any) {
-        toast({ title: "Couldn't set up your chama", description: err.message, variant: 'destructive' });
+        toast({
+          title: "Couldn't set up your chama",
+          description: describeAuthError(err?.message || err?.errors?.[0]?.longMessage, 'onboarding'),
+          variant: 'destructive',
+        });
       }
     });
   };

@@ -5,6 +5,7 @@ import { currentUser } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { CHAMA_LEVELS } from '@/lib/chama-levels';
+import { describeAuthError } from '@/lib/auth-error-messages';
 
 const OnboardingSchema = z.object({
   fullName: z.string().min(2, 'Enter your full name.'),
@@ -20,21 +21,21 @@ export type OnboardingInput = z.infer<typeof OnboardingSchema>;
 
 export async function completeOnboarding(input: OnboardingInput) {
   const clerkUser = await currentUser();
-  if (!clerkUser) throw new Error('You must be signed in.');
+  if (!clerkUser) throw new Error(describeAuthError('You must be signed in.', 'sign-in'));
 
   const parsed = OnboardingSchema.safeParse(input);
   if (!parsed.success) {
-    throw new Error(parsed.error.errors[0]?.message || 'Invalid data provided.');
+    throw new Error(describeAuthError(parsed.error.errors[0]?.message || 'Invalid data provided.', 'onboarding'));
   }
   const d = parsed.data;
 
   const level = CHAMA_LEVELS.find((l) => l.key === d.levelKey);
-  if (!level) throw new Error('Choose a valid chama level.');
+  if (!level) throw new Error(describeAuthError('Choose a valid chama level.', 'onboarding'));
 
   const email =
     clerkUser.emailAddresses.find((e) => e.id === clerkUser.primaryEmailAddressId)
       ?.emailAddress || clerkUser.emailAddresses[0]?.emailAddress;
-  if (!email) throw new Error('Your account has no email on file.');
+  if (!email) throw new Error(describeAuthError('Your account has no email on file.', 'onboarding'));
 
   let user = await prisma.user.findUnique({ where: { clerkId: clerkUser.id } });
 
@@ -65,7 +66,7 @@ export async function completeOnboarding(input: OnboardingInput) {
   ]);
 
   if (isTeamMember) {
-    throw new Error('You are already a member of a chama.');
+    throw new Error(describeAuthError('You are already a member of a chama.', 'onboarding'));
   }
 
   if (!ownsTeam) {
