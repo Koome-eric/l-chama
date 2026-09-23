@@ -4,8 +4,8 @@ import { z } from 'zod';
 import { auth, clerkClient } from '@clerk/nextjs/server';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { describeAuthError } from '@/lib/auth-error-messages';
 import { revalidatePath } from 'next/cache';
+import { friendlyAccountError } from '@/lib/errors';
 
 const ProfileSchema = z
   .object({
@@ -63,7 +63,7 @@ export async function completeProfile(input: ProfileInput) {
       password: d.password,
     });
   } catch (err: any) {
-    throw new Error(describeAuthError(err?.errors?.[0]?.longMessage || err?.message, 'profile'));
+    throw new Error(err?.errors?.[0]?.longMessage || 'Could not set your password. Try again.');
   }
 
   const fullName = `${d.firstName.trim()} ${d.lastName.trim()}`.trim();
@@ -118,14 +118,14 @@ export async function completeProfile(input: ProfileInput) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
       const target = Array.isArray(err.meta?.target) ? err.meta?.target.join(', ') : String(err.meta?.target ?? '');
       if (target.includes('email')) {
-        throw new Error(describeAuthError('That email address is already registered to another account.', 'profile'));
+        throw new Error('That email address is already registered to another account. Try signing in instead, or use a different email.');
       }
       if (target.includes('phone')) {
-        throw new Error(describeAuthError('That phone number is already registered to another account.', 'profile'));
+        throw new Error('That phone number is already registered to another account. Try signing in instead, or use a different number.');
       }
-      throw new Error(describeAuthError('Some of these details are already registered to another account.', 'profile'));
+      throw new Error('Some of these details are already registered to another account.');
     }
-    throw err;
+    throw friendlyAccountError(err, { email: 'email address', phone: 'phone number', idNumber: 'ID/passport number' });
   }
 
   revalidatePath('/onboarding/profile');

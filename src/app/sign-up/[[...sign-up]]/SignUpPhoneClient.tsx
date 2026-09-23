@@ -15,7 +15,6 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { COUNTRIES } from '@/lib/countries';
-import { describeAuthError } from '@/lib/auth-error-messages';
 
 type Step = 'phone' | 'phone-otp' | 'email-otp';
 
@@ -62,7 +61,7 @@ export function SignUpPhoneClient() {
       await signUp.preparePhoneNumberVerification({ strategy: 'phone_code' });
       setStep('phone-otp');
     } catch (err: any) {
-      setError(describeAuthError(err?.errors?.[0]?.longMessage || err?.message, 'sign-up'));
+      setError(err?.errors?.[0]?.longMessage || err?.message || 'Could not send the code. Try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -90,9 +89,9 @@ export function SignUpPhoneClient() {
         return;
       }
 
-      setError(describeAuthError('The verification code is invalid or expired.', 'sign-up'));
+      setError('Could not verify that code. Please try again.');
     } catch (err: any) {
-      setError(describeAuthError(err?.errors?.[0]?.longMessage || err?.message, 'sign-up'));
+      setError(err?.errors?.[0]?.longMessage || err?.message || 'Invalid code. Try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -109,9 +108,9 @@ export function SignUpPhoneClient() {
         router.push('/onboarding/profile');
         return;
       }
-      setError(describeAuthError('The verification code is invalid or expired.', 'sign-up'));
+      setError('Could not verify that code. Please try again.');
     } catch (err: any) {
-      setError(describeAuthError(err?.errors?.[0]?.longMessage || err?.message, 'sign-up'));
+      setError(err?.errors?.[0]?.longMessage || err?.message || 'Invalid code. Try again.');
     } finally {
       setIsSubmitting(false);
     }

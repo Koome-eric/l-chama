@@ -5,7 +5,12 @@ import { currentUser } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { CHAMA_LEVELS } from '@/lib/chama-levels';
-import { describeAuthError } from '@/lib/auth-error-messages';
+import { friendlyAccountError } from '@/lib/errors';
+
+// What each unique column means to the person filling the form, so a
+// duplicate-account error can explain itself instead of naming a
+// database column.
+const FIELD_LABELS = { clerkId: 'account', email: 'email address', phone: 'phone number' };
 
 const OnboardingSchema = z.object({
   fullName: z.string().min(2, 'Enter your full name.'),
@@ -21,65 +26,71 @@ export type OnboardingInput = z.infer<typeof OnboardingSchema>;
 
 export async function completeOnboarding(input: OnboardingInput) {
   const clerkUser = await currentUser();
-  if (!clerkUser) throw new Error(describeAuthError('You must be signed in.', 'sign-in'));
+  if (!clerkUser) throw new Error('You must be signed in.');
 
   const parsed = OnboardingSchema.safeParse(input);
   if (!parsed.success) {
-    throw new Error(describeAuthError(parsed.error.errors[0]?.message || 'Invalid data provided.', 'onboarding'));
+    throw new Error(parsed.error.errors[0]?.message || 'Invalid data provided.');
   }
   const d = parsed.data;
 
   const level = CHAMA_LEVELS.find((l) => l.key === d.levelKey);
-  if (!level) throw new Error(describeAuthError('Choose a valid chama level.', 'onboarding'));
+  if (!level) throw new Error('Choose a valid chama level.');
 
   const email =
     clerkUser.emailAddresses.find((e) => e.id === clerkUser.primaryEmailAddressId)
       ?.emailAddress || clerkUser.emailAddresses[0]?.emailAddress;
-  if (!email) throw new Error(describeAuthError('Your account has no email on file.', 'onboarding'));
+  if (!email) throw new Error('Your account has no email on file.');
 
-  let user = await prisma.user.findUnique({ where: { clerkId: clerkUser.id } });
+  try {
+    let user = await prisma.user.findUnique({ where: { clerkId: clerkUser.id } });
 
-  if (!user) {
-    user = await prisma.user.create({
-      data: {
-        clerkId: clerkUser.id,
-        email,
-        fullName: d.fullName.trim(),
-        phone: d.phone.trim(),
-        onboardingCompleted: true,
-      },
-    });
-  } else {
-    user = await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        fullName: d.fullName.trim(),
-        phone: d.phone.trim(),
-        onboardingCompleted: true,
-      },
-    });
-  }
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          clerkId: clerkUser.id,
+          email,
+          fullName: d.fullName.trim(),
+          phone: d.phone.trim(),
+          onboardingCompleted: true,
+        },
+      });
+    } else {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          fullName: d.fullName.trim(),
+          phone: d.phone.trim(),
+          onboardingCompleted: true,
+        },
+      });
+    }
 
-  const [ownsTeam, isTeamMember] = await Promise.all([
-    prisma.team.findUnique({ where: { ownerId: user.id } }),
-    prisma.teamMembership.findUnique({ where: { userId: user.id } }),
-  ]);
+    const [ownsTeam, isTeamMember] = await Promise.all([
+      prisma.team.findUnique({ where: { ownerId: user.id } }),
+      prisma.teamMembership.findUnique({ where: { userId: user.id } }),
+    ]);
 
-  if (isTeamMember) {
-    throw new Error(describeAuthError('You are already a member of a chama.', 'onboarding'));
-  }
+    if (isTeamMember) {
+      throw new Error('You are already a member of a chama, so a new one can\'t be created for you. Head to your dashboard instead — if this looks wrong, contact support.');
+    }
 
-  if (!ownsTeam) {
-    await prisma.team.create({
-      data: {
-        name: d.chamaName.trim(),
-        ownerId: user.id,
-        levelKey: level.key,
-        levelName: level.name,
-        monthlyAmount: level.monthlyAmount,
-        groupSize: level.groupSize,
-      },
-    });
+    if (!ownsTeam) {
+      await prisma.team.create({
+        data: {
+          name: d.chamaName.trim(),
+          ownerId: user.id,
+          levelKey: level.key,
+          levelName: level.name,
+          monthlyAmount: level.monthlyAmount,
+          groupSize: level.groupSize,
+        },
+      });
+    }
+  } catch (err) {
+    // Re-throw plain-language errors (like the "already a member" one
+    // above) as-is; only translate raw database/SDK errors.
+    throw friendlyAccountError(err, FIELD_LABELS);
   }
 
   revalidatePath('/');

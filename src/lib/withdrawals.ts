@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { notifyUser } from '@/lib/notifications';
 import { createMobileMoneyRecipient, initiateTransfer, toPaystackPhone } from '@/lib/paystack';
 import { withdrawalFeeRateFor } from '@/lib/withdrawal-fee';
+import { friendlyPaymentError } from '@/lib/errors';
 import type { SignatoryRole, WithdrawalScope } from '@prisma/client';
 
 /* ────────────────────────────────────────────────────────────── */
@@ -267,7 +268,10 @@ async function payoutWithdrawal(withdrawalRequestId: string) {
     );
     return { status: 'PAID' as const };
   } catch (err: any) {
+    // Keep the raw provider error in failureReason for an admin to debug,
+    // but tell the member something they can actually act on.
     const failureReason = String(err?.message ?? 'Unknown error').slice(0, 300);
+    const friendlyReason = friendlyPaymentError(err, 'withdrawal payout').message;
     await prisma.withdrawalRequest.update({
       where: { id: request.id },
       data: { status: 'FAILED', failureReason },
@@ -275,7 +279,7 @@ async function payoutWithdrawal(withdrawalRequestId: string) {
     await notifyUser(
       request.requestedById,
       'Withdrawal payout failed',
-      `Your KES ${request.amount.toLocaleString()} withdrawal was approved by all signatories but the payout failed: ${failureReason}. An admin can retry it or pay it out manually.`
+      `Your KES ${request.amount.toLocaleString()} withdrawal was approved by all signatories, but the payout couldn't go through: ${friendlyReason} An admin can retry it or pay it out manually.`
     );
     return { status: 'FAILED' as const };
   }

@@ -5,6 +5,7 @@ import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { CHAMA_LEVELS } from '@/lib/chama-levels';
+import { friendlyAccountError } from '@/lib/errors';
 
 const OBJECTIVE_KEYS = ['BUY_ASSETS', 'GET_A_LOAN', 'GET_INTEREST', 'SCHOOL_FEES', 'DECEMBER_HOLIDAY'] as const;
 
@@ -61,41 +62,47 @@ export async function registerOrganisation(input: OrganisationInput) {
     prisma.teamMembership.findUnique({ where: { userId: user.id } }),
   ]);
 
-  if (isTeamMember) throw new Error('You are already a member of a chama.');
-
-  if (!ownsTeam) {
-    const team = await prisma.team.create({
-      data: {
-        name: d.organisationName.trim(),
-        ownerId: user.id,
-        levelKey: level.key,
-        levelName: level.name,
-        monthlyAmount: level.monthlyAmount,
-        groupSize: level.groupSize,
-        businessRegNumber: d.registrationNumber.trim(),
-        numberOfMembers: d.numberOfMembers,
-        totalDirectors: d.totalDirectors,
-        physicalAddress: d.physicalAddress.trim(),
-        additionalComments: d.additionalComments?.trim() || undefined,
-        approvalStatus: 'PENDING_APPROVAL',
-        isDiaspora: d.isDiaspora,
-        objectives: d.objectives,
-        membersRunningSME: d.membersRunningSME,
-        membersEmployed: d.membersEmployed,
-        hasLastRespectCover: d.hasLastRespectCover,
-        lastRespectContribution: d.hasLastRespectCover ? d.lastRespectContribution : null,
-      },
-    });
-
-    if (d.hasLastRespectCover) {
-      await prisma.lastRespectFund.create({ data: { teamId: team.id, balance: 0 } });
-    }
+  if (isTeamMember) {
+    throw new Error("You're already a member of a chama, so you can't also register a new organisation — a member can only belong to one chama at a time. If this looks wrong, contact support.");
   }
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { onboardingCompleted: true },
-  });
+  try {
+    if (!ownsTeam) {
+      const team = await prisma.team.create({
+        data: {
+          name: d.organisationName.trim(),
+          ownerId: user.id,
+          levelKey: level.key,
+          levelName: level.name,
+          monthlyAmount: level.monthlyAmount,
+          groupSize: level.groupSize,
+          businessRegNumber: d.registrationNumber.trim(),
+          numberOfMembers: d.numberOfMembers,
+          totalDirectors: d.totalDirectors,
+          physicalAddress: d.physicalAddress.trim(),
+          additionalComments: d.additionalComments?.trim() || undefined,
+          approvalStatus: 'PENDING_APPROVAL',
+          isDiaspora: d.isDiaspora,
+          objectives: d.objectives,
+          membersRunningSME: d.membersRunningSME,
+          membersEmployed: d.membersEmployed,
+          hasLastRespectCover: d.hasLastRespectCover,
+          lastRespectContribution: d.hasLastRespectCover ? d.lastRespectContribution : null,
+        },
+      });
+
+      if (d.hasLastRespectCover) {
+        await prisma.lastRespectFund.create({ data: { teamId: team.id, balance: 0 } });
+      }
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { onboardingCompleted: true },
+    });
+  } catch (err) {
+    throw friendlyAccountError(err, { businessRegNumber: 'registration number' });
+  }
 
   revalidatePath('/onboarding/organisation');
   revalidatePath('/onboarding/pending');

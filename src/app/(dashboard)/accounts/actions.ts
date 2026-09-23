@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { notifyUser } from '@/lib/notifications';
 import { chargeMpesa, initializeCardTransaction, toPaystackPhone } from '@/lib/paystack';
+import { friendlyPaymentError } from '@/lib/errors';
 
 async function getCurrentDbUser() {
   const clerkUser = await currentUser();
@@ -93,7 +94,7 @@ export async function initiateMpesaPayment(input: { productId: string; amount: n
     await prisma.payment
       .update({ where: { id: payment.id }, data: { status: 'FAILED', note: String(err.message ?? '').slice(0, 200) } })
       .catch(() => {});
-    throw new Error(err.message || 'Could not start the M-Pesa payment. Please try again.');
+    throw friendlyPaymentError(err, 'M-Pesa payment');
   }
 
   revalidatePath('/accounts');
@@ -137,7 +138,7 @@ export async function initiateCardPayment(input: { productId: string; amount: nu
     await prisma.payment
       .update({ where: { id: payment.id }, data: { status: 'FAILED', note: String(err.message ?? '').slice(0, 200) } })
       .catch(() => {});
-    throw new Error(err.message || 'Could not start the card payment. Please try again.');
+    throw friendlyPaymentError(err, 'card payment');
   }
 
   revalidatePath('/accounts');

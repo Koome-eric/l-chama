@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { notifyUser } from '@/lib/notifications';
 import { syncChamaToLudeva } from '@/lib/ludeva-sync';
+import { friendlyAccountError } from '@/lib/errors';
 
 export async function acceptChamaInvite(
   token: string,
@@ -43,53 +44,62 @@ export async function acceptChamaInvite(
     );
   }
 
-  let user = await prisma.user.findUnique({ where: { clerkId: clerkUser.id } });
+  let user;
+  try {
+    user = await prisma.user.findUnique({ where: { clerkId: clerkUser.id } });
 
-  if (!user) {
-    user = await prisma.user.create({
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          clerkId: clerkUser.id,
+          email: clerkEmail,
+          phone,
+          idNumber,
+          fullName: `${clerkUser.firstName ?? ''} ${clerkUser.lastName ?? ''}`.trim() || undefined,
+          profileCompleted: true,
+          onboardingCompleted: true,
+        },
+      });
+    } else {
+      const alreadyOwnsOrBelongs = await prisma.teamMembership.findUnique({ where: { userId: user.id } });
+      if (alreadyOwnsOrBelongs) {
+        throw new Error("You're already a member of a chama, so you can't accept another invite — a member can only belong to one chama at a time.");
+      }
+      const ownsAnother = await prisma.team.findUnique({ where: { ownerId: user.id } });
+      if (ownsAnother) {
+        throw new Error("You already own your own chama, so you can't also join this one as a member.");
+      }
+
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          phone: user.phone || phone,
+          idNumber: user.idNumber || idNumber,
+          profileCompleted: true,
+          onboardingCompleted: true,
+        },
+      });
+    }
+
+    await prisma.teamMembership.create({
       data: {
-        clerkId: clerkUser.id,
-        email: clerkEmail,
-        phone,
-        idNumber,
-        fullName: `${clerkUser.firstName ?? ''} ${clerkUser.lastName ?? ''}`.trim() || undefined,
-        profileCompleted: true,
-        onboardingCompleted: true,
+        teamId: invite.teamId,
+        userId: user.id,
+        canInvite: invite.canInvite,
+        canManagePermissions: invite.canManagePermissions,
+        canRemoveMembers: invite.canRemoveMembers,
+        canApproveLoans: invite.canApproveLoans,
+        canInvestPooled: invite.canInvestPooled,
+        canViewPooledFunds: invite.canViewPooledFunds,
+        canManageReports: invite.canManageReports,
+        canWithdraw: invite.canWithdraw,
       },
     });
-  } else {
-    const alreadyOwnsOrBelongs = await prisma.teamMembership.findUnique({ where: { userId: user.id } });
-    if (alreadyOwnsOrBelongs) throw new Error('You are already part of a chama.');
-    const ownsAnother = await prisma.team.findUnique({ where: { ownerId: user.id } });
-    if (ownsAnother) throw new Error('You already own your own chama.');
 
-    user = await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        phone: user.phone || phone,
-        idNumber: user.idNumber || idNumber,
-        profileCompleted: true,
-        onboardingCompleted: true,
-      },
-    });
+    await prisma.teamInvite.update({ where: { id: invite.id }, data: { status: 'ACCEPTED' } });
+  } catch (err) {
+    throw friendlyAccountError(err, { clerkId: 'account', email: 'email address', phone: 'phone number' });
   }
-
-  await prisma.teamMembership.create({
-    data: {
-      teamId: invite.teamId,
-      userId: user.id,
-      canInvite: invite.canInvite,
-      canManagePermissions: invite.canManagePermissions,
-      canRemoveMembers: invite.canRemoveMembers,
-      canApproveLoans: invite.canApproveLoans,
-      canInvestPooled: invite.canInvestPooled,
-      canViewPooledFunds: invite.canViewPooledFunds,
-      canManageReports: invite.canManageReports,
-      canWithdraw: invite.canWithdraw,
-    },
-  });
-
-  await prisma.teamInvite.update({ where: { id: invite.id }, data: { status: 'ACCEPTED' } });
 
   const client = await clerkClient();
   const existingMetadata = clerkUser.publicMetadata || {};

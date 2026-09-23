@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Manrope, Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "@/components/ui/toaster";
+import { clerkLocalization } from "@/lib/clerk-localization";
 import "./globals.css";
 
 // Space Grotesk carries the headline personality — a geometric grotesk
@@ -23,7 +24,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ClerkProvider>
+    <ClerkProvider localization={clerkLocalization as any}>
       <html
         lang="en"
         suppressHydrationWarning

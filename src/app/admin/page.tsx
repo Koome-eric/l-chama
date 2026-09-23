@@ -30,7 +30,15 @@ export default async function AdminPage() {
   const canManageOtherAdmins = isSuperAdmin || !!myAccount?.canManageAdmins;
 
   const [teams, campaigns, products, reports, savingsEntries, totalUsers, pooledFundsAgg, payments, juniorApplications, ludevaMembers, adminAccounts] = await Promise.all([
-    prisma.team.findMany({ include: { owner: true }, orderBy: { submittedAt: 'desc' } }),
+    prisma.team.findMany({
+      include: {
+        owner: true,
+        secretary: true,
+        treasurer: true,
+        members: { include: { user: true }, orderBy: { createdAt: 'asc' } },
+      },
+      orderBy: { submittedAt: 'desc' },
+    }),
     prisma.campaign.findMany({ include: { creator: true }, orderBy: { createdAt: 'desc' } }),
     prisma.investmentProduct.findMany({ orderBy: { createdAt: 'desc' } }),
     prisma.memberReport.findMany({ include: { team: true }, orderBy: { uploadedAt: 'desc' }, take: 200 }),
@@ -65,6 +73,13 @@ export default async function AdminPage() {
     ownerName: t.owner.fullName || t.owner.email || t.owner.phone || 'Unknown',
     ownerEmail: t.owner.email,
     ownerPhone: t.owner.phone,
+    ownerIdNumber: t.owner.idNumber,
+    ownerGender: t.owner.gender,
+    ownerCountry: t.owner.country,
+    ownerRegion: t.owner.region,
+    ownerJoinedAt: t.createdAt.toISOString(),
+    secretaryName: t.secretary ? (t.secretary.fullName || t.secretary.email || t.secretary.phone || 'Unknown') : null,
+    treasurerName: t.treasurer ? (t.treasurer.fullName || t.treasurer.email || t.treasurer.phone || 'Unknown') : null,
     levelName: t.levelName,
     businessRegNumber: t.businessRegNumber,
     numberOfMembers: t.numberOfMembers,
@@ -81,6 +96,29 @@ export default async function AdminPage() {
     membersEmployed: t.membersEmployed,
     hasLastRespectCover: t.hasLastRespectCover,
     lastRespectContribution: t.lastRespectContribution,
+    members: t.members.map((m: (typeof t.members)[number]) => ({
+      id: m.id,
+      fullName: m.user.fullName || m.user.email || m.user.phone || 'Unknown',
+      email: m.user.email,
+      phone: m.user.phone,
+      idNumber: m.user.idNumber,
+      gender: m.user.gender,
+      country: m.user.country,
+      region: m.user.region,
+      isSecretary: m.userId === t.secretaryId,
+      isTreasurer: m.userId === t.treasurerId,
+      joinedAt: m.createdAt.toISOString(),
+      permissions: {
+        canInvite: m.canInvite,
+        canManagePermissions: m.canManagePermissions,
+        canRemoveMembers: m.canRemoveMembers,
+        canApproveLoans: m.canApproveLoans,
+        canInvestPooled: m.canInvestPooled,
+        canViewPooledFunds: m.canViewPooledFunds,
+        canManageReports: m.canManageReports,
+        canWithdraw: m.canWithdraw,
+      },
+    })),
   }));
 
   const campaignData = campaigns.map((c: (typeof campaigns)[number]) => ({

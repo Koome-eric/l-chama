@@ -83,6 +83,7 @@ import {
   approveOrganisation,
   rejectOrganisation,
   setTeamLudevaMembership,
+  deleteOrganisation,
   verifyCampaign,
   unverifyCampaign,
   createInvestmentProduct,
@@ -108,12 +109,43 @@ import {
 /*                              TYPES                              */
 /* ────────────────────────────────────────────────────────────── */
 
+type TeamMemberRow = {
+  id: string;
+  fullName: string;
+  email: string | null;
+  phone: string | null;
+  idNumber: string | null;
+  gender: string | null;
+  country: string | null;
+  region: string | null;
+  isSecretary: boolean;
+  isTreasurer: boolean;
+  joinedAt: string;
+  permissions: {
+    canInvite: boolean;
+    canManagePermissions: boolean;
+    canRemoveMembers: boolean;
+    canApproveLoans: boolean;
+    canInvestPooled: boolean;
+    canViewPooledFunds: boolean;
+    canManageReports: boolean;
+    canWithdraw: boolean;
+  };
+};
+
 type TeamRow = {
   id: string;
   name: string;
   ownerName: string;
   ownerEmail: string | null;
   ownerPhone: string | null;
+  ownerIdNumber: string | null;
+  ownerGender: string | null;
+  ownerCountry: string | null;
+  ownerRegion: string | null;
+  ownerJoinedAt: string;
+  secretaryName: string | null;
+  treasurerName: string | null;
   levelName: string | null;
   businessRegNumber: string | null;
   numberOfMembers: number | null;
@@ -130,6 +162,7 @@ type TeamRow = {
   membersEmployed: number | null;
   hasLastRespectCover: boolean;
   lastRespectContribution: number | null;
+  members: TeamMemberRow[];
 };
 
 type CampaignRow = {
@@ -761,6 +794,102 @@ function OverviewSection({
 
 type OrgFilter = 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'ALL';
 
+const PERMISSION_LABELS: Record<keyof TeamMemberRow['permissions'], string> = {
+  canInvite: 'Invite members',
+  canManagePermissions: 'Manage permissions',
+  canRemoveMembers: 'Remove members',
+  canApproveLoans: 'Approve loans',
+  canInvestPooled: 'Invest pooled funds',
+  canViewPooledFunds: 'View pooled funds',
+  canManageReports: 'Manage reports',
+  canWithdraw: 'Withdraw',
+};
+
+function MembersDialog({ team, onOpenChange }: { team: TeamRow | null; onOpenChange: (open: boolean) => void }) {
+  return (
+    <Dialog open={!!team} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
+        {team && (
+          <>
+            <DialogHeader>
+              <DialogTitle>{team.name} — members</DialogTitle>
+              <DialogDescription>
+                Everyone with access to this chama: the team leader who created it, plus every member who accepted an invite.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
+                <div className="mb-2 flex items-center gap-2">
+                  <Badge className="bg-primary text-primary-foreground">Team Leader</Badge>
+                  <span className="text-xs text-muted-foreground">Created this chama · has every permission</span>
+                </div>
+                <dl className="grid gap-x-4 gap-y-2 text-sm sm:grid-cols-2">
+                  <div><dt className="text-xs text-muted-foreground">Full name</dt><dd className="font-medium">{team.ownerName}</dd></div>
+                  <div><dt className="text-xs text-muted-foreground">Email</dt><dd className="font-medium">{team.ownerEmail || '—'}</dd></div>
+                  <div><dt className="text-xs text-muted-foreground">Phone</dt><dd className="font-medium">{team.ownerPhone || '—'}</dd></div>
+                  <div><dt className="text-xs text-muted-foreground">ID / Passport No.</dt><dd className="font-medium">{team.ownerIdNumber || '—'}</dd></div>
+                  <div><dt className="text-xs text-muted-foreground">Gender</dt><dd className="font-medium">{team.ownerGender || '—'}</dd></div>
+                  <div><dt className="text-xs text-muted-foreground">Location</dt><dd className="font-medium">{[team.ownerRegion, team.ownerCountry].filter(Boolean).join(', ') || '—'}</dd></div>
+                  <div className="sm:col-span-2"><dt className="text-xs text-muted-foreground">Account created</dt><dd className="font-medium">{new Date(team.ownerJoinedAt).toLocaleString()}</dd></div>
+                </dl>
+              </div>
+
+              <div>
+                <p className="mb-2 text-sm font-medium">
+                  Invited members ({team.members.length})
+                </p>
+                {team.members.length === 0 ? (
+                  <p className="rounded-lg bg-muted/40 p-4 text-sm text-muted-foreground">
+                    No one has accepted an invite to this chama yet — it's just the team leader for now.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {team.members.map((m) => {
+                      const grantedPermissions = (Object.keys(m.permissions) as (keyof TeamMemberRow['permissions'])[]).filter(
+                        (k) => m.permissions[k]
+                      );
+                      return (
+                        <div key={m.id} className="rounded-xl border border-border/60 p-4">
+                          <div className="mb-2 flex flex-wrap items-center gap-2">
+                            <span className="font-medium">{m.fullName}</span>
+                            {m.isSecretary && <Badge variant="secondary">Secretary signatory</Badge>}
+                            {m.isTreasurer && <Badge variant="secondary">Treasurer signatory</Badge>}
+                          </div>
+                          <dl className="grid gap-x-4 gap-y-2 text-sm sm:grid-cols-2">
+                            <div><dt className="text-xs text-muted-foreground">Email</dt><dd>{m.email || '—'}</dd></div>
+                            <div><dt className="text-xs text-muted-foreground">Phone</dt><dd>{m.phone || '—'}</dd></div>
+                            <div><dt className="text-xs text-muted-foreground">ID / Passport No.</dt><dd>{m.idNumber || '—'}</dd></div>
+                            <div><dt className="text-xs text-muted-foreground">Gender</dt><dd>{m.gender || '—'}</dd></div>
+                            <div className="sm:col-span-2"><dt className="text-xs text-muted-foreground">Location</dt><dd>{[m.region, m.country].filter(Boolean).join(', ') || '—'}</dd></div>
+                            <div className="sm:col-span-2"><dt className="text-xs text-muted-foreground">Joined chama</dt><dd>{new Date(m.joinedAt).toLocaleString()}</dd></div>
+                          </dl>
+                          <div className="mt-3 border-t border-border/60 pt-3">
+                            <p className="mb-1 text-xs text-muted-foreground">Permissions</p>
+                            {grantedPermissions.length === 0 ? (
+                              <p className="text-xs text-muted-foreground">No extra permissions granted — can only view the chama.</p>
+                            ) : (
+                              <div className="flex flex-wrap gap-1.5">
+                                {grantedPermissions.map((k) => (
+                                  <Badge key={k} variant="outline" className="text-xs font-normal">{PERMISSION_LABELS[k]}</Badge>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function OrganisationsAdminSection({ teams }: { teams: TeamRow[] }) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
@@ -768,6 +897,9 @@ function OrganisationsAdminSection({ teams }: { teams: TeamRow[] }) {
   const [filter, setFilter] = useState<OrgFilter>('PENDING_APPROVAL');
   const [query, setQuery] = useState('');
   const [rejectTarget, setRejectTarget] = useState<TeamRow | null>(null);
+  const [membersTarget, setMembersTarget] = useState<TeamRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<TeamRow | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   const counts = {
     PENDING_APPROVAL: teams.filter((t) => t.approvalStatus === 'PENDING_APPROVAL').length,
@@ -816,6 +948,20 @@ function OrganisationsAdminSection({ teams }: { teams: TeamRow[] }) {
         window.location.reload();
       } catch (err: any) {
         toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      }
+    });
+  };
+
+  const handleDelete = (id: string) => {
+    startTransition(async () => {
+      try {
+        await deleteOrganisation(id);
+        toast({ title: 'Organisation deleted', description: 'The chama, its members and its financial records have been permanently removed.' });
+        setDeleteTarget(null);
+        setDeleteConfirmText('');
+        window.location.reload();
+      } catch (err: any) {
+        toast({ title: 'Could not delete organisation', description: err.message, variant: 'destructive' });
       }
     });
   };
@@ -872,6 +1018,22 @@ function OrganisationsAdminSection({ teams }: { teams: TeamRow[] }) {
                   {t.approvalStatus === 'PENDING_APPROVAL' ? 'Pending' : t.approvalStatus === 'APPROVED' ? 'Approved' : 'Rejected'}
                 </Badge>
               </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="mt-3 gap-1.5"
+                onClick={() => setMembersTarget(t)}
+              >
+                <Users className="h-4 w-4" /> View members ({1 + t.members.length})
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="mt-3 ml-2 gap-1.5 text-destructive hover:text-destructive"
+                onClick={() => { setDeleteTarget(t); setDeleteConfirmText(''); }}
+              >
+                <Trash2 className="h-4 w-4" /> Delete organisation
+              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl bg-muted/40 p-4 text-sm sm:grid-cols-4">
@@ -959,6 +1121,52 @@ function OrganisationsAdminSection({ teams }: { teams: TeamRow[] }) {
           </Card>
         ))}
       </div>
+
+      <MembersDialog team={membersTarget} onOpenChange={(open) => !open && setMembersTarget(null)} />
+
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) { setDeleteTarget(null); setDeleteConfirmText(''); } }}>
+        <DialogContent>
+          {deleteTarget && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-destructive">Delete {deleteTarget.name}?</DialogTitle>
+                <DialogDescription>This permanently removes, and cannot be undone:</DialogDescription>
+              </DialogHeader>
+              <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                <li>The chama itself and its organisation details</li>
+                <li>Its team leader ({deleteTarget.ownerName}) and all {deleteTarget.members.length} member{deleteTarget.members.length === 1 ? '' : 's'}' attachment to it — their L-CHAMA accounts stay intact and are free to join or create another chama</li>
+                <li>Its loan account balance, every loan request, guarantee and repayment</li>
+                <li>Its pooled investments</li>
+                <li>Its Last Respect Cover fund and claims (if enabled)</li>
+                <li>Every pending invite and withdrawal request on it</li>
+              </ul>
+              <p className="text-sm text-muted-foreground">
+                Past deposit payments and any uploaded performance reports are kept for record-keeping, just unlinked from this chama.
+              </p>
+              <div className="space-y-1.5 pt-2">
+                <Label htmlFor="delete-confirm-text">
+                  Type <span className="font-semibold text-foreground">{deleteTarget.name}</span> to confirm
+                </Label>
+                <Input
+                  id="delete-confirm-text"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="destructive"
+                  disabled={isPending || deleteConfirmText !== deleteTarget.name}
+                  onClick={() => handleDelete(deleteTarget.id)}
+                >
+                  {isPending ? 'Deleting…' : 'Permanently delete'}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

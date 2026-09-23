@@ -5,6 +5,7 @@ import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { chargeMpesa, initializeCardTransaction, toPaystackPhone } from '@/lib/paystack';
+import { friendlyPaymentError } from '@/lib/errors';
 
 /* ────────────────────────────────────────────────────────────── */
 /*  Public giving — the whole point of a campaign's share link is   */
@@ -110,6 +111,6 @@ export async function donateToCampaign(input: DonateInput) {
     await prisma.donation
       .update({ where: { id: donation.id }, data: { status: 'FAILED' } })
       .catch(() => {});
-    throw new Error(err.message || 'Could not start the donation. Please try again.');
+    throw friendlyPaymentError(err, 'donation');
   }
 }

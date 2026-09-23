@@ -15,6 +15,7 @@ import {
 } from '@/lib/admin-auth';
 import { notifyUser } from '@/lib/notifications';
 import { syncChamaToLudeva } from '@/lib/ludeva-sync';
+import { friendlyAccountError } from '@/lib/errors';
 
 // The 8 operational admin-panel sections that can be individually
 // granted/revoked per admin — see AdminAccount in prisma/schema.prisma.
@@ -306,6 +307,82 @@ export async function setTeamLudevaMembership(teamId: string, isLudevaMember: bo
   if (!team) throw new Error('Organisation not found.');
 
   await prisma.team.update({ where: { id: teamId }, data: { isLudevaMember } });
+
+  revalidatePath('/admin');
+  return { success: true };
+}
+
+// Permanently deletes a chama: the team itself, its membership list and
+// pending invites, its loan account and every loan request/guarantee/
+// repayment on it, its pooled investments, its Last Respect fund and
+// claims, and every withdrawal request/approval tied to it. The team
+// leader's and members' L-CHAMA *accounts* are left untouched — only
+// their attachment to this chama is removed, so they're simply free to
+// create or join a different one afterward.
+//
+// Uploaded report history (MemberReport/SavingsEntry rows synced from
+// Google Sheets) and past Payment records are unlinked from the team
+// rather than deleted outright, since those are financial/audit records
+// an admin may still need after the chama itself is gone.
+//
+// This cannot be undone, so the confirmation burden (typing the chama's
+// name) lives on the client — this action itself just requires the
+// permission and that the organisation still exists.
+export async function deleteOrganisation(teamId: string) {
+  await requirePermission('canManageOrganisations');
+
+  const team = await prisma.team.findUnique({
+    where: { id: teamId },
+    include: { members: { select: { userId: true } } },
+  });
+  if (!team) throw new Error('Organisation not found.');
+
+  const { name: teamName, ownerId } = team;
+  const memberUserIds = team.members.map((m) => m.userId);
+
+  try {
+    await prisma.$transaction([
+      // Children of LoanRequest, then LoanRequest itself.
+      prisma.loanGuarantee.deleteMany({ where: { loanRequest: { teamId } } }),
+      prisma.loanRepayment.deleteMany({ where: { loanRequest: { teamId } } }),
+      prisma.loanRequest.deleteMany({ where: { teamId } }),
+
+      // Children of WithdrawalRequest, then WithdrawalRequest itself.
+      prisma.withdrawalApproval.deleteMany({ where: { withdrawalRequest: { teamId } } }),
+      prisma.withdrawalRequest.deleteMany({ where: { teamId } }),
+
+      // Everything else that belongs exclusively to this team.
+      prisma.teamMembership.deleteMany({ where: { teamId } }),
+      prisma.teamInvite.deleteMany({ where: { teamId } }),
+      prisma.teamInvestment.deleteMany({ where: { teamId } }),
+      prisma.lastRespectClaim.deleteMany({ where: { teamId } }),
+      prisma.lastRespectFund.deleteMany({ where: { teamId } }),
+      prisma.loanAccount.deleteMany({ where: { teamId } }),
+
+      // Unlink (don't delete) historical records worth keeping.
+      prisma.memberReport.updateMany({ where: { teamId }, data: { teamId: null } }),
+      prisma.savingsEntry.updateMany({ where: { teamId }, data: { teamId: null } }),
+      prisma.payment.updateMany({ where: { teamId }, data: { teamId: null } }),
+
+      prisma.team.delete({ where: { id: teamId } }),
+    ]);
+  } catch (err) {
+    throw friendlyAccountError(err);
+  }
+
+  // Best-effort — the chama is already gone at this point either way.
+  await notifyUser(
+    ownerId,
+    'Chama deleted',
+    `${teamName} has been permanently removed by an L-CHAMA admin. You're free to create or join a different chama.`
+  ).catch(() => {});
+  for (const userId of memberUserIds) {
+    await notifyUser(
+      userId,
+      'Chama deleted',
+      `${teamName}, which you were a member of, has been permanently removed by an L-CHAMA admin. You're free to create or join a different chama.`
+    ).catch(() => {});
+  }
 
   revalidatePath('/admin');
   return { success: true };

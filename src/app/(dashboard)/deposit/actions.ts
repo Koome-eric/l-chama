@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { getChamaContext } from '@/lib/chama';
 import { chargeMpesa, initializeCardTransaction, toPaystackPhone } from '@/lib/paystack';
+import { friendlyPaymentError } from '@/lib/errors';
 
 /* ────────────────────────────────────────────────────────────── */
 /*  Deposit into a chama's shared LoanAccount — the real-money       */
@@ -74,7 +75,7 @@ export async function initiateDepositMpesaPayment(input: { amount: number; phone
     await prisma.payment
       .update({ where: { id: payment.id }, data: { status: 'FAILED', note: String(err.message ?? '').slice(0, 200) } })
       .catch(() => {});
-    throw new Error(err.message || 'Could not start the M-Pesa payment. Please try again.');
+    throw friendlyPaymentError(err, 'M-Pesa payment');
   }
 
   revalidatePath('/deposit');
@@ -119,7 +120,7 @@ export async function initiateDepositCardPayment(input: { amount: number }) {
     await prisma.payment
       .update({ where: { id: payment.id }, data: { status: 'FAILED', note: String(err.message ?? '').slice(0, 200) } })
       .catch(() => {});
-    throw new Error(err.message || 'Could not start the card payment. Please try again.');
+    throw friendlyPaymentError(err, 'card payment');
   }
 
   revalidatePath('/deposit');
