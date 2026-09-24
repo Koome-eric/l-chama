@@ -52,7 +52,7 @@ export function ProfileClient({ defaultEmail }: { defaultEmail?: string }) {
     !!country &&
     region.trim().length > 0 &&
     (!isExistingLudevaMember || ludevaMemberNumber.trim().length >= 3) &&
-    password.length >= 6 &&
+    password.length >= 15 &&
     hasNumber &&
     hasLetter;
 
@@ -197,9 +197,12 @@ export function ProfileClient({ defaultEmail }: { defaultEmail?: string }) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
+          <p className="mt-1 text-xs text-muted-foreground">
+            Must be at least 15 characters, with a mix of letters and numbers.
+          </p>
           <ul className="mt-1 space-y-0.5 text-xs">
-            <li className={password.length >= 6 ? 'text-primary' : 'text-muted-foreground'}>
-              At least 6 characters
+            <li className={password.length >= 15 ? 'text-primary' : 'text-muted-foreground'}>
+              At least 15 characters
             </li>
             <li className={hasNumber ? 'text-primary' : 'text-muted-foreground'}>Contains a number</li>
             <li className={hasLetter ? 'text-primary' : 'text-muted-foreground'}>Contains a letter</li>

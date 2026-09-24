@@ -20,7 +20,7 @@ const ProfileSchema = z
     ludevaMemberNumber: z.string().trim().optional(),
     password: z
       .string()
-      .min(6, 'Password must be at least 6 characters.')
+      .min(15, 'Password must be at least 15 characters.')
       .regex(/[0-9]/, 'Password must contain a number.')
       .regex(/[a-zA-Z]/, 'Password must contain a letter.'),
   })
