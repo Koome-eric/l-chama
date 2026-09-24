@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { Eye, EyeOff } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,6 +39,7 @@ export function ProfileClient({ defaultEmail }: { defaultEmail?: string }) {
   const [isExistingLudevaMember, setIsExistingLudevaMember] = useState(false);
   const [ludevaMemberNumber, setLudevaMemberNumber] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const hasNumber = /[0-9]/.test(password);
@@ -61,7 +63,7 @@ export function ProfileClient({ defaultEmail }: { defaultEmail?: string }) {
     setError(null);
     startTransition(async () => {
       try {
-        await completeProfile({
+        const result = await completeProfile({
           firstName,
           lastName,
           idNumber,
@@ -73,10 +75,16 @@ export function ProfileClient({ defaultEmail }: { defaultEmail?: string }) {
           ludevaMemberNumber: isExistingLudevaMember ? ludevaMemberNumber : undefined,
           password,
         });
+        if (!result.success) {
+          setError(result.error);
+          return;
+        }
         toast({ title: 'Profile complete' });
         router.push('/onboarding/organisation');
       } catch (err: any) {
-        setError(err.message || 'Something went wrong. Please try again.');
+        // Only reached for a genuine network/unexpected failure — every
+        // known error case above is returned as { success: false, error }.
+        setError(err.message || 'Something went wrong. Please check your connection and try again.');
       }
     });
   };
@@ -191,12 +199,25 @@ export function ProfileClient({ defaultEmail }: { defaultEmail?: string }) {
 
         <div>
           <Label htmlFor="password">Password</Label>
-          <Input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+          <div className="relative">
+            <Input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              aria-pressed={showPassword}
+              tabIndex={-1}
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
           <p className="mt-1 text-xs text-muted-foreground">
             Must be at least 15 characters, with a mix of letters and numbers.
           </p>

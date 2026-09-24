@@ -31,13 +31,22 @@ const ProfileSchema = z
 
 export type ProfileInput = z.infer<typeof ProfileSchema>;
 
-export async function completeProfile(input: ProfileInput) {
+export type ProfileResult = { success: true } | { success: false; error: string };
+
+// This function never throws. Next.js strips the message off any error
+// thrown out of a Server Action in production and replaces it with a
+// bare "Error: ... { digest: ... }" on the client — which is exactly
+// the unreadable error the person was seeing, even though the message
+// we wrote (e.g. "That email address is already registered...") was
+// perfectly friendly. Returning { success: false, error } instead means
+// the real message always reaches the UI.
+export async function completeProfile(input: ProfileInput): Promise<ProfileResult> {
   const { userId: clerkId } = await auth();
-  if (!clerkId) throw new Error('You must be signed in.');
+  if (!clerkId) return { success: false, error: 'You must be signed in.' };
 
   const parsed = ProfileSchema.safeParse(input);
   if (!parsed.success) {
-    throw new Error(parsed.error.errors[0]?.message || 'Invalid data provided.');
+    return { success: false, error: parsed.error.errors[0]?.message || 'Invalid data provided.' };
   }
   const d = parsed.data;
 
@@ -63,7 +72,7 @@ export async function completeProfile(input: ProfileInput) {
       password: d.password,
     });
   } catch (err: any) {
-    throw new Error(err?.errors?.[0]?.longMessage || 'Could not set your password. Try again.');
+    return { success: false, error: err?.errors?.[0]?.longMessage || 'Could not set your password. Try again.' };
   }
 
   const fullName = `${d.firstName.trim()} ${d.lastName.trim()}`.trim();
@@ -118,14 +127,21 @@ export async function completeProfile(input: ProfileInput) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
       const target = Array.isArray(err.meta?.target) ? err.meta?.target.join(', ') : String(err.meta?.target ?? '');
       if (target.includes('email')) {
-        throw new Error('That email address is already registered to another account. Try signing in instead, or use a different email.');
+        return {
+          success: false,
+          error: 'That email address is already registered to another account. Try signing in instead, or use a different email.',
+        };
       }
       if (target.includes('phone')) {
-        throw new Error('That phone number is already registered to another account. Try signing in instead, or use a different number.');
+        return {
+          success: false,
+          error: 'That phone number is already registered to another account. Try signing in instead, or use a different number.',
+        };
       }
-      throw new Error('Some of these details are already registered to another account.');
+      return { success: false, error: 'Some of these details are already registered to another account.' };
     }
-    throw friendlyAccountError(err, { email: 'email address', phone: 'phone number', idNumber: 'ID/passport number' });
+    const friendly = friendlyAccountError(err, { email: 'email address', phone: 'phone number', idNumber: 'ID/passport number' });
+    return { success: false, error: friendly.message };
   }
 
   revalidatePath('/onboarding/profile');
