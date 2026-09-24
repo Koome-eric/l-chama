@@ -76,6 +76,7 @@ import { ProgressBar } from '@/components/ui/progress-bar';
 import { useToast } from '@/hooks/use-toast';
 import { formatKES } from '@/lib/chama-levels';
 import { cn } from '@/lib/utils';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { StatCard } from '@/components/admin/StatCard';
 import { MiniBarChart } from '@/components/admin/MiniBarChart';
 import { SearchBox, FilterPill } from '@/components/admin/SectionToolbar';
@@ -525,6 +526,7 @@ export function AdminClient({
             <p className="hidden truncate text-xs text-muted-foreground sm:block">{SECTION_META[section].description}</p>
           </div>
           <div className="ml-auto flex items-center gap-3">
+            <ThemeToggle />
             {(() => {
               const totalNeedsReview =
                 stats.orgs.pending + stats.campaigns.unverified + stats.payments.pending + stats.juniorApplications.pending + stats.ludevaMembers.pending;

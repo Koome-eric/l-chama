@@ -32,6 +32,7 @@ import {
   SidebarInset,
 } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 // ─────────────────────────────────────────────
 // Sidebar nav — every item points at a real route in the app. A couple
@@ -138,6 +139,7 @@ export function AppSidebar({
         <header className="sticky top-0 z-40 flex h-14 items-center gap-4 border-b bg-background/80 backdrop-blur px-4 sm:px-6 print:hidden">
           <SidebarTrigger className="md:hidden" />
           <div className="ml-auto flex items-center gap-3">
+            <ThemeToggle />
             <UserButton
               afterSignOutUrl="/"
               appearance={{ elements: { avatarBox: 'h-9 w-9 rounded-lg' } }}

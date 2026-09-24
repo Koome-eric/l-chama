@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@clerk/nextjs';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 export default function LChamaHeader() {
   const { isSignedIn } = useAuth();
@@ -32,6 +33,7 @@ export default function LChamaHeader() {
         </nav>
 
         <div className="flex items-center gap-3">
+          <ThemeToggle />
           {isSignedIn ? (
             <Button asChild size="sm">
               <Link href="/panel">My Chama</Link>

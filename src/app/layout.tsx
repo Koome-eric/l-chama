@@ -3,7 +3,14 @@ import { Manrope, Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "@/components/ui/toaster";
 import { clerkLocalization } from "@/lib/clerk-localization";
+import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
+
+// Runs before React hydrates, straight from the server-rendered HTML, so
+// the correct theme class is on <html> before first paint — no light-mode
+// flash for users who've chosen (or whose system prefers) dark. Kept as a
+// plain string so it can't accidentally depend on any bundled module.
+const THEME_BOOT_SCRIPT = `(function(){try{var s=localStorage.getItem('lchama-theme');var d=s?s==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;if(d){document.documentElement.classList.add('dark');document.documentElement.style.colorScheme='dark'}else{document.documentElement.style.colorScheme='light'}}catch(e){}})()`;
 
 // Space Grotesk carries the headline personality — a geometric grotesk
 // with just enough character to feel like a fintech product rather than
@@ -30,9 +37,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         suppressHydrationWarning
         className={`${manrope.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}
       >
+        <head>
+          <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+        </head>
         <body className="font-sans antialiased">
-          {children}
-          <Toaster />
+          <ThemeProvider>
+            {children}
+            <Toaster />
+          </ThemeProvider>
         </body>
       </html>
     </ClerkProvider>
