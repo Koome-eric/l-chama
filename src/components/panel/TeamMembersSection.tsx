@@ -206,6 +206,7 @@ export function TeamMembersSection({
       canViewPooledFunds: m.canViewPooledFunds,
       canManageReports: m.canManageReports,
       canWithdraw: m.canWithdraw,
+      canManageSubTeams: m.canManageSubTeams,
     });
   };
 

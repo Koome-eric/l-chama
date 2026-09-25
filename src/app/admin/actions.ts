@@ -529,6 +529,41 @@ export async function toggleInvestmentProductActive(productId: string) {
   return { success: true };
 }
 
+// Hard delete — only allowed once nothing actually references the
+// product anymore (a chama's TeamInvestment, or a member's personal
+// MemberAccount). Both relations are left as the Prisma default
+// (Restrict), so a delete against a referenced product would otherwise
+// fail with a raw foreign-key error; we check first and give a clear,
+// actionable message instead — "close it out" for an active investment,
+// or "deactivate" as the alternative that hides it from /invest without
+// touching history.
+export async function deleteInvestmentProduct(productId: string) {
+  await requirePermission('canManageProducts');
+
+  const product = await prisma.investmentProduct.findUnique({ where: { id: productId } });
+  if (!product) throw new Error('Product not found.');
+
+  const [investmentCount, memberAccountCount] = await Promise.all([
+    prisma.teamInvestment.count({ where: { productId } }),
+    prisma.memberAccount.count({ where: { productId } }),
+  ]);
+
+  if (investmentCount > 0 || memberAccountCount > 0) {
+    const parts: string[] = [];
+    if (investmentCount > 0) parts.push(`${investmentCount} chama investment${investmentCount === 1 ? '' : 's'}`);
+    if (memberAccountCount > 0) parts.push(`${memberAccountCount} member account${memberAccountCount === 1 ? '' : 's'}`);
+    throw new Error(
+      `Can't delete "${product.name}" — it still has ${parts.join(' and ')} attached. Deactivate it instead to hide it from /invest without losing that history.`
+    );
+  }
+
+  await prisma.investmentProduct.delete({ where: { id: productId } });
+
+  revalidatePath('/admin');
+  revalidatePath('/invest');
+  return { success: true };
+}
+
 // ─────────────────────────────────────────────
 // Member Reports — Google Sheets performance pipeline (mirrors Ludeva's
 // MemberReport pipeline). Rows arrive either via the /api/member-reports/sync

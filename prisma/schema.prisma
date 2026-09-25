@@ -65,6 +65,15 @@ model User {
   sentInvites    TeamInvite[]    @relation("TeamInvitesSentBy")
   decidedTeams   Team[]          @relation("TeamDecidedBy")
 
+  // ── Sub-chamas — organisational sub-groups inside a chama a member
+  // already belongs to (see SubTeam below). Purely a grouping/leadership
+  // layer: money, loans and withdrawals all still live on the parent
+  // Team, so a sub-chama membership is a single extra tag, not a second
+  // TeamMembership. One sub-chama at a time, same as one chama at a time. ──
+  ledSubTeams       SubTeam[]           @relation("SubTeamLeader")
+  subTeamsCreated   SubTeam[]           @relation("SubTeamCreatedBy")
+  subTeamMembership SubTeamMembership?  @relation("SubTeamMember")
+
   loanRequestsMade    LoanRequest[]   @relation("LoanRequester")
   loanRequestsDecided LoanRequest[]   @relation("LoanDecidedBy")
   loanGuarantees      LoanGuarantee[] @relation("LoanGuarantor")
@@ -197,11 +206,64 @@ model Team {
   savingsEntries  SavingsEntry[]
   withdrawals     WithdrawalRequest[]
   loanDeposits    Payment[]
+  subTeams        SubTeam[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("team")
+}
+
+// ─────────────────────────────────────────────
+// Sub-chamas — smaller groups inside an already-APPROVED chama, each run
+// by a Team Leader drawn from the chama's own members. This is purely an
+// organisational/leadership layer: pooled funds, the LoanAccount, loan
+// requests, savings and withdrawals all stay scoped to the parent Team
+// exactly as before — a sub-chama has no ledger of its own. A member
+// (and a leader) can belong to at most one sub-chama at a time within a
+// given parent chama, enforced by SubTeamMembership.userId being unique
+// platform-wide (mirrors the single-chama-at-a-time rule on
+// TeamMembership itself). Deleting a SubTeam just removes the grouping —
+// members stay full chama members throughout.
+// ─────────────────────────────────────────────
+model SubTeam {
+  id     String @id @default(cuid())
+  teamId String
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  name String
+
+  // Must be an existing member (or, in principle, the owner) of the
+  // parent Team — enforced in application code, since Prisma can't
+  // express "must also be a TeamMembership/owner of the same teamId".
+  leaderId String
+  leader   User   @relation("SubTeamLeader", fields: [leaderId], references: [id])
+
+  createdById String
+  createdBy   User   @relation("SubTeamCreatedBy", fields: [createdById], references: [id])
+
+  members SubTeamMembership[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([teamId, name])
+  @@map("subteam")
+}
+
+model SubTeamMembership {
+  id        String  @id @default(cuid())
+  subTeamId String
+  subTeam   SubTeam @relation(fields: [subTeamId], references: [id], onDelete: Cascade)
+
+  // Unique, not just per-subTeam: a member can only sit in one sub-chama
+  // at a time, platform-wide, same rule as TeamMembership.userId.
+  userId String @unique
+  user   User   @relation("SubTeamMember", fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@map("subteammembership")
 }
 
 // ✅ Per-member custom permissions within a chama. The owner ("Admin")
@@ -226,6 +288,7 @@ model TeamMembership {
   canViewPooledFunds   Boolean @default(true)  // view the loan account & investment balances
   canManageReports     Boolean @default(false) // upload/sync Google Sheets performance data
   canWithdraw          Boolean @default(false) // close out an investment back to the pooled fund
+  canManageSubTeams    Boolean @default(false) // create/rename/delete sub-chamas, assign leaders, move members between them
 
   createdAt DateTime @default(now())
 
@@ -260,6 +323,7 @@ model TeamInvite {
   canViewPooledFunds   Boolean @default(true)
   canManageReports     Boolean @default(false)
   canWithdraw          Boolean @default(false)
+  canManageSubTeams    Boolean @default(false)
 
   expiresAt DateTime
   createdAt DateTime @default(now())

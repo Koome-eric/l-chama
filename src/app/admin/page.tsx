@@ -36,6 +36,10 @@ export default async function AdminPage() {
         secretary: true,
         treasurer: true,
         members: { include: { user: true }, orderBy: { createdAt: 'asc' } },
+        subTeams: {
+          include: { leader: true, members: { include: { user: true } } },
+          orderBy: { createdAt: 'asc' },
+        },
       },
       orderBy: { submittedAt: 'desc' },
     }),
@@ -117,7 +121,17 @@ export default async function AdminPage() {
         canViewPooledFunds: m.canViewPooledFunds,
         canManageReports: m.canManageReports,
         canWithdraw: m.canWithdraw,
+        canManageSubTeams: m.canManageSubTeams,
       },
+    })),
+    subTeams: t.subTeams.map((st: (typeof t.subTeams)[number]) => ({
+      id: st.id,
+      name: st.name,
+      leaderName: st.leader.fullName || st.leader.email || st.leader.phone || 'Unknown',
+      members: st.members.map((sm: (typeof st.members)[number]) => ({
+        id: sm.id,
+        fullName: sm.user.fullName || sm.user.email || sm.user.phone || 'Unknown',
+      })),
     })),
   }));
 
@@ -267,6 +281,9 @@ export default async function AdminPage() {
       total: products.length,
       active: products.filter((p: (typeof products)[number]) => p.isActive).length,
       inactive: products.filter((p: (typeof products)[number]) => !p.isActive).length,
+    },
+    subTeams: {
+      total: teams.reduce((sum: number, t: (typeof teams)[number]) => sum + t.subTeams.length, 0),
     },
     reports: {
       total: reports.length,

@@ -27,6 +27,7 @@ export default async function TeamPage() {
       canViewPooledFunds: m.canViewPooledFunds,
       canManageReports: m.canManageReports,
       canWithdraw: m.canWithdraw,
+      canManageSubTeams: m.canManageSubTeams,
     })),
     invites: ctx.team.invites.map((i: (typeof ctx.team.invites)[number]) => ({
       id: i.id,
@@ -43,6 +44,7 @@ export default async function TeamPage() {
       canViewPooledFunds: i.canViewPooledFunds,
       canManageReports: i.canManageReports,
       canWithdraw: i.canWithdraw,
+      canManageSubTeams: i.canManageSubTeams,
     })),
   };
 

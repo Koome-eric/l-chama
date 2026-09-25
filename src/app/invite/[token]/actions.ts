@@ -93,6 +93,7 @@ export async function acceptChamaInvite(
         canViewPooledFunds: invite.canViewPooledFunds,
         canManageReports: invite.canManageReports,
         canWithdraw: invite.canWithdraw,
+        canManageSubTeams: invite.canManageSubTeams,
       },
     });
 

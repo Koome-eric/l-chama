@@ -19,6 +19,7 @@ import {
   PiggyBank,
   Wallet,
   Coins,
+  Network,
 } from 'lucide-react';
 
 import {
@@ -44,6 +45,7 @@ import { ThemeToggle } from '@/components/theme-toggle';
 const menuItems = [
   { href: '/panel', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/team', label: 'Team Members', icon: Users },
+  { href: '/sub-chamas', label: 'Sub-Chamas', icon: Network },
   { href: '/panel?tab=loan-account', label: 'Contribute', icon: HandCoins, match: '/panel' },
   { href: '/accounts', label: 'Accounts', icon: Wallet },
   { href: '/invest', label: 'Invest', icon: PiggyBank },

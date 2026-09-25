@@ -30,6 +30,8 @@ import {
   Users,
   ShieldCheck,
   Coins,
+  Crown,
+  Network,
 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -90,6 +92,7 @@ import {
   createInvestmentProduct,
   updateInvestmentProduct,
   toggleInvestmentProductActive,
+  deleteInvestmentProduct,
   syncMemberReportsCsv,
   deleteMemberReport,
   syncSavingsCsv,
@@ -131,6 +134,7 @@ type TeamMemberRow = {
     canViewPooledFunds: boolean;
     canManageReports: boolean;
     canWithdraw: boolean;
+    canManageSubTeams: boolean;
   };
 };
 
@@ -164,6 +168,14 @@ type TeamRow = {
   hasLastRespectCover: boolean;
   lastRespectContribution: number | null;
   members: TeamMemberRow[];
+  subTeams: SubTeamRow[];
+};
+
+type SubTeamRow = {
+  id: string;
+  name: string;
+  leaderName: string;
+  members: { id: string; fullName: string }[];
 };
 
 type CampaignRow = {
@@ -326,6 +338,7 @@ type Stats = {
     totalTarget: number;
   };
   products: { total: number; active: number; inactive: number };
+  subTeams: { total: number };
   reports: { total: number; matched: number };
   savings: { total: number; matched: number };
   payments: { total: number; pending: number };
@@ -660,6 +673,10 @@ function OverviewSection({
               <p className="font-figures text-xl font-bold text-white">{stats.orgs.total.toLocaleString()}</p>
             </div>
             <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-white/50">Sub-chamas</p>
+              <p className="font-figures text-xl font-bold text-white">{stats.subTeams.total.toLocaleString()}</p>
+            </div>
+            <div>
               <p className="text-xs font-medium uppercase tracking-wide text-white/50">Campaigns raised</p>
               <p className="font-figures text-xl font-bold text-white">{formatKES(stats.campaigns.totalRaised)}</p>
             </div>
@@ -805,6 +822,7 @@ const PERMISSION_LABELS: Record<keyof TeamMemberRow['permissions'], string> = {
   canViewPooledFunds: 'View pooled funds',
   canManageReports: 'Manage reports',
   canWithdraw: 'Withdraw',
+  canManageSubTeams: 'Manage sub-chamas',
 };
 
 function MembersDialog({ team, onOpenChange }: { team: TeamRow | null; onOpenChange: (open: boolean) => void }) {
@@ -881,6 +899,42 @@ function MembersDialog({ team, onOpenChange }: { team: TeamRow | null; onOpenCha
                         </div>
                       );
                     })}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <p className="mb-2 text-sm font-medium">
+                  Sub-chamas ({team.subTeams.length})
+                </p>
+                {team.subTeams.length === 0 ? (
+                  <p className="rounded-lg bg-muted/40 p-4 text-sm text-muted-foreground">
+                    This chama hasn't split into any sub-chamas yet.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {team.subTeams.map((st) => (
+                      <div key={st.id} className="rounded-xl border border-border/60 p-4">
+                        <div className="mb-2 flex flex-wrap items-center gap-2">
+                          <span className="font-medium">{st.name}</span>
+                          <Badge variant="outline" className="gap-1 text-xs font-normal">
+                            <Crown className="h-3 w-3" /> {st.leaderName}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {st.members.length} member{st.members.length === 1 ? '' : 's'}
+                          </span>
+                        </div>
+                        {st.members.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {st.members.map((m) => (
+                              <Badge key={m.id} variant="secondary" className="text-xs font-normal">
+                                {m.fullName}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -1010,6 +1064,11 @@ function OrganisationsAdminSection({ teams }: { teams: TeamRow[] }) {
                       {t.name}
                       {t.isDiaspora && <Badge variant="secondary">Diaspora Chama</Badge>}
                       {t.isLudevaMember && <Badge className="bg-primary text-primary-foreground">Ludeva Member</Badge>}
+                      {t.subTeams.length > 0 && (
+                        <Badge variant="outline" className="gap-1 text-xs font-normal">
+                          <Network className="h-3 w-3" /> {t.subTeams.length} sub-chama{t.subTeams.length === 1 ? '' : 's'}
+                        </Badge>
+                      )}
                     </CardTitle>
                     <CardDescription>
                       {t.ownerName} {t.ownerEmail ? `· ${t.ownerEmail}` : ''} {t.ownerPhone ? `· ${t.ownerPhone}` : ''}
@@ -1397,6 +1456,19 @@ function ProductsAdminSection({ products }: { products: ProductRow[] }) {
     });
   };
 
+  const handleDelete = (p: ProductRow) => {
+    if (!confirm(`Permanently delete "${p.name}"? This can't be undone.`)) return;
+    startTransition(async () => {
+      try {
+        await deleteInvestmentProduct(p.id);
+        toast({ title: 'Product deleted' });
+        window.location.reload();
+      } catch (err: any) {
+        toast({ title: "Couldn't delete product", description: err.message, variant: 'destructive' });
+      }
+    });
+  };
+
   const formFields = (
     <div className="space-y-3">
       <div>
@@ -1510,6 +1582,15 @@ function ProductsAdminSection({ products }: { products: ProductRow[] }) {
                 </Button>
                 <Button size="sm" variant="outline" className="flex-1 gap-1.5" onClick={() => handleToggle(p.id)} disabled={isPending}>
                   <Power className="h-3.5 w-3.5" /> {p.isActive ? 'Deactivate' : 'Activate'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 text-destructive hover:text-destructive"
+                  onClick={() => handleDelete(p)}
+                  disabled={isPending}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
             </CardContent>

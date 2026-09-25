@@ -18,6 +18,7 @@ export type ChamaPermissions = {
   canViewPooledFunds: boolean;
   canManageReports: boolean;
   canWithdraw: boolean;
+  canManageSubTeams: boolean;
 };
 
 export const OWNER_PERMISSIONS: ChamaPermissions = {
@@ -29,6 +30,7 @@ export const OWNER_PERMISSIONS: ChamaPermissions = {
   canViewPooledFunds: true,
   canManageReports: true,
   canWithdraw: true,
+  canManageSubTeams: true,
 };
 
 // Sensible defaults for a newly invited member if the invite form
@@ -43,6 +45,7 @@ export const DEFAULT_INVITE_PERMISSIONS: ChamaPermissions = {
   canViewPooledFunds: true,
   canManageReports: false,
   canWithdraw: false,
+  canManageSubTeams: false,
 };
 
 export const PERMISSION_LABELS: Record<keyof ChamaPermissions, string> = {
@@ -54,6 +57,7 @@ export const PERMISSION_LABELS: Record<keyof ChamaPermissions, string> = {
   canViewPooledFunds: "View the loan account & investment balances",
   canManageReports: "Sync/upload Google Sheets performance reports",
   canWithdraw: "Close an investment back to the pooled fund",
+  canManageSubTeams: "Create sub-chamas, assign leaders, move members between them",
 };
 
 export function permissionsFrom(source: Record<string, any>): ChamaPermissions {
@@ -66,6 +70,7 @@ export function permissionsFrom(source: Record<string, any>): ChamaPermissions {
     canViewPooledFunds: !!source.canViewPooledFunds,
     canManageReports: !!source.canManageReports,
     canWithdraw: !!source.canWithdraw,
+    canManageSubTeams: !!source.canManageSubTeams,
   };
 }
 

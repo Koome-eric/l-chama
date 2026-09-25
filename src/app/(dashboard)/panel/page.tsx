@@ -129,6 +129,7 @@ export default async function ChamaPanelPage({
       canViewPooledFunds: m.canViewPooledFunds,
       canManageReports: m.canManageReports,
       canWithdraw: m.canWithdraw,
+      canManageSubTeams: m.canManageSubTeams,
     })),
     invites: ctx.team.invites.map((i) => ({
       id: i.id,
@@ -145,6 +146,7 @@ export default async function ChamaPanelPage({
       canViewPooledFunds: i.canViewPooledFunds,
       canManageReports: i.canManageReports,
       canWithdraw: i.canWithdraw,
+      canManageSubTeams: i.canManageSubTeams,
     })),
     loanAccount: loanAccount ? { balance: loanAccount.balance } : { balance: 0 },
     savingsSummary: {
