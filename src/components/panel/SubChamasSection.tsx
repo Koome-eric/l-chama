@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import {
   Card,
   CardContent,
@@ -41,7 +41,6 @@ import { Network, UserPlus, Trash2, Crown, Settings2, ArrowRightLeft, Users } fr
 import {
   createSubTeam,
   renameSubTeam,
-  changeSubTeamLeader,
   deleteSubTeam,
   addSubTeamMember,
   removeSubTeamMember,
@@ -55,22 +54,12 @@ export function SubChamasSection({ data }: { data: SubChamasData }) {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState('');
-  const [newLeaderId, setNewLeaderId] = useState('');
 
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
 
-  const [leaderChangeId, setLeaderChangeId] = useState<string | null>(null);
-  const [leaderChangeValue, setLeaderChangeValue] = useState('');
-
   const [addMemberSubTeamId, setAddMemberSubTeamId] = useState<string | null>(null);
   const [addMemberValue, setAddMemberValue] = useState('');
-
-  const leaderIds = useMemo(() => new Set(data.subTeams.map((st) => st.leader.userId)), [data.subTeams]);
-  const eligibleLeaders = useMemo(
-    () => data.allMembers.filter((m) => !leaderIds.has(m.userId)),
-    [data.allMembers, leaderIds]
-  );
 
   const run = (action: () => Promise<unknown>, successMsg: string, errTitle = 'Error') => {
     startTransition(async () => {
@@ -86,7 +75,7 @@ export function SubChamasSection({ data }: { data: SubChamasData }) {
 
   const handleCreate = () =>
     run(
-      () => createSubTeam({ name: newName, leaderMembershipId: newLeaderId }),
+      () => createSubTeam({ name: newName }),
       'Sub-chama created',
       "Couldn't create sub-chama"
     );
@@ -97,17 +86,6 @@ export function SubChamasSection({ data }: { data: SubChamasData }) {
   };
   const handleRename = () =>
     run(() => renameSubTeam(renamingId!, renameValue), 'Sub-chama renamed', "Couldn't rename");
-
-  const openLeaderChange = (st: SubTeamRow) => {
-    setLeaderChangeId(st.id);
-    setLeaderChangeValue('');
-  };
-  const handleLeaderChange = () =>
-    run(
-      () => changeSubTeamLeader(leaderChangeId!, leaderChangeValue),
-      'Leader updated',
-      "Couldn't change leader"
-    );
 
   const handleDelete = (st: SubTeamRow) => {
     if (!confirm(`Delete "${st.name}"? Members stay in the chama — this only removes the grouping.`)) return;
@@ -146,7 +124,7 @@ export function SubChamasSection({ data }: { data: SubChamasData }) {
               <Network className="h-5 w-5" /> Sub-Chamas
             </CardTitle>
             <CardDescription>
-              Each sub-chama has one leader and its own members, drawn from {data.teamName}. Money,
+              The Team Leader leads every sub-chama. Each one has its own members, drawn from {data.teamName}. Money,
               loans and withdrawals stay on the main chama — this is just how you organise people.
             </CardDescription>
           </div>
@@ -161,8 +139,8 @@ export function SubChamasSection({ data }: { data: SubChamasData }) {
                 <DialogHeader>
                   <DialogTitle>Create a sub-chama</DialogTitle>
                   <DialogDescription>
-                    Pick a name and a leader from {data.teamName}'s current members. The leader gets
-                    to add and remove members in their own sub-chama afterward.
+                    Give it a name. As Team Leader you lead every sub-chama, and you add members to it
+                    from {data.teamName}'s current members afterward.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-3">
@@ -175,29 +153,9 @@ export function SubChamasSection({ data }: { data: SubChamasData }) {
                       onChange={(e) => setNewName(e.target.value)}
                     />
                   </div>
-                  <div>
-                    <Label className="mb-1 block">Leader</Label>
-                    <Select value={newLeaderId} onValueChange={setNewLeaderId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Choose a member" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {eligibleLeaders.map((m) => (
-                          <SelectItem key={m.membershipId} value={m.membershipId}>
-                            {m.fullName || m.email}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {eligibleLeaders.length === 0 && (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Every current member already leads a sub-chama.
-                      </p>
-                    )}
-                  </div>
                 </div>
                 <DialogFooter>
-                  <Button onClick={handleCreate} disabled={isPending || !newName.trim() || !newLeaderId}>
+                  <Button onClick={handleCreate} disabled={isPending || !newName.trim()}>
                     {isPending ? 'Creating...' : 'Create'}
                   </Button>
                 </DialogFooter>
@@ -227,6 +185,7 @@ export function SubChamasSection({ data }: { data: SubChamasData }) {
               <CardDescription className="flex items-center gap-1.5 mt-1">
                 <Crown className="h-3.5 w-3.5" />
                 {st.leader.fullName || st.leader.email}
+                <Badge variant="outline" className="text-[10px] font-normal">Team Leader</Badge>
                 <span className="text-muted-foreground/70">
                   {' '}
                   · {st.members.length} member{st.members.length === 1 ? '' : 's'}
@@ -237,9 +196,6 @@ export function SubChamasSection({ data }: { data: SubChamasData }) {
               <div className="flex gap-1 shrink-0">
                 <Button size="sm" variant="ghost" onClick={() => openRename(st)}>
                   <Settings2 className="h-4 w-4" />
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => openLeaderChange(st)}>
-                  <Crown className="h-4 w-4" />
                 </Button>
                 <Button
                   size="sm"
@@ -378,35 +334,6 @@ export function SubChamasSection({ data }: { data: SubChamasData }) {
           <Input value={renameValue} onChange={(e) => setRenameValue(e.target.value)} />
           <DialogFooter>
             <Button onClick={handleRename} disabled={isPending || !renameValue.trim()}>
-              {isPending ? 'Saving...' : 'Save'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Change leader dialog */}
-      <Dialog open={!!leaderChangeId} onOpenChange={(open) => !open && setLeaderChangeId(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Change leader</DialogTitle>
-            <DialogDescription>Pick a new leader from {data.teamName}'s members.</DialogDescription>
-          </DialogHeader>
-          <Select value={leaderChangeValue} onValueChange={setLeaderChangeValue}>
-            <SelectTrigger>
-              <SelectValue placeholder="Choose a member" />
-            </SelectTrigger>
-            <SelectContent>
-              {data.allMembers
-                .filter((m) => !leaderIds.has(m.userId) || m.userId === data.subTeams.find((s) => s.id === leaderChangeId)?.leader.userId)
-                .map((m) => (
-                  <SelectItem key={m.membershipId} value={m.membershipId}>
-                    {m.fullName || m.email}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-          <DialogFooter>
-            <Button onClick={handleLeaderChange} disabled={isPending || !leaderChangeValue}>
               {isPending ? 'Saving...' : 'Save'}
             </Button>
           </DialogFooter>

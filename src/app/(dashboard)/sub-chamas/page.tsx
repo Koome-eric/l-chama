@@ -55,7 +55,7 @@ export default async function SubChamasPage() {
       <div>
         <h1 className="font-headline text-2xl font-semibold">Sub-Chamas</h1>
         <p className="text-muted-foreground">
-          Split {data.teamName} into smaller groups, each with its own leader — everyone stays a full
+          Split {data.teamName} into smaller groups, all led by the Team Leader — everyone stays a full
           member of {data.teamName} and its shared loan account throughout.
         </p>
       </div>

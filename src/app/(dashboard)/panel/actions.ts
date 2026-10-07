@@ -16,6 +16,7 @@ import {
 import { syncChamaToLudeva } from '@/lib/ludeva-sync';
 import { createWithdrawalRequest, decideWithdrawalRequest, getSignatoryStatus } from '@/lib/withdrawals';
 import { phoneLookupVariants } from '@/lib/phone';
+import { isValidMonthKey, monthLabel } from '@/lib/payouts';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 // The domain in this address MUST be a domain verified in the Resend
@@ -624,6 +625,60 @@ export async function updateChamaPhoto(photoUrl: string) {
 
   await prisma.team.update({ where: { id: ctx.team.id }, data: { photoUrl: photoUrl || null } });
 
+  revalidatePath('/panel');
+  return { success: true };
+}
+
+
+// ─────────────────────────────────────────────
+// Monthly payout rotation — who is due a payout in which month. The
+// Dashboard shows the current month's recipient (Ludeva Number + name)
+// to the whole chama. Only the Admin (owner) or a member with
+// canManagePermissions can set it. One recipient per chama per month:
+// setting a month that already has one replaces it.
+// ─────────────────────────────────────────────
+export async function setPayoutRecipient(monthKey: string, recipientUserId: string) {
+  const user = await getCurrentDbUser();
+  const ctx = await getChamaContext(user);
+  if (!ctx) throw new Error('You are not part of a chama.');
+  if (!hasPermission(ctx, 'canManagePermissions')) {
+    throw new Error('Only the Team Leader can set the payout schedule.');
+  }
+  if (ctx.team.approvalStatus !== 'APPROVED') {
+    throw new Error('Your organisation must be approved first.');
+  }
+  if (!isValidMonthKey(monthKey)) throw new Error('Choose a valid month.');
+
+  const isInChama =
+    recipientUserId === ctx.team.ownerId || ctx.team.members.some((m) => m.userId === recipientUserId);
+  if (!isInChama) throw new Error('That person is not a member of this chama.');
+
+  await prisma.payoutSchedule.upsert({
+    where: { teamId_payoutMonth: { teamId: ctx.team.id, payoutMonth: monthKey } },
+    create: { teamId: ctx.team.id, userId: recipientUserId, payoutMonth: monthKey },
+    update: { userId: recipientUserId },
+  });
+
+  if (recipientUserId !== user.id) {
+    await notifyUser(
+      recipientUserId,
+      'Payout scheduled',
+      `Your payout from ${ctx.team.name} is scheduled for ${monthLabel(monthKey)}.`
+    );
+  }
+
+  revalidatePath('/panel');
+  return { success: true };
+}
+
+export async function removePayoutSlot(monthKey: string) {
+  const user = await getCurrentDbUser();
+  const ctx = await getChamaContext(user);
+  if (!ctx) throw new Error('You are not part of a chama.');
+  if (!hasPermission(ctx, 'canManagePermissions')) {
+    throw new Error('Only the Team Leader can change the payout schedule.');
+  }
+  await prisma.payoutSchedule.deleteMany({ where: { teamId: ctx.team.id, payoutMonth: monthKey } });
   revalidatePath('/panel');
   return { success: true };
 }

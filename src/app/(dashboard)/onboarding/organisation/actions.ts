@@ -26,6 +26,9 @@ const OrganisationSchema = z.object({
   membersEmployed: z.coerce.number().int().min(0, 'Enter a number of members (0 or more).'),
   hasLastRespectCover: z.boolean().default(false),
   lastRespectContribution: z.coerce.number().min(0).optional(),
+  privacyPolicyAccepted: z.literal(true, {
+    errorMap: () => ({ message: 'Please tick "I Agree" to the Privacy Policy to continue.' }),
+  }),
 });
 
 export type OrganisationInput = z.infer<typeof OrganisationSchema>;
@@ -82,6 +85,8 @@ export async function registerOrganisation(input: OrganisationInput) {
           physicalAddress: d.physicalAddress.trim(),
           additionalComments: d.additionalComments?.trim() || undefined,
           approvalStatus: 'PENDING_APPROVAL',
+          privacyPolicyAccepted: true,
+          termsAcceptedAt: new Date(),
           isDiaspora: d.isDiaspora,
           objectives: d.objectives,
           membersRunningSME: d.membersRunningSME,
@@ -98,7 +103,7 @@ export async function registerOrganisation(input: OrganisationInput) {
 
     await prisma.user.update({
       where: { id: user.id },
-      data: { onboardingCompleted: true },
+      data: { onboardingCompleted: true, privacyPolicyAcceptedAt: new Date() },
     });
   } catch (err) {
     throw friendlyAccountError(err, { businessRegNumber: 'registration number' });

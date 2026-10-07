@@ -50,6 +50,8 @@ import {
   XCircle,
   Landmark,
   UserPlus,
+  CalendarClock,
+  BellRing,
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -60,6 +62,8 @@ import {
   decideLoanRequest,
   markRepaymentPaid,
   updateChamaPhoto,
+  setPayoutRecipient,
+  removePayoutSlot,
 } from './actions';
 import { formatKES } from '@/lib/chama-levels';
 import { PayoutCalculator } from '@/components/payments/PayoutCalculator';
@@ -121,6 +125,16 @@ type TeamData = {
   members: Member[];
   invites: Invite[];
   loanAccount: { balance: number };
+  currentMonth: string; // "YYYY-MM"
+  payoutSchedule: {
+    month: string;
+    monthLabel: string;
+    userId: string;
+    name: string;
+    ludevaNumber: string | null;
+    line: string; // e.g. "Payout. Sept 2026, LB0048; Linda Atieno"
+  }[];
+  deadline: { dueDate: string; dueLabel: string; daysLeft: number; status: 'today' | 'soon' | 'upcoming' };
   loanRequests: LoanRequestData[];
   savingsSummary: {
     totalChamaFunds: number;
@@ -225,6 +239,201 @@ const LOAN_STATUS_META: Record<
   REJECTED: { label: 'Rejected', icon: XCircle, color: 'text-destructive' },
 };
 
+// ─────────────────────────────────────────────
+// Dashboard notice: this month's payout recipient (Ludeva Number + name)
+// and the monthly contribution deadline (the 25th). Shown to every
+// member; the Team Leader (or anyone with canManagePermissions) also
+// gets the payout-schedule editor underneath.
+// ─────────────────────────────────────────────
+function upcomingMonthKeys(fromKey: string, count = 12) {
+  const [y0, m0] = fromKey.split('-').map(Number);
+  return Array.from({ length: count }, (_, i) => {
+    const idx = m0 - 1 + i;
+    const y = y0 + Math.floor(idx / 12);
+    const m = (idx % 12) + 1;
+    return `${y}-${String(m).padStart(2, '0')}`;
+  });
+}
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
+const labelForMonth = (key: string) => {
+  const [y, m] = key.split('-').map(Number);
+  return `${MONTH_NAMES[m - 1]} ${y}`;
+};
+
+function PayoutAndDeadlineNotice({ team }: { team: TeamData }) {
+  const { toast } = useToast();
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [month, setMonth] = useState(team.currentMonth);
+  const [recipientId, setRecipientId] = useState('');
+  const [showEditor, setShowEditor] = useState(false);
+
+  const canEdit = team.isOwner || team.permissions.canManagePermissions;
+  const thisMonth = team.payoutSchedule.find((p) => p.month === team.currentMonth);
+  const later = team.payoutSchedule.filter((p) => p.month !== team.currentMonth);
+  const { deadline } = team;
+
+  const everyone = [
+    { userId: team.owner.id, name: team.owner.fullName || team.owner.email },
+    ...team.members.map((m) => ({ userId: m.userId, name: m.fullName || m.email })),
+  ];
+
+  const deadlineText =
+    deadline.status === 'today'
+      ? 'Contributions are due TODAY'
+      : `Contributions due by ${deadline.dueLabel} · ${deadline.daysLeft} day${deadline.daysLeft === 1 ? '' : 's'} left`;
+
+  const save = () => {
+    if (!recipientId) return;
+    startTransition(async () => {
+      try {
+        await setPayoutRecipient(month, recipientId);
+        toast({ title: 'Payout schedule updated', description: `${labelForMonth(month)} saved.` });
+        setRecipientId('');
+        router.refresh();
+      } catch (err: any) {
+        toast({ variant: 'destructive', title: 'Could not save', description: err.message });
+      }
+    });
+  };
+
+  const remove = (monthKey: string) => {
+    startTransition(async () => {
+      try {
+        await removePayoutSlot(monthKey);
+        router.refresh();
+      } catch (err: any) {
+        toast({ variant: 'destructive', title: 'Could not remove', description: err.message });
+      }
+    });
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-3 md:grid-cols-2">
+        {/* Payout due this month */}
+        <Card className="rounded-2xl shadow-sm border-primary/30 bg-primary/5">
+          <CardContent className="p-4 flex items-start gap-3">
+            <div className="h-10 w-10 shrink-0 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Wallet className="h-5 w-5 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Payout due this month</p>
+              {thisMonth ? (
+                <p className="font-headline font-semibold text-base sm:text-lg break-words">{thisMonth.line}</p>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No payout scheduled for {labelForMonth(team.currentMonth)} yet.
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Contribution deadline reminder */}
+        <Card
+          className={cn(
+            'rounded-2xl shadow-sm',
+            deadline.status === 'upcoming' ? 'border-border/50' : 'border-amber-500/50 bg-amber-500/5'
+          )}
+        >
+          <CardContent className="p-4 flex items-start gap-3">
+            <div
+              className={cn(
+                'h-10 w-10 shrink-0 rounded-xl flex items-center justify-center',
+                deadline.status === 'upcoming' ? 'bg-muted' : 'bg-amber-500/15'
+              )}
+            >
+              <BellRing className={cn('h-5 w-5', deadline.status === 'upcoming' ? 'text-muted-foreground' : 'text-amber-600')} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Deadline reminder</p>
+              <p className="font-headline font-semibold text-base sm:text-lg">{deadlineText}</p>
+              <p className="text-xs text-muted-foreground">The deadline is the 25th of every month.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {later.length > 0 && (
+        <p className="text-xs text-muted-foreground px-1">
+          Coming up: {later.slice(0, 3).map((p) => `${p.monthLabel} — ${p.ludevaNumber ? p.ludevaNumber + '; ' : ''}${p.name}`).join(' · ')}
+        </p>
+      )}
+
+      {canEdit && (
+        <div className="px-1">
+          <Button variant="ghost" size="sm" className="gap-2 -ml-2" onClick={() => setShowEditor((v) => !v)}>
+            <CalendarClock className="h-4 w-4" />
+            {showEditor ? 'Hide payout schedule' : 'Manage payout schedule'}
+          </Button>
+
+          {showEditor && (
+            <Card className="rounded-2xl shadow-sm mt-2">
+              <CardContent className="p-4 space-y-4">
+                <div className="grid gap-3 sm:grid-cols-[1fr_2fr_auto] items-end">
+                  <div>
+                    <Label htmlFor="payout-month">Month</Label>
+                    <select
+                      id="payout-month"
+                      value={month}
+                      onChange={(e) => setMonth(e.target.value)}
+                      className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    >
+                      {upcomingMonthKeys(team.currentMonth).map((k) => (
+                        <option key={k} value={k}>
+                          {labelForMonth(k)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <Label htmlFor="payout-member">Member due payout</Label>
+                    <select
+                      id="payout-member"
+                      value={recipientId}
+                      onChange={(e) => setRecipientId(e.target.value)}
+                      className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    >
+                      <option value="">Select a member…</option>
+                      {everyone.map((m) => (
+                        <option key={m.userId} value={m.userId}>
+                          {m.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <Button onClick={save} disabled={!recipientId || isPending}>
+                    {isPending ? 'Saving…' : 'Save'}
+                  </Button>
+                </div>
+
+                {team.payoutSchedule.length > 0 && (
+                  <ul className="divide-y rounded-lg border text-sm">
+                    {team.payoutSchedule.map((p) => (
+                      <li key={p.month} className="flex items-center justify-between gap-3 px-3 py-2">
+                        <span className="break-words">{p.line}</span>
+                        <Button variant="ghost" size="sm" disabled={isPending} onClick={() => remove(p.month)}>
+                          Remove
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  The member's Ludeva Number is taken from their profile. Members are reminded ahead of the 25th
+                  automatically.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OverviewTab({ team }: { team: TeamData }) {
   const { totalBalance, entryCount, leaderboard, milestone } = team.savingsSummary;
   const totalMembers = team.members.length + 1; // +1 for the owner
@@ -254,6 +463,8 @@ function OverviewTab({ team }: { team: TeamData }) {
 
   return (
     <div className="space-y-6">
+      <PayoutAndDeadlineNotice team={team} />
+
       {(team.isOwner || team.photoUrl) && <ChamaPhotoCard team={team} />}
 
       {/* Hero KPI cards */}

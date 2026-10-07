@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { phoneLookupVariants } from '@/lib/phone';
+import { upsertSavingsEntries } from '@/lib/savings-upsert';
 
 // Webhook for a Google Sheets Apps Script to push Savings Data rows
 // straight in — same idea as the Investments/MemberReport pipeline
@@ -102,17 +103,19 @@ export async function POST(req: NextRequest) {
   const owners = await prisma.team.findMany({ where: { ownerId: { in: users.map((u) => u.id) } } });
   const teamIdByOwnerId = new Map(owners.map((t) => [t.ownerId, t.id]));
 
-  await prisma.$transaction(
-    cleaned.map((row: any, i: number) => {
-      const byEmail = row.memberEmail ? userByEmail.get(row.memberEmail) : undefined;
-      const byPhone = byEmail
-        ? undefined
-        : (phoneVariantsByRow.get(i) || []).map((v) => userByPhone.get(v)).find(Boolean);
-      const user = byEmail || byPhone;
-      const teamId = user ? teamIdByOwnerId.get(user.id) || teamIdByUserId.get(user.id) || null : null;
-      return prisma.savingsEntry.create({ data: { ...row, teamId } });
-    })
-  );
+  // Idempotent: a row already stored (same member + account + date + period)
+  // is updated in place instead of inserted again, so re-pushing a row — from
+  // a timed-out or overlapping Apps Script run, say — can never duplicate it.
+  const withTeam = cleaned.map((row: any, i: number) => {
+    const byEmail = row.memberEmail ? userByEmail.get(row.memberEmail) : undefined;
+    const byPhone = byEmail
+      ? undefined
+      : (phoneVariantsByRow.get(i) || []).map((v) => userByPhone.get(v)).find(Boolean);
+    const user = byEmail || byPhone;
+    const teamId = user ? teamIdByOwnerId.get(user.id) || teamIdByUserId.get(user.id) || null : null;
+    return { ...row, teamId };
+  });
+  const { created, updated } = await upsertSavingsEntries(withTeam);
 
-  return NextResponse.json({ success: true, imported: cleaned.length });
+  return NextResponse.json({ success: true, imported: cleaned.length, created, updated });
 }

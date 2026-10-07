@@ -24,7 +24,11 @@ async function requireChamaCtx() {
 // Sub-chamas are purely organisational — they never touch the loan
 // account, savings, or withdrawals, so only the chama's approval status
 // (not any financial state) gates creating one.
-export async function createSubTeam(input: { name: string; leaderMembershipId: string }) {
+//
+// The Team Leader (the account that created the chama) is ALWAYS the
+// leader of every sub-chama under it — there is no separate per-sub-chama
+// leader to pick. Members are simply added to a sub-chama's roster.
+export async function createSubTeam(input: { name: string }) {
   const { user, ctx } = await requireChamaCtx();
   if (!hasPermission(ctx, 'canManageSubTeams')) {
     throw new Error('You do not have permission to create sub-chamas.');
@@ -36,28 +40,14 @@ export async function createSubTeam(input: { name: string; leaderMembershipId: s
   const name = input.name?.trim();
   if (!name) throw new Error('Give the sub-chama a name.');
 
-  const leaderMember = ctx.team.members.find((m) => m.id === input.leaderMembershipId);
-  if (!leaderMember) throw new Error("Pick a leader from the chama's current members.");
-
-  const alreadyLeads = await prisma.subTeam.findFirst({
-    where: { teamId: ctx.team.id, leaderId: leaderMember.userId },
-  });
-  if (alreadyLeads) throw new Error('This member already leads a sub-chama.');
-
   const nameTaken = await prisma.subTeam.findFirst({
     where: { teamId: ctx.team.id, name: { equals: name, mode: 'insensitive' } },
   });
   if (nameTaken) throw new Error('A sub-chama with that name already exists.');
 
   const subTeam = await prisma.subTeam.create({
-    data: { teamId: ctx.team.id, name, leaderId: leaderMember.userId, createdById: user.id },
+    data: { teamId: ctx.team.id, name, leaderId: ctx.team.ownerId, createdById: user.id },
   });
-
-  await notifyUser(
-    leaderMember.userId,
-    'You are now a sub-chama leader',
-    `${user.fullName || user.email} made you the leader of "${name}" inside ${ctx.team.name}.`
-  );
 
   revalidatePath('/sub-chamas');
   return { success: true, subTeamId: subTeam.id };
@@ -81,41 +71,6 @@ export async function renameSubTeam(subTeamId: string, name: string) {
   if (nameTaken) throw new Error('A sub-chama with that name already exists.');
 
   await prisma.subTeam.update({ where: { id: subTeamId }, data: { name: clean } });
-  revalidatePath('/sub-chamas');
-  return { success: true };
-}
-
-export async function changeSubTeamLeader(subTeamId: string, newLeaderMembershipId: string) {
-  const { user, ctx } = await requireChamaCtx();
-  if (!hasPermission(ctx, 'canManageSubTeams')) {
-    throw new Error('You do not have permission to manage sub-chamas.');
-  }
-
-  const subTeam = await prisma.subTeam.findUnique({ where: { id: subTeamId } });
-  if (!subTeam || subTeam.teamId !== ctx.team.id) throw new Error('Sub-chama not found.');
-
-  const newLeaderMember = ctx.team.members.find((m) => m.id === newLeaderMembershipId);
-  if (!newLeaderMember) throw new Error("Pick a leader from the chama's current members.");
-
-  const alreadyLeadsAnother = await prisma.subTeam.findFirst({
-    where: { teamId: ctx.team.id, leaderId: newLeaderMember.userId, id: { not: subTeamId } },
-  });
-  if (alreadyLeadsAnother) throw new Error('This member already leads another sub-chama.');
-
-  // If the new leader was previously just a regular member of this same
-  // sub-chama, drop that membership row — leading it is enough, they
-  // don't also need a separate member row within their own sub-chama.
-  await prisma.$transaction([
-    prisma.subTeamMembership.deleteMany({ where: { subTeamId, userId: newLeaderMember.userId } }),
-    prisma.subTeam.update({ where: { id: subTeamId }, data: { leaderId: newLeaderMember.userId } }),
-  ]);
-
-  await notifyUser(
-    newLeaderMember.userId,
-    'You are now a sub-chama leader',
-    `${user.fullName || user.email} made you the leader of "${subTeam.name}" inside ${ctx.team.name}.`
-  );
-
   revalidatePath('/sub-chamas');
   return { success: true };
 }

@@ -14,7 +14,7 @@ export default async function ProfilePage() {
         defaults={{
           firstName: user.firstName || '',
           lastName: user.lastName || '',
-          idNumber: user.idNumber || '',
+          hasIdOnFile: !!user.idNumber,
           email: user.email || '',
           gender: user.gender || '',
           country: user.country || 'KE',

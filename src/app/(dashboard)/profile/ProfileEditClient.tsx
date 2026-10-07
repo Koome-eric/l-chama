@@ -27,7 +27,7 @@ const GENDERS = [
 type Defaults = {
   firstName: string;
   lastName: string;
-  idNumber: string;
+  hasIdOnFile: boolean;
   email: string;
   gender: 'MALE' | 'FEMALE' | 'OTHER' | '';
   country: string;
@@ -46,7 +46,7 @@ export function ProfileEditClient({ defaults, ludeva }: { defaults: Defaults; lu
 
   const [firstName, setFirstName] = useState(defaults.firstName);
   const [lastName, setLastName] = useState(defaults.lastName);
-  const [idNumber, setIdNumber] = useState(defaults.idNumber);
+  const [idNumber, setIdNumber] = useState('');
   const [email, setEmail] = useState(defaults.email);
   const [gender, setGender] = useState<'MALE' | 'FEMALE' | 'OTHER' | ''>(defaults.gender);
   const [country, setCountry] = useState(defaults.country || 'KE');
@@ -57,7 +57,7 @@ export function ProfileEditClient({ defaults, ludeva }: { defaults: Defaults; lu
   const canSubmit =
     firstName.trim().length > 0 &&
     lastName.trim().length > 0 &&
-    idNumber.trim().length >= 4 &&
+    (defaults.hasIdOnFile ? idNumber.trim().length === 0 || idNumber.trim().length >= 4 : idNumber.trim().length >= 4) &&
     !!gender &&
     !!country &&
     region.trim().length > 0;
@@ -100,7 +100,14 @@ export function ProfileEditClient({ defaults, ludeva }: { defaults: Defaults; lu
 
         <div>
           <Label htmlFor="idNumber">ID/Passport Number</Label>
-          <Input id="idNumber" value={idNumber} onChange={(e) => setIdNumber(e.target.value)} />
+          <Input
+            id="idNumber"
+            type="password"
+            autoComplete="off"
+            value={idNumber}
+            placeholder={defaults.hasIdOnFile ? '•••••••• on file — leave blank to keep it' : 'Enter your ID/passport number'}
+            onChange={(e) => setIdNumber(e.target.value)}
+          />
         </div>
 
         <div>

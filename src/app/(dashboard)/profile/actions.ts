@@ -8,7 +8,8 @@ import { revalidatePath } from 'next/cache';
 const UpdateProfileSchema = z.object({
   firstName: z.string().min(1, 'Enter your first name.'),
   lastName: z.string().min(1, 'Enter your last name.'),
-  idNumber: z.string().min(4, 'Enter a valid ID/passport number.'),
+  // Blank = keep the number already on file (it is never sent back to the browser).
+  idNumber: z.string().optional(),
   email: z.string().email('Enter a valid email.').optional().or(z.literal('')),
   gender: z.enum(['MALE', 'FEMALE', 'OTHER'], { errorMap: () => ({ message: 'Select a gender.' }) }),
   country: z.string().min(1, 'Select a country.'),
@@ -30,6 +31,10 @@ export async function updateProfile(input: UpdateProfileInput) {
   const existing = await prisma.user.findUnique({ where: { clerkId } });
   if (!existing) throw new Error('Profile not found.');
 
+  const newId = d.idNumber?.trim() || '';
+  if (newId && newId.length < 4) throw new Error('Enter a valid ID/passport number.');
+  if (!newId && !existing.idNumber) throw new Error('Enter your ID/passport number.');
+
   const fullName = `${d.firstName.trim()} ${d.lastName.trim()}`.trim();
 
   // Keep Clerk's name in sync so it shows correctly in the account menu.
@@ -50,7 +55,7 @@ export async function updateProfile(input: UpdateProfileInput) {
       firstName: d.firstName.trim(),
       lastName: d.lastName.trim(),
       fullName,
-      idNumber: d.idNumber.trim(),
+      idNumber: newId || existing.idNumber,
       gender: d.gender,
       country: d.country,
       region: d.region.trim(),

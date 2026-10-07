@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { CHAMA_LEVELS, formatKES, type ChamaLevelKey } from '@/lib/chama-levels';
 import { registerOrganisation } from './actions';
+import { PrivacyConsent } from '@/components/PrivacyConsent';
 import { CheckCircle2, Globe, HeartHandshake } from 'lucide-react';
 
 const OBJECTIVES: { key: string; label: string }[] = [
@@ -47,6 +48,8 @@ export function OrganisationClient() {
   const [hasLastRespectCover, setHasLastRespectCover] = useState(false);
   const [lastRespectContribution, setLastRespectContribution] = useState('');
 
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+
   const [error, setError] = useState<string | null>(null);
 
   const toggleObjective = (key: string) => {
@@ -63,10 +66,15 @@ export function OrganisationClient() {
     objectives.length >= 1 &&
     membersRunningSME !== '' &&
     membersEmployed !== '' &&
-    (!hasLastRespectCover || Number(lastRespectContribution) > 0);
+    (!hasLastRespectCover || Number(lastRespectContribution) > 0) &&
+    privacyAccepted;
 
   const handleSubmit = () => {
     if (!levelKey) return;
+    if (!privacyAccepted) {
+      setError('Please tick "I Agree" to the Privacy Policy to continue.');
+      return;
+    }
     setError(null);
     startTransition(async () => {
       try {
@@ -84,6 +92,7 @@ export function OrganisationClient() {
           membersEmployed: Number(membersEmployed),
           hasLastRespectCover,
           lastRespectContribution: hasLastRespectCover ? Number(lastRespectContribution) : undefined,
+          privacyPolicyAccepted: true,
         });
         toast({ title: 'Submitted for approval', description: "We'll notify you once it's reviewed." });
         router.push('/onboarding/pending');
@@ -292,6 +301,8 @@ export function OrganisationClient() {
           </div>
         </CardContent>
       </Card>
+
+      <PrivacyConsent checked={privacyAccepted} onChange={setPrivacyAccepted} id="org-privacy-consent" />
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 

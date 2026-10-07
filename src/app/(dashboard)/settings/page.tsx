@@ -15,7 +15,17 @@ export default async function SettingsPage() {
     ['Full name', user.fullName || '—'],
     ['Email', user.email || '—'],
     ['Phone', user.phone || '—'],
-    ['ID number', user.idNumber || '—'],
+    // ID/passport numbers are sensitive — never rendered here. The Ludeva
+    // number is shown instead (admin-verified only); full ID details are
+    // visible to admins only.
+    [
+      'Ludeva number',
+      user.ludevaMembershipStatus === 'VERIFIED' && user.ludevaMemberNumber
+        ? user.ludevaMemberNumber
+        : user.ludevaMembershipStatus === 'PENDING'
+          ? 'Awaiting admin confirmation'
+          : '—',
+    ],
     ['Country', user.country || '—'],
     ['Region', user.region || '—'],
   ];

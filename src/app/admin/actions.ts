@@ -2,6 +2,7 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
+import { upsertSavingsEntries } from '@/lib/savings-upsert';
 import { revalidatePath } from 'next/cache';
 import { isPlatformAdmin } from '@/lib/admin';
 import {
@@ -720,20 +721,33 @@ export async function syncSavingsCsv(csvText: string) {
   const teamIdFor = await matchSavingsRowsToTeams(rows);
   let matched = 0;
 
-  await prisma.$transaction(
+  // Idempotent — pasting the same CSV twice updates rows instead of
+  // duplicating them (see src/lib/savings-upsert.ts).
+  const { created, updated } = await upsertSavingsEntries(
     rows.map((row) => {
       const teamId = teamIdFor(row.memberEmail!);
       if (teamId) matched += 1;
-      return prisma.savingsEntry.create({
-        data: { ...row, memberEmail: row.memberEmail!, teamId },
-      });
+      return {
+        memberEmail: row.memberEmail!,
+        memberPhone: null,
+        memberName: row.memberName ?? null,
+        accountNo: row.accountNo ?? null,
+        date: row.date ?? null,
+        openingBalance: row.openingBalance ?? null,
+        deposit: row.deposit ?? null,
+        payout: row.payout ?? null,
+        closingBalance: row.closingBalance ?? null,
+        periodLabel: row.periodLabel ?? null,
+        notes: row.notes ?? null,
+        teamId,
+      };
     })
   );
 
   revalidatePath('/admin');
   revalidatePath('/reports');
   revalidatePath('/savings');
-  return { success: true, imported: rows.length, matched };
+  return { success: true, imported: rows.length, matched, created, updated };
 }
 
 export type SavingsEntryInput = {

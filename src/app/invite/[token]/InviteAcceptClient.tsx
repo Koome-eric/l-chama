@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Users, IdCard, Phone } from 'lucide-react';
 import { acceptChamaInvite } from './actions';
+import { PrivacyConsent } from '@/components/PrivacyConsent';
 import { useToast } from '@/hooks/use-toast';
 
 export function ChamaInviteAcceptClient({
@@ -24,14 +25,14 @@ export function ChamaInviteAcceptClient({
   teamName,
   invitedByName,
   email,
-  existingIdNumber = '',
+  hasIdOnFile = false,
   existingPhone = '',
 }: {
   token: string;
   teamName: string;
   invitedByName: string;
   email: string;
-  existingIdNumber?: string;
+  hasIdOnFile?: boolean;
   existingPhone?: string;
 }) {
   const { isSignedIn, isLoaded, user } = useUser();
@@ -39,18 +40,19 @@ export function ChamaInviteAcceptClient({
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [idNumber, setIdNumber] = useState(existingIdNumber);
+  const [idNumber, setIdNumber] = useState('');
   const [phone, setPhone] = useState(existingPhone);
   const [autoAccepting, setAutoAccepting] = useState(false);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
 
   const returnUrl = `/invite/${token}`;
-  const canAccept = idNumber.trim().length >= 4 && phone.trim().length >= 7;
+  const canAccept = (hasIdOnFile || idNumber.trim().length >= 4) && phone.trim().length >= 7 && privacyAccepted;
 
   const handleAccept = () => {
     setError(null);
     startTransition(async () => {
       try {
-        await acceptChamaInvite(token, { idNumber, phone });
+        await acceptChamaInvite(token, { idNumber, phone, privacyPolicyAccepted: privacyAccepted });
         toast({ title: 'Welcome to the chama!', description: `You now have access to ${teamName}'s dashboard.` });
         router.replace('/panel');
       } catch (err: any) {
@@ -69,7 +71,7 @@ export function ChamaInviteAcceptClient({
     if (isSignedIn && user && !autoAccepting && canAccept) {
       const currentEmail = user.primaryEmailAddress?.emailAddress || user.emailAddresses[0]?.emailAddress;
       const emailMatches = currentEmail?.toLowerCase() === email.toLowerCase();
-      if (emailMatches && existingIdNumber && existingPhone) {
+      if (emailMatches && hasIdOnFile && existingPhone) {
         setAutoAccepting(true);
         handleAccept();
       }
@@ -113,6 +115,7 @@ export function ChamaInviteAcceptClient({
               <p className="text-sm text-muted-foreground">
                 Just a couple more details to finish setting up your membership.
               </p>
+              {!hasIdOnFile && (
               <div>
                 <Label htmlFor="invite-idNumber" className="flex items-center gap-1.5">
                   <IdCard className="h-3.5 w-3.5" /> ID / Passport Number
@@ -124,6 +127,7 @@ export function ChamaInviteAcceptClient({
                   placeholder="e.g. 30112233"
                 />
               </div>
+              )}
               <div>
                 <Label htmlFor="invite-phone" className="flex items-center gap-1.5">
                   <Phone className="h-3.5 w-3.5" /> Phone Number
@@ -135,6 +139,7 @@ export function ChamaInviteAcceptClient({
                   placeholder="07XX XXX XXX"
                 />
               </div>
+              <PrivacyConsent checked={privacyAccepted} onChange={setPrivacyAccepted} id="invite-privacy-consent" />
               {error && <p className="text-sm text-destructive">{error}</p>}
             </>
           )}

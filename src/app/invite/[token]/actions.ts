@@ -9,14 +9,19 @@ import { friendlyAccountError } from '@/lib/errors';
 
 export async function acceptChamaInvite(
   token: string,
-  profile: { idNumber: string; phone: string }
+  profile: { idNumber: string; phone: string; privacyPolicyAccepted: boolean }
 ) {
   const clerkUser = await currentUser();
   if (!clerkUser) throw new Error('You must be signed in to accept this invite.');
 
   const idNumber = profile.idNumber.trim();
   const phone = profile.phone.trim();
-  if (idNumber.length < 4) throw new Error('Enter a valid ID/passport number.');
+  if (profile.privacyPolicyAccepted !== true) {
+    throw new Error('Please tick "I Agree" to the Privacy Policy to join the chama.');
+  }
+  // Blank is allowed when the account already has an ID on file (it is never
+  // sent back to the browser); that is re-checked below once the user is loaded.
+  if (idNumber && idNumber.length < 4) throw new Error('Enter a valid ID/passport number.');
   if (phone.length < 7) throw new Error('Enter a valid phone number.');
 
   const invite = await prisma.teamInvite.findUnique({
@@ -49,6 +54,7 @@ export async function acceptChamaInvite(
     user = await prisma.user.findUnique({ where: { clerkId: clerkUser.id } });
 
     if (!user) {
+      if (idNumber.length < 4) throw new Error('Enter a valid ID/passport number.');
       user = await prisma.user.create({
         data: {
           clerkId: clerkUser.id,
@@ -58,6 +64,7 @@ export async function acceptChamaInvite(
           fullName: `${clerkUser.firstName ?? ''} ${clerkUser.lastName ?? ''}`.trim() || undefined,
           profileCompleted: true,
           onboardingCompleted: true,
+          privacyPolicyAcceptedAt: new Date(),
         },
       });
     } else {
@@ -70,6 +77,7 @@ export async function acceptChamaInvite(
         throw new Error("You already own your own chama, so you can't also join this one as a member.");
       }
 
+      if (!user.idNumber && idNumber.length < 4) throw new Error('Enter a valid ID/passport number.');
       user = await prisma.user.update({
         where: { id: user.id },
         data: {
@@ -77,6 +85,7 @@ export async function acceptChamaInvite(
           idNumber: user.idNumber || idNumber,
           profileCompleted: true,
           onboardingCompleted: true,
+          privacyPolicyAcceptedAt: new Date(),
         },
       });
     }

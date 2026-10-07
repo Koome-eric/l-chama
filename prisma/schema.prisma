@@ -106,6 +106,13 @@ model User {
 
   notifications Notification[]
 
+  // When this person ticked "I Agree" to the Privacy Policy (/privacy).
+  // Set on chama-invite acceptance and Junior Account applications;
+  // chama owners also have it recorded on Team (privacyPolicyAccepted).
+  privacyPolicyAcceptedAt DateTime?
+
+  payoutSlots PayoutSchedule[] @relation("PayoutRecipient")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -207,6 +214,7 @@ model Team {
   withdrawals     WithdrawalRequest[]
   loanDeposits    Payment[]
   subTeams        SubTeam[]
+  payoutSchedule  PayoutSchedule[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -476,6 +484,31 @@ model LastRespectClaim {
   updatedAt DateTime @updatedAt
 
   @@map("lastrespectclaim")
+}
+
+// ─────────────────────────────────────────────
+// Monthly payout rotation — which member's payout is due in which month.
+// Set by the chama's Admin (owner) or a member with canManagePermissions
+// from the Dashboard. The Dashboard shows the current month's entry to
+// everyone in the chama as e.g. "Payout. Sept 2026, LB0048; Linda Atieno"
+// (the "Ludeva Number" is User.ludevaMemberNumber). One recipient per
+// chama per month. payoutMonth is "YYYY-MM".
+// ─────────────────────────────────────────────
+model PayoutSchedule {
+  id     String @id @default(cuid())
+  teamId String
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation("PayoutRecipient", fields: [userId], references: [id])
+
+  payoutMonth String // "YYYY-MM"
+
+  createdAt DateTime @default(now())
+
+  @@unique([teamId, payoutMonth])
+  @@index([teamId])
+  @@map("payoutschedule")
 }
 
 model Notification {

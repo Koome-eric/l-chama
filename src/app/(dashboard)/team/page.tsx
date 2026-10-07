@@ -1,5 +1,12 @@
 import { requirePanelAccess } from '@/lib/require-panel-access';
 import { TeamMembersSection } from '@/components/panel/TeamMembersSection';
+import type { User } from '@prisma/client';
+
+// Team-facing pages never receive anyone's ID/passport number. The only
+// identifier shown to other chama members is the admin-VERIFIED Ludeva
+// number; full ID details stay on the admin dashboard.
+const publicLudevaNumber = (u: User) =>
+  u.ludevaMembershipStatus === 'VERIFIED' ? u.ludevaMemberNumber : null;
 
 export default async function TeamPage() {
   const { user, ctx } = await requirePanelAccess('/team');
@@ -13,12 +20,14 @@ export default async function TeamPage() {
       id: ctx.team.owner.id,
       fullName: ctx.team.owner.fullName,
       email: ctx.team.owner.email ?? 'Unknown email',
+      ludevaNumber: publicLudevaNumber(ctx.team.owner),
     },
     members: ctx.team.members.map((m: (typeof ctx.team.members)[number]) => ({
       membershipId: m.id,
       userId: m.userId,
       fullName: m.user.fullName,
       email: m.user.email ?? 'Unknown email',
+      ludevaNumber: publicLudevaNumber(m.user),
       canInvite: m.canInvite,
       canManagePermissions: m.canManagePermissions,
       canRemoveMembers: m.canRemoveMembers,

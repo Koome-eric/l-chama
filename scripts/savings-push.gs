@@ -1,79 +1,137 @@
 /**
- * Savings Account — Excel/Sheets → database push script.
+ * L-Chama Savings Account — Google Sheets → database push script.
  *
- * Same pattern as the existing Investments/MemberReport push script:
- * reads unpushed rows from a "Savings Data" sheet tab in the same
- * workbook Ludeva already uses, and posts them to the app's
- * /api/savings/sync webhook, using a running-balance formula instead
- * of the per-transaction MMF formula Investments uses.
+ * Pairs with LChama_Savings_Data.xlsx. Reads unpushed rows from the
+ * "Savings Data" tab and posts them to the app's /api/savings/sync
+ * webhook. Plain running balance — no interest: opening + deposit -
+ * payout = closing.
+ *
+ * A row is matched to an account by Member Email first; if that doesn't
+ * resolve to a user (e.g. the member signed up by phone only), Phone
+ * Number is used as a fallback identifier.
  *
  * SETUP
- * 1. In the workbook, add a "Savings Data" tab with a header row (row 4,
- *    matching the existing sheet's convention of a couple of instruction
- *    rows above the header) containing at least:
- *      memberEmail, accountNo, memberName, date, openingBalance, deposit,
- *      withdrawal, monthlyRate, interestEarned, closingBalance,
- *      periodLabel, notes, phoneNumber, _pushStatus, _pushedAt
+ * 1. Extensions > Apps Script, paste this in as Code.gs.
+ * 2. Project Settings (gear icon) > Script Properties, add:
+ *      SAVINGS_API_URL = https://www.ludevaplc.co.ke/api/savings/sync
+ *      SAVINGS_API_KEY = <same value as SAVINGS_SYNC_SECRET in the app's env>
+ * 3. Run pushSavingsRows() once manually to authorize it.
+ * 4. Triggers (clock icon) > Add Trigger > pushSavingsRows, time-driven,
+ *    e.g. every hour — so new rows sync automatically.
  *
- *    phoneNumber is a second identifier: the app matches a row to a
- *    member by email first, and falls back to phone if the email on the
- *    row doesn't resolve to an account (e.g. a phone-only sign-up).
- * 2. Add a "Push Log" tab for the success/failure log.
- * 3. File > Project properties > Script properties, set:
- *      SAVINGS_API_URL   = https://<your-app-domain>/api/savings/sync
- *      SAVINGS_API_KEY   = <same value as the app's SAVINGS_SYNC_SECRET env var>
- * 4. Run pushSavingsRows() manually, or wrap it in a time-driven trigger
- *    (Triggers > Add Trigger) to sync automatically.
+ * DUPLICATE FIX (v2) — why rows used to be pushed twice, and what changed:
+ *   - The old script pushed one row per HTTP call and only marked the row
+ *     "✅ Pushed" AFTER the server answered. With a few hundred rows that
+ *     can exceed Apps Script's 6-minute limit, or an hourly trigger can
+ *     start while the previous run is still going: the server had already
+ *     saved the rows, but the sheet never said so, so the next run pushed
+ *     them again.
+ *   - Fix 1: a script lock — only one run at a time; an overlapping run
+ *     exits immediately.
+ *   - Fix 2: rows are sent in batches of 50 and their status cells are
+ *     written right after each batch, not per row at the very end.
+ *   - Fix 3 (server): /api/savings/sync now updates an existing entry
+ *     (same member + account no. + date + period label) instead of
+ *     inserting a new one, so even a repeated push can no longer create
+ *     a duplicate. "Failed" rows can safely be retried.
  */
+const BATCH_SIZE = 50;
+
 function pushSavingsRows() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('Savings Data');
-  const logSheet = ss.getSheetByName('Push Log');
-  const apiUrl = PropertiesService.getScriptProperties().getProperty('SAVINGS_API_URL');
-  const apiKey = PropertiesService.getScriptProperties().getProperty('SAVINGS_API_KEY');
+  // Only one run at a time. If a previous (slow) run is still going, skip.
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(10 * 1000)) {
+    console.log('Another run is still in progress — skipping this one.');
+    return;
+  }
 
-  const data = sheet.getDataRange().getValues();
-  const headers = data[3]; // header row
-  const rows = data.slice(5); // skip header + instructions
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('Savings Data');
+    const logSheet = ss.getSheetByName('Push Log');
+    const props = PropertiesService.getScriptProperties();
+    const apiUrl = props.getProperty('SAVINGS_API_URL');
+    const apiKey = props.getProperty('SAVINGS_API_KEY');
 
-  const statusCol = headers.indexOf('_pushStatus');
-  const pushedAtCol = headers.indexOf('_pushedAt');
+    if (!apiUrl) throw new Error('SAVINGS_API_URL is missing from Script Properties.');
+    if (!apiKey) throw new Error('SAVINGS_API_KEY is missing from Script Properties.');
 
-  rows.forEach((row, i) => {
-    const rowIndex = i + 6;
-    if (row[statusCol] === '✅ Pushed') return;
+    const data = sheet.getDataRange().getValues();
+    const headers = data[3]; // row 4
+    const rows = data.slice(5); // row 6 onward (row 5 is the worked example)
 
-    const payload = {
-      memberEmail: row[headers.indexOf('memberEmail')],
-      memberPhone: row[headers.indexOf('phoneNumber')],
-      accountNo: row[headers.indexOf('accountNo')],
-      memberName: row[headers.indexOf('memberName')],
-      date: row[headers.indexOf('date')],
-      openingBalance: row[headers.indexOf('openingBalance')],
-      deposit: row[headers.indexOf('deposit')],
-      withdrawal: row[headers.indexOf('withdrawal')],
-      monthlyRate: row[headers.indexOf('monthlyRate')],
-      interestEarned: row[headers.indexOf('interestEarned')],
-      closingBalance: row[headers.indexOf('closingBalance')],
-      periodLabel: row[headers.indexOf('periodLabel')],
-      notes: row[headers.indexOf('notes')],
-    };
+    const col = (name) => headers.indexOf(name);
+    const emailCol = col('Member Email');
+    const phoneCol = col('Phone Number');
+    const statusCol = col('Push Status');
+    const pushedAtCol = col('Pushed At');
 
-    try {
-      const response = UrlFetchApp.fetch(apiUrl, {
-        method: 'post',
-        contentType: 'application/json',
-        headers: { 'x-sync-secret': apiKey },
-        payload: JSON.stringify({ records: [payload] }),
-        muteHttpExceptions: true,
+    // Collect rows still to push, remembering their sheet row number.
+    const pending = [];
+    rows.forEach((row, i) => {
+      if (!row[emailCol] && !row[phoneCol]) return; // blank row — no identifier at all
+      if (row[statusCol] === '✅ Pushed') return;
+      pending.push({
+        rowIndex: i + 6,
+        payload: {
+          memberEmail: row[emailCol],
+          memberPhone: row[phoneCol],
+          accountNo: row[col('Account No.')],
+          memberName: row[col('Member Name')],
+          date: formatCell(row[col('Date')]),
+          openingBalance: row[col('Opening Balance')],
+          deposit: row[col('Deposit')],
+          payout: row[col('Payout')],
+          closingBalance: row[col('Closing Balance')],
+          periodLabel: row[col('Period Label')],
+          notes: row[col('Notes')],
+        },
       });
+    });
 
-      sheet.getRange(rowIndex, statusCol + 1).setValue('✅ Pushed');
-      sheet.getRange(rowIndex, pushedAtCol + 1).setValue(new Date());
-      logSheet.appendRow([new Date(), payload.memberEmail, '✅ Success', response.getContentText()]);
-    } catch (err) {
-      sheet.getRange(rowIndex, statusCol + 1).setValue('❌ Failed');
-      logSheet.appendRow([new Date(), payload.memberEmail, '❌ Network error', err.message]);
+    for (let i = 0; i < pending.length; i += BATCH_SIZE) {
+      const batch = pending.slice(i, i + BATCH_SIZE);
+      let ok = false;
+      let detail = '';
+
+      try {
+        const response = UrlFetchApp.fetch(apiUrl, {
+          method: 'post',
+          contentType: 'application/json',
+          headers: { 'x-sync-secret': apiKey },
+          payload: JSON.stringify({ records: batch.map((b) => b.payload) }),
+          muteHttpExceptions: true,
+        });
+        const code = response.getResponseCode();
+        ok = code >= 200 && code < 300;
+        detail = ok ? response.getContentText() : 'HTTP ' + code + ' ' + response.getContentText();
+      } catch (err) {
+        detail = 'Network error: ' + err.message;
+      }
+
+      // Write the status of this batch immediately.
+      const now = new Date();
+      batch.forEach((b) => {
+        sheet.getRange(b.rowIndex, statusCol + 1).setValue(ok ? '✅ Pushed' : '❌ Failed');
+        if (ok) sheet.getRange(b.rowIndex, pushedAtCol + 1).setValue(now);
+      });
+      logSheet.appendRow([
+        now,
+        batch.length + ' row(s): ' + batch[0].payload.memberEmail + ' …',
+        ok ? '✅ Success' : '❌ Failed',
+        detail,
+      ]);
+      SpreadsheetApp.flush();
     }
-  });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// Dates come back from Sheets as JS Date objects — send a clean YYYY-MM-DD.
+function formatCell(value) {
+  if (value instanceof Date) {
+    return Utilities.formatDate(value, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+  return value;
 }

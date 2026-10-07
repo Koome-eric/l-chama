@@ -39,7 +39,7 @@ export default async function ChamaInvitePage({
             teamName={invite.team.name}
             invitedByName={invite.invitedBy.fullName || invite.invitedBy.email || 'Team leader'}
             email={invite.email}
-            existingIdNumber={dbUser?.idNumber ?? ''}
+            hasIdOnFile={!!dbUser?.idNumber}
             existingPhone={dbUser?.phone ?? ''}
           />
         )}

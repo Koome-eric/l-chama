@@ -131,3 +131,27 @@ requests. `(dashboard)/reports/page.tsx`.
   completing here; run `npx prisma generate` in your own environment
   and it resolves).
 
+
+
+## Privacy Policy "I Agree" + payout notice + 25th deadline reminders
+
+**Privacy Policy tick box** (`components/PrivacyConsent.tsx`) — links to `/privacy` (opens in a new tab) and must be ticked before an applicant can continue:
+- Sign-up page: Clerk's form only appears after ticking.
+- Organisation registration (recorded on `Team.privacyPolicyAccepted` + `termsAcceptedAt`, enforced server-side).
+- Accepting a chama invite (auto-accept no longer skips it).
+- Junior Account applications.
+Acceptance time is stored on the new `User.privacyPolicyAcceptedAt`.
+
+**Payout notice on the chama Dashboard** — Overview tab shows e.g. `Payout. Sept 2026, LB0048; Linda Atieno` (Ludeva Number = the member's `ludevaMemberNumber`). New `PayoutSchedule` model; the Team Leader (or anyone with "manage roles") sets it from "Manage payout schedule" on the Dashboard.
+
+**Deadline reminders (25th of every month)** — Dashboard card with a live "N days left" countdown, plus a daily cron (`/api/cron/contribution-reminders`, `vercel.json`) that sends in-app notifications 5 days before, 1 day before and on the 25th, and a payout notice on the 1st. Dates use Nairobi time.
+
+**Deploy steps:** `npx prisma db push` (new table + column), set `CRON_SECRET` in your env.
+
+
+## Fix: duplicate savings entries
+
+Cause: `/api/savings/sync` (and the admin CSV sync) always INSERTed, and the Apps Script only marked a row "✅ Pushed" after the call returned — so a timed-out or overlapping run re-pushed rows the server had already saved.
+- `src/lib/savings-upsert.ts` — rows are now matched on member + account no. + date + period label and updated in place; also de-duplicated within a batch and serialised with a Postgres advisory lock. Used by the webhook and the admin CSV paste.
+- `scripts/savings-push.gs` — script lock (no overlapping runs), batches of 50, status written per batch.
+- `prisma/dedupe-savings.ts` — one-off cleanup of existing duplicates (dry run by default, `--apply` to delete).

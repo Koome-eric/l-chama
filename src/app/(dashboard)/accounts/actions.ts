@@ -167,8 +167,13 @@ export async function submitJuniorApplication(input: {
   guardianKraPin: string;
   birthCertUrl: string;
   childPhotoUrl: string;
+  privacyPolicyAccepted: boolean;
 }) {
   const user = await getCurrentDbUser();
+
+  if (input.privacyPolicyAccepted !== true) {
+    throw new Error('Please tick "I Agree" to the Privacy Policy to submit the application.');
+  }
 
   const childFullName = input.childFullName?.trim();
   const guardianIdNumber = input.guardianIdNumber?.trim();
@@ -194,6 +199,8 @@ export async function submitJuniorApplication(input: {
       childPhotoUrl: input.childPhotoUrl,
     },
   });
+
+  await prisma.user.update({ where: { id: user.id }, data: { privacyPolicyAcceptedAt: new Date() } });
 
   revalidatePath('/accounts');
   return { success: true, applicationId: application.id };

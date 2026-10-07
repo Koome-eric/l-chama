@@ -16,6 +16,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Baby, FileUp, Loader2 } from 'lucide-react';
 import { submitJuniorApplication } from '@/app/(dashboard)/accounts/actions';
+import { PrivacyConsent } from '@/components/PrivacyConsent';
 
 // Uploads a single file to Cloudflare R2 via the shared /api/upload-doc
 // endpoint and returns its public URL. Same pipeline the main Ludeva
@@ -43,6 +44,7 @@ export function JuniorApplicationDialog({ trigger, defaultOpen }: { trigger?: Re
 
   const [birthCertFile, setBirthCertFile] = useState<File | null>(null);
   const [childPhotoFile, setChildPhotoFile] = useState<File | null>(null);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -67,6 +69,11 @@ export function JuniorApplicationDialog({ trigger, defaultOpen }: { trigger?: Re
       return;
     }
 
+    if (!privacyAccepted) {
+      toast({ title: 'Privacy Policy', description: 'Please tick "I Agree" to the Privacy Policy.', variant: 'destructive' });
+      return;
+    }
+
     setSubmitting(true);
     try {
       const [birthCertUrl, childPhotoUrl] = await Promise.all([
@@ -82,6 +89,7 @@ export function JuniorApplicationDialog({ trigger, defaultOpen }: { trigger?: Re
         guardianKraPin,
         birthCertUrl,
         childPhotoUrl,
+        privacyPolicyAccepted: privacyAccepted,
       });
 
       toast({
@@ -92,6 +100,7 @@ export function JuniorApplicationDialog({ trigger, defaultOpen }: { trigger?: Re
       formRef.current?.reset();
       setBirthCertFile(null);
       setChildPhotoFile(null);
+      setPrivacyAccepted(false);
       window.location.reload();
     } catch (err: any) {
       toast({ title: 'Error', description: err.message, variant: 'destructive' });
@@ -183,8 +192,10 @@ export function JuniorApplicationDialog({ trigger, defaultOpen }: { trigger?: Re
             </div>
           </div>
 
+          <PrivacyConsent checked={privacyAccepted} onChange={setPrivacyAccepted} id="junior-privacy-consent" />
+
           <DialogFooter>
-            <Button type="submit" disabled={submitting} className="w-full gap-2">
+            <Button type="submit" disabled={submitting || !privacyAccepted} className="w-full gap-2">
               {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
               {submitting ? 'Submitting…' : 'Submit Application'}
             </Button>

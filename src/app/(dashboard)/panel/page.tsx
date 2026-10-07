@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
 import { getChamaContext } from '@/lib/chama';
 import { withdrawalFeeRateFor } from '@/lib/withdrawal-fee';
+import { currentMonthKey, nextContributionDeadline, payoutLine, monthLabel } from '@/lib/payouts';
 import { PanelClient } from './PanelClient';
 
 export default async function ChamaPanelPage({
@@ -26,7 +27,8 @@ export default async function ChamaPanelPage({
     redirect('/onboarding/pending');
   }
 
-  const [loanAccount, loanRequests, savingsEntries] = await Promise.all([
+  const monthKey = currentMonthKey();
+  const [loanAccount, loanRequests, savingsEntries, payoutSlots] = await Promise.all([
     prisma.loanAccount.findUnique({ where: { teamId: ctx.team.id } }),
     prisma.loanRequest.findMany({
       where: { teamId: ctx.team.id },
@@ -34,7 +36,25 @@ export default async function ChamaPanelPage({
       orderBy: { createdAt: 'desc' },
     }),
     prisma.savingsEntry.findMany({ where: { teamId: ctx.team.id } }),
+    // Current month onwards — past months are history, not shown.
+    prisma.payoutSchedule.findMany({
+      where: { teamId: ctx.team.id, payoutMonth: { gte: monthKey } },
+      include: { user: true },
+      orderBy: { payoutMonth: 'asc' },
+    }),
   ]);
+
+  const payoutSlotData = payoutSlots.map((p) => {
+    const name = p.user.fullName || p.user.email || 'Member';
+    return {
+      month: p.payoutMonth,
+      monthLabel: monthLabel(p.payoutMonth),
+      userId: p.userId,
+      name,
+      ludevaNumber: p.user.ludevaMemberNumber,
+      line: payoutLine(p.payoutMonth, p.user.ludevaMemberNumber, name),
+    };
+  });
 
   // Chama-wide savings totals — no interest (that's a Ludeva Investment
   // Account feature, not part of normal L-Chama savings). "Total Chama
@@ -149,6 +169,9 @@ export default async function ChamaPanelPage({
       canManageSubTeams: i.canManageSubTeams,
     })),
     loanAccount: loanAccount ? { balance: loanAccount.balance } : { balance: 0 },
+    currentMonth: monthKey,
+    payoutSchedule: payoutSlotData,
+    deadline: nextContributionDeadline(),
     savingsSummary: {
       totalChamaFunds,
       totalPayout,
