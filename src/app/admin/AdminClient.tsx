@@ -32,6 +32,9 @@ import {
   Coins,
   Crown,
   Network,
+  Copy,
+  Download,
+  Link2,
 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -99,6 +102,11 @@ import {
   createSavingsEntry,
   updateSavingsEntry,
   deleteSavingsEntry,
+  deleteSavingsEntries,
+  rematchSavingsEntries,
+  findSavingsDuplicates,
+  deleteSavingsDuplicates,
+  type SavingsDuplicateGroup,
   logoutAdmin,
   resolvePayment,
   decideJuniorApplication,
@@ -2025,6 +2033,8 @@ function MemberReportsAdminSection({ reports }: { reports: ReportRow[] }) {
         </CardContent>
       </Card>
 
+      <SavingsDuplicatesCard />
+
       <div className="space-y-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="font-headline text-lg font-semibold">Recent Rows ({reports.length})</h2>
@@ -2138,6 +2148,154 @@ function rowToForm(r: SavingsRow): SavingsEntryForm {
   };
 }
 
+
+function SavingsDuplicatesCard() {
+  const { toast } = useToast();
+  const [isPending, startTransition] = useTransition();
+  const [result, setResult] = useState<{ total: number; groups: SavingsDuplicateGroup[] } | null>(null);
+
+  const extraCount = (gs: SavingsDuplicateGroup[]) => gs.reduce((n, g) => n + g.entries.length - 1, 0);
+
+  const scan = () =>
+    startTransition(async () => {
+      try {
+        setResult(await findSavingsDuplicates());
+      } catch (err: any) {
+        toast({ title: 'Scan failed', description: err.message, variant: 'destructive' });
+      }
+    });
+
+  const clean = (keys: string[] | undefined, count: number) => {
+    const what = keys ? `${count} duplicate cop${count === 1 ? 'y' : 'ies'} in this group` : `all ${count} duplicate cop${count === 1 ? 'y' : 'ies'}`;
+    if (!confirm(`Delete ${what}? The most recently updated entry in each group is kept. This cannot be undone.`)) return;
+    startTransition(async () => {
+      try {
+        const res = await deleteSavingsDuplicates(keys);
+        toast({ title: 'Duplicates removed', description: `Deleted ${res.deleted} entr${res.deleted === 1 ? 'y' : 'ies'}.` });
+        window.location.reload();
+      } catch (err: any) {
+        toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      }
+    });
+  };
+
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600">
+              <Copy className="h-5 w-5" />
+            </div>
+            <div>
+              <CardTitle className="text-base">Duplicate records</CardTitle>
+              <CardDescription>
+                Finds entries for the same member, account no., date and period. Scans every savings entry, not just the
+                ones listed below. The most recently updated copy is kept.
+              </CardDescription>
+            </div>
+          </div>
+          <Button variant="outline" onClick={scan} disabled={isPending} className="gap-1.5 shrink-0">
+            {isPending && !result ? 'Scanning…' : result ? 'Re-scan' : 'Scan for duplicates'}
+          </Button>
+        </div>
+      </CardHeader>
+
+      {result && (
+        <CardContent className="space-y-4">
+          {result.groups.length === 0 ? (
+            <p className="rounded-lg bg-muted/40 p-4 text-sm text-muted-foreground">
+              No duplicates found across {result.total} entries.
+            </p>
+          ) : (
+            <>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm">
+                  <span className="font-medium">{extraCount(result.groups)}</span> duplicate cop
+                  {extraCount(result.groups) === 1 ? 'y' : 'ies'} in {result.groups.length} group
+                  {result.groups.length === 1 ? '' : 's'} (of {result.total} entries).
+                </p>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  disabled={isPending}
+                  onClick={() => clean(undefined, extraCount(result.groups))}
+                  className="gap-1.5"
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Delete all duplicates
+                </Button>
+              </div>
+
+              <div className="space-y-3">
+                {result.groups.map((g) => (
+                  <div key={g.key} className="rounded-xl border border-border/60 p-3">
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{g.memberName || g.memberEmail}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {g.memberEmail}
+                          {g.accountNo ? ` · ${g.accountNo}` : ''}
+                          {g.period ? ` · ${g.period}` : ''}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={g.identical ? 'secondary' : 'destructive'} className="text-xs font-normal">
+                          {g.identical ? 'Identical copies' : 'Figures differ'}
+                        </Badge>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={isPending}
+                          onClick={() => clean([g.key], g.entries.length - 1)}
+                          className="gap-1.5 text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" /> Delete {g.entries.length - 1}
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead></TableHead>
+                            <TableHead>Opening</TableHead>
+                            <TableHead>Deposit</TableHead>
+                            <TableHead>Payout</TableHead>
+                            <TableHead>Closing</TableHead>
+                            <TableHead>Last updated</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {g.entries.map((e) => (
+                            <TableRow key={e.id} className={e.keep ? '' : 'bg-destructive/5'}>
+                              <TableCell>
+                                <Badge variant={e.keep ? 'default' : 'outline'} className="text-xs font-normal">
+                                  {e.keep ? 'Keep' : 'Delete'}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="font-figures text-sm">{e.openingBalance || '—'}</TableCell>
+                              <TableCell className="font-figures text-sm">{e.deposit || '—'}</TableCell>
+                              <TableCell className="font-figures text-sm">{e.payout || '—'}</TableCell>
+                              <TableCell className="font-figures text-sm">{e.closingBalance || '—'}</TableCell>
+                              <TableCell className="text-xs text-muted-foreground">
+                                {new Date(e.updatedAt).toLocaleString()}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
 function SavingsAdminSection({ entries }: { entries: SavingsRow[] }) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
@@ -2209,6 +2367,62 @@ function SavingsAdminSection({ entries }: { entries: SavingsRow[] }) {
     });
   };
 
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const toggleOne = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  const handleBulkDelete = () => {
+    const ids = [...selected];
+    if (!confirm(`Delete ${ids.length} savings entr${ids.length === 1 ? 'y' : 'ies'}? This cannot be undone.`)) return;
+    startTransition(async () => {
+      try {
+        const res = await deleteSavingsEntries(ids);
+        toast({ title: 'Entries deleted', description: `Deleted ${res.deleted} entr${res.deleted === 1 ? 'y' : 'ies'}.` });
+        window.location.reload();
+      } catch (err: any) {
+        toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      }
+    });
+  };
+
+  const handleBulkRematch = () => {
+    const ids = [...selected];
+    startTransition(async () => {
+      try {
+        const res = await rematchSavingsEntries(ids);
+        toast({
+          title: 'Chama matching refreshed',
+          description: `${res.changed} of ${res.checked} entr${res.checked === 1 ? 'y' : 'ies'} updated.`,
+        });
+        window.location.reload();
+      } catch (err: any) {
+        toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      }
+    });
+  };
+
+  const handleBulkExport = () => {
+    const cols: (keyof SavingsRow)[] = [
+      'memberEmail', 'memberName', 'accountNo', 'date', 'openingBalance', 'deposit', 'payout', 'closingBalance', 'periodLabel', 'notes',
+    ];
+    const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const lines = [
+      cols.join(','),
+      ...entries.filter((e) => selected.has(e.id)).map((e) => cols.map((c) => esc(e[c])).join(',')),
+    ];
+    const url = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `savings-entries-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const filtered = entries.filter((r) => {
     if (!query.trim()) return true;
     const q = query.toLowerCase();
@@ -2219,6 +2433,15 @@ function SavingsAdminSection({ entries }: { entries: SavingsRow[] }) {
       (r.accountNo ?? '').toLowerCase().includes(q)
     );
   });
+
+  const allFilteredSelected = filtered.length > 0 && filtered.every((r) => selected.has(r.id));
+  const toggleAllFiltered = () =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allFilteredSelected) filtered.forEach((r) => next.delete(r.id));
+      else filtered.forEach((r) => next.add(r.id));
+      return next;
+    });
 
   return (
     <div className="space-y-6">
@@ -2267,6 +2490,28 @@ function SavingsAdminSection({ entries }: { entries: SavingsRow[] }) {
           </div>
         </div>
 
+        {selected.size > 0 && (
+          <div className="flex flex-col gap-2 rounded-xl border border-primary/30 bg-primary/5 p-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm font-medium">
+              {selected.size} selected
+              <button type="button" className="ml-3 text-xs font-normal text-muted-foreground underline" onClick={() => setSelected(new Set())}>
+                Clear
+              </button>
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={handleBulkExport} disabled={isPending} className="gap-1.5">
+                <Download className="h-3.5 w-3.5" /> Export CSV
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleBulkRematch} disabled={isPending} className="gap-1.5">
+                <Link2 className="h-3.5 w-3.5" /> Re-match chama
+              </Button>
+              <Button size="sm" variant="destructive" onClick={handleBulkDelete} disabled={isPending} className="gap-1.5">
+                <Trash2 className="h-3.5 w-3.5" /> Delete selected
+              </Button>
+            </div>
+          </div>
+        )}
+
         {entries.length === 0 ? (
           <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">No savings entries yet.</CardContent></Card>
         ) : (
@@ -2274,6 +2519,9 @@ function SavingsAdminSection({ entries }: { entries: SavingsRow[] }) {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-8">
+                    <input type="checkbox" aria-label="Select all" className="h-4 w-4 accent-primary" checked={allFilteredSelected} onChange={toggleAllFiltered} />
+                  </TableHead>
                   <TableHead>Member</TableHead>
                   <TableHead className="hidden sm:table-cell">Chama</TableHead>
                   <TableHead className="hidden md:table-cell">Period</TableHead>
@@ -2286,7 +2534,10 @@ function SavingsAdminSection({ entries }: { entries: SavingsRow[] }) {
               </TableHeader>
               <TableBody>
                 {filtered.map((r) => (
-                  <TableRow key={r.id}>
+                  <TableRow key={r.id} className={selected.has(r.id) ? 'bg-primary/5' : ''}>
+                    <TableCell className="w-8">
+                      <input type="checkbox" aria-label="Select entry" className="h-4 w-4 accent-primary" checked={selected.has(r.id)} onChange={() => toggleOne(r.id)} />
+                    </TableCell>
                     <TableCell className="max-w-[180px]">
                       <p className="truncate font-medium">{r.memberName || r.memberEmail}</p>
                       <p className="truncate text-xs text-muted-foreground">

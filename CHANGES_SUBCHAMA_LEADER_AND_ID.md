@@ -29,3 +29,22 @@
   `updateProfile` keeps the existing ID when left blank.
 - Invite page: if an ID is already on file the field is hidden and the stored ID is used server-side.
 - Files: settings/page.tsx, profile/{page,ProfileEditClient,actions}, invite/[token]/{page,InviteAcceptClient,actions}
+
+## Admin › Savings Accounts: detect & delete duplicate records
+- New "Duplicate records" card on the admin Savings screen: "Scan for duplicates" lists every group of
+  entries with the same member (email, else phone) + account no. + date + period label — the exact key the
+  sync uses — across ALL entries (not just the 200 shown in the table).
+- Each group shows every copy side by side (Keep / Delete) and whether the copies are "Identical" or
+  "Figures differ". Delete one group, or "Delete all duplicates". The most recently updated copy is kept.
+- Server recomputes duplicates itself on delete (browser ids are never trusted) and holds the sync advisory
+  lock so it can't race a Google Sheets push. Needs the existing `canManageSavings` admin permission.
+- Entries with no email and no phone are never grouped.
+- Files: src/lib/savings-upsert.ts, src/app/admin/actions.ts, src/app/admin/AdminClient.tsx
+
+## Admin › Savings Accounts: multi-select + bulk actions
+- Checkbox on every row plus select-all (applies to the rows matching the current search).
+- A toolbar appears when anything is selected: **Delete selected**, **Re-match chama** (re-links the
+  selected entries to a chama by member email — fixes "Unmatched" rows after a member joins), **Export CSV**
+  (downloads the selected rows, same column order the sync expects), and Clear.
+- Server actions `deleteSavingsEntries` / `rematchSavingsEntries` (max 1000 per call, `canManageSavings`).
+- Files: src/app/admin/actions.ts, src/app/admin/AdminClient.tsx

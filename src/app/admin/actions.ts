@@ -2,7 +2,7 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
-import { upsertSavingsEntries } from '@/lib/savings-upsert';
+import { upsertSavingsEntries, groupSavingsDuplicates, SAVINGS_SYNC_LOCK } from '@/lib/savings-upsert';
 import { revalidatePath } from 'next/cache';
 import { isPlatformAdmin } from '@/lib/admin';
 import {
@@ -798,6 +798,136 @@ export async function updateSavingsEntry(entryId: string, input: SavingsEntryInp
   revalidatePath('/reports');
   revalidatePath('/savings');
   return { success: true };
+}
+
+const MAX_BULK = 1000;
+const bulkIds = (ids: string[]) => {
+  const clean = [...new Set((ids ?? []).filter((i) => typeof i === 'string' && i))];
+  if (clean.length === 0) throw new Error('Select at least one entry.');
+  if (clean.length > MAX_BULK) throw new Error(`Select at most ${MAX_BULK} entries at a time.`);
+  return clean;
+};
+
+export async function deleteSavingsEntries(ids: string[]) {
+  await requirePermission('canManageSavings');
+  const clean = bulkIds(ids);
+  const res = await prisma.savingsEntry.deleteMany({ where: { id: { in: clean } } });
+  revalidatePath('/admin');
+  revalidatePath('/reports');
+  revalidatePath('/savings');
+  return { success: true, deleted: res.count };
+}
+
+// Re-links the selected entries to a chama by member email — useful after a
+// member has since joined or created a chama (entries synced earlier stay
+// "Unmatched" until this runs).
+export async function rematchSavingsEntries(ids: string[]) {
+  await requirePermission('canManageSavings');
+  const clean = bulkIds(ids);
+  const entries = await prisma.savingsEntry.findMany({ where: { id: { in: clean } } });
+  const withEmail = entries.filter((e) => e.memberEmail);
+  const teamIdFor = await matchSavingsRowsToTeams(withEmail.map((e) => ({ memberEmail: e.memberEmail.toLowerCase() })));
+
+  let changed = 0;
+  await prisma.$transaction(
+    withEmail.flatMap((e) => {
+      const teamId = teamIdFor(e.memberEmail.toLowerCase());
+      if (teamId === e.teamId) return [];
+      changed += 1;
+      return [prisma.savingsEntry.update({ where: { id: e.id }, data: { teamId } })];
+    })
+  );
+
+  revalidatePath('/admin');
+  revalidatePath('/reports');
+  revalidatePath('/savings');
+  return { success: true, checked: withEmail.length, changed };
+}
+
+export type SavingsDuplicateGroup = {
+  key: string;
+  memberName: string | null;
+  memberEmail: string;
+  accountNo: string | null;
+  period: string | null;
+  // true when every figure is the same in all copies (a pure re-push);
+  // false when the copies disagree (e.g. a later correction) — worth a look.
+  identical: boolean;
+  entries: {
+    id: string;
+    keep: boolean;
+    openingBalance: string | null;
+    deposit: string | null;
+    payout: string | null;
+    closingBalance: string | null;
+    notes: string | null;
+    uploadedAt: string;
+    updatedAt: string;
+  }[];
+};
+
+async function computeSavingsDuplicates() {
+  // Scan EVERY entry, not just the 200 the admin table loads.
+  const all = await prisma.savingsEntry.findMany();
+  return groupSavingsDuplicates(all);
+}
+
+export async function findSavingsDuplicates(): Promise<{ total: number; groups: SavingsDuplicateGroup[] }> {
+  await requirePermission('canManageSavings');
+  const total = await prisma.savingsEntry.count();
+  const groups = await computeSavingsDuplicates();
+  const fields = ['openingBalance', 'deposit', 'payout', 'closingBalance', 'notes'] as const;
+
+  return {
+    total,
+    groups: groups.map((g) => {
+      const [keeper] = g.entries;
+      return {
+        key: g.key,
+        memberName: keeper.memberName,
+        memberEmail: keeper.memberEmail,
+        accountNo: keeper.accountNo,
+        period: keeper.periodLabel || keeper.date,
+        identical: g.entries.every((e) => fields.every((f) => (e[f] ?? '') === (keeper[f] ?? ''))),
+        entries: g.entries.map((e, i) => ({
+          id: e.id,
+          keep: i === 0,
+          openingBalance: e.openingBalance,
+          deposit: e.deposit,
+          payout: e.payout,
+          closingBalance: e.closingBalance,
+          notes: e.notes,
+          uploadedAt: e.uploadedAt.toISOString(),
+          updatedAt: e.updatedAt.toISOString(),
+        })),
+      };
+    }),
+  };
+}
+
+// Deletes the non-kept copies. Duplicates are recomputed on the server from
+// the database (never trusted from the browser), inside the same lock the
+// sync uses so it can't race a Sheets push. Pass group keys to clean only
+// those groups, or omit to clean all of them.
+export async function deleteSavingsDuplicates(groupKeys?: string[]) {
+  await requirePermission('canManageSavings');
+
+  const deleted = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${SAVINGS_SYNC_LOCK})`;
+    const all = await tx.savingsEntry.findMany();
+    const wanted = groupKeys ? new Set(groupKeys) : null;
+    const extras = groupSavingsDuplicates(all)
+      .filter((g) => !wanted || wanted.has(g.key))
+      .flatMap((g) => g.entries.slice(1).map((e) => e.id));
+    if (extras.length === 0) return 0;
+    const res = await tx.savingsEntry.deleteMany({ where: { id: { in: extras } } });
+    return res.count;
+  });
+
+  revalidatePath('/admin');
+  revalidatePath('/reports');
+  revalidatePath('/savings');
+  return { success: true, deleted };
 }
 
 export async function deleteSavingsEntry(entryId: string) {

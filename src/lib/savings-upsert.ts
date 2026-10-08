@@ -37,13 +37,15 @@ function identityOf(r: Pick<SavingsRow, 'memberEmail' | 'memberPhone'>) {
   return r.memberEmail ? `e:${r.memberEmail.toLowerCase()}` : r.memberPhone ? `p:${r.memberPhone.replace(/\D/g, '').slice(-9)}` : '';
 }
 
-export function savingsRowKey(r: SavingsRow) {
+export function savingsRowKey(
+  r: Pick<SavingsRow, 'memberEmail' | 'memberPhone' | 'accountNo' | 'date' | 'periodLabel'>
+) {
   return [identityOf(r), norm(r.accountNo) ?? '', norm(r.date) ?? '', norm(r.periodLabel) ?? ''].join('|');
 }
 
 // Arbitrary constant — serialises concurrent savings syncs so two requests
 // racing each other can't both see "no existing row" and both insert.
-const SAVINGS_SYNC_LOCK = 727_001;
+export const SAVINGS_SYNC_LOCK = 727_001;
 
 export async function upsertSavingsEntries(rows: SavingsRow[]) {
   // 1. Collapse duplicates inside the batch itself (last one wins).
@@ -89,4 +91,46 @@ export async function upsertSavingsEntries(rows: SavingsRow[]) {
   );
 
   return { created, updated };
+}
+
+// ─────────────────────────────────────────────
+// Duplicate detection — same identity key the sync uses above, so "duplicate"
+// means exactly "the sync would have treated these as one entry".
+// Entries with no email AND no phone are never grouped (nothing reliable to
+// match them on). Within a group the most recently updated entry is the one
+// to keep (it carries the latest data); the rest are the duplicates.
+// ─────────────────────────────────────────────
+type DupCandidate = {
+  id: string;
+  memberEmail: string;
+  memberPhone: string | null;
+  memberName: string | null;
+  accountNo: string | null;
+  date: string | null;
+  openingBalance: string | null;
+  deposit: string | null;
+  payout: string | null;
+  closingBalance: string | null;
+  periodLabel: string | null;
+  notes: string | null;
+  updatedAt: Date;
+  uploadedAt: Date;
+};
+
+export function groupSavingsDuplicates<T extends DupCandidate>(entries: T[]): { key: string; entries: T[] }[] {
+  const groups = new Map<string, T[]>();
+  for (const e of entries) {
+    const key = savingsRowKey({ ...e, memberEmail: e.memberEmail || null });
+    if (key.startsWith('|')) continue; // no email/phone identity
+    groups.set(key, [...(groups.get(key) ?? []), e]);
+  }
+  const out: { key: string; entries: T[] }[] = [];
+  for (const [key, list] of groups) {
+    if (list.length < 2) continue;
+    list.sort(
+      (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime() || b.uploadedAt.getTime() - a.uploadedAt.getTime()
+    );
+    out.push({ key, entries: list }); // entries[0] is the keeper
+  }
+  return out;
 }
