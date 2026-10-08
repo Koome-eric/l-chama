@@ -2033,8 +2033,6 @@ function MemberReportsAdminSection({ reports }: { reports: ReportRow[] }) {
         </CardContent>
       </Card>
 
-      <SavingsDuplicatesCard />
-
       <div className="space-y-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="font-headline text-lg font-semibold">Recent Rows ({reports.length})</h2>
@@ -2153,13 +2151,16 @@ function SavingsDuplicatesCard() {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [result, setResult] = useState<{ total: number; groups: SavingsDuplicateGroup[] } | null>(null);
+  const [match, setMatch] = useState<'name' | 'identity'>('name');
+  const [keep, setKeep] = useState<'oldest' | 'newest'>('oldest');
+  const selectCls = 'h-9 rounded-md border border-input bg-background px-2 text-sm';
 
   const extraCount = (gs: SavingsDuplicateGroup[]) => gs.reduce((n, g) => n + g.entries.length - 1, 0);
 
   const scan = () =>
     startTransition(async () => {
       try {
-        setResult(await findSavingsDuplicates());
+        setResult(await findSavingsDuplicates({ match, keep }));
       } catch (err: any) {
         toast({ title: 'Scan failed', description: err.message, variant: 'destructive' });
       }
@@ -2167,10 +2168,10 @@ function SavingsDuplicatesCard() {
 
   const clean = (keys: string[] | undefined, count: number) => {
     const what = keys ? `${count} duplicate cop${count === 1 ? 'y' : 'ies'} in this group` : `all ${count} duplicate cop${count === 1 ? 'y' : 'ies'}`;
-    if (!confirm(`Delete ${what}? The most recently updated entry in each group is kept. This cannot be undone.`)) return;
+    if (!confirm(`Delete ${what}? One record per group is kept (${keep === 'oldest' ? 'the original, oldest' : 'the most recently updated'} one). This cannot be undone.`)) return;
     startTransition(async () => {
       try {
-        const res = await deleteSavingsDuplicates(keys);
+        const res = await deleteSavingsDuplicates(keys, { match, keep });
         toast({ title: 'Duplicates removed', description: `Deleted ${res.deleted} entr${res.deleted === 1 ? 'y' : 'ies'}.` });
         window.location.reload();
       } catch (err: any) {
@@ -2190,14 +2191,30 @@ function SavingsDuplicatesCard() {
             <div>
               <CardTitle className="text-base">Duplicate records</CardTitle>
               <CardDescription>
-                Finds entries for the same member, account no., date and period. Scans every savings entry, not just the
-                ones listed below. The most recently updated copy is kept.
+                Finds repeated entries (same member, account no., date and period), checks every savings entry, and
+                lets you delete all the extras so only one record remains.
               </CardDescription>
             </div>
           </div>
-          <Button variant="outline" onClick={scan} disabled={isPending} className="gap-1.5 shrink-0">
-            {isPending && !result ? 'Scanning…' : result ? 'Re-scan' : 'Scan for duplicates'}
+          <Button onClick={scan} disabled={isPending} className="gap-1.5 shrink-0">
+            {isPending && !result ? 'Scanning…' : result ? 'Re-scan' : 'Detect duplicates'}
           </Button>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
+          <label className="flex items-center gap-2">
+            Match by
+            <select className={selectCls} value={match} onChange={(e) => { setMatch(e.target.value as any); setResult(null); }}>
+              <option value="name">Same member name</option>
+              <option value="identity">Same email / phone</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-2">
+            Keep
+            <select className={selectCls} value={keep} onChange={(e) => { setKeep(e.target.value as any); setResult(null); }}>
+              <option value="oldest">Original (oldest)</option>
+              <option value="newest">Latest update</option>
+            </select>
+          </label>
         </div>
       </CardHeader>
 
@@ -2478,6 +2495,8 @@ function SavingsAdminSection({ entries }: { entries: SavingsRow[] }) {
           </Button>
         </CardContent>
       </Card>
+
+      <SavingsDuplicatesCard />
 
       <div className="space-y-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

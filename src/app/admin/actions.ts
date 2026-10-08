@@ -2,7 +2,7 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
-import { upsertSavingsEntries, groupSavingsDuplicates, SAVINGS_SYNC_LOCK } from '@/lib/savings-upsert';
+import { upsertSavingsEntries, groupSavingsDuplicates, SAVINGS_SYNC_LOCK, type DupOptions } from '@/lib/savings-upsert';
 import { revalidatePath } from 'next/cache';
 import { isPlatformAdmin } from '@/lib/admin';
 import {
@@ -866,16 +866,18 @@ export type SavingsDuplicateGroup = {
   }[];
 };
 
-async function computeSavingsDuplicates() {
-  // Scan EVERY entry, not just the 200 the admin table loads.
-  const all = await prisma.savingsEntry.findMany();
-  return groupSavingsDuplicates(all);
-}
+const cleanDupOptions = (o?: DupOptions): DupOptions => ({
+  match: o?.match === 'identity' ? 'identity' : 'name',
+  keep: o?.keep === 'newest' ? 'newest' : 'oldest',
+});
 
-export async function findSavingsDuplicates(): Promise<{ total: number; groups: SavingsDuplicateGroup[] }> {
+export async function findSavingsDuplicates(
+  options?: DupOptions
+): Promise<{ total: number; groups: SavingsDuplicateGroup[] }> {
   await requirePermission('canManageSavings');
   const total = await prisma.savingsEntry.count();
-  const groups = await computeSavingsDuplicates();
+  // Scan EVERY entry, not just the 200 the admin table loads.
+  const groups = groupSavingsDuplicates(await prisma.savingsEntry.findMany(), cleanDupOptions(options));
   const fields = ['openingBalance', 'deposit', 'payout', 'closingBalance', 'notes'] as const;
 
   return {
@@ -906,17 +908,17 @@ export async function findSavingsDuplicates(): Promise<{ total: number; groups: 
 }
 
 // Deletes the non-kept copies. Duplicates are recomputed on the server from
-// the database (never trusted from the browser), inside the same lock the
-// sync uses so it can't race a Sheets push. Pass group keys to clean only
-// those groups, or omit to clean all of them.
-export async function deleteSavingsDuplicates(groupKeys?: string[]) {
+// the database (never trusted from the browser) with the same match/keep
+// options the scan used, inside the same lock the sync uses so it can't race
+// a Sheets push. Pass group keys to clean only those groups, or omit for all.
+export async function deleteSavingsDuplicates(groupKeys?: string[], options?: DupOptions) {
   await requirePermission('canManageSavings');
 
   const deleted = await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(${SAVINGS_SYNC_LOCK})`;
     const all = await tx.savingsEntry.findMany();
     const wanted = groupKeys ? new Set(groupKeys) : null;
-    const extras = groupSavingsDuplicates(all)
+    const extras = groupSavingsDuplicates(all, cleanDupOptions(options))
       .filter((g) => !wanted || wanted.has(g.key))
       .flatMap((g) => g.entries.slice(1).map((e) => e.id));
     if (extras.length === 0) return 0;

@@ -117,18 +117,41 @@ type DupCandidate = {
   uploadedAt: Date;
 };
 
-export function groupSavingsDuplicates<T extends DupCandidate>(entries: T[]): { key: string; entries: T[] }[] {
+export type DupMatch = 'name' | 'identity';
+export type DupKeep = 'oldest' | 'newest';
+export type DupOptions = { match?: DupMatch; keep?: DupKeep };
+
+// "name"     → same member name (case/spacing/punctuation-insensitive) + account no. + date + period
+// "identity" → same email (else phone) + account no. + date + period (what the sync itself uses)
+// Either way the account/date/period part keeps a member's entries for DIFFERENT
+// periods apart — only true repeats of the same entry are grouped.
+const normName = (v: string | null | undefined) =>
+  (v ?? '').toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
+
+export function groupSavingsDuplicates<T extends DupCandidate>(
+  entries: T[],
+  { match = 'identity', keep = 'newest' }: DupOptions = {}
+): { key: string; entries: T[] }[] {
   const groups = new Map<string, T[]>();
   for (const e of entries) {
-    const key = savingsRowKey({ ...e, memberEmail: e.memberEmail || null });
-    if (key.startsWith('|')) continue; // no email/phone identity
+    let key: string;
+    if (match === 'name') {
+      const n = normName(e.memberName);
+      if (!n) continue; // no name to match on
+      key = ['n:' + n, norm(e.accountNo) ?? '', norm(e.date) ?? '', norm(e.periodLabel) ?? ''].join('|');
+    } else {
+      key = savingsRowKey({ ...e, memberEmail: e.memberEmail || null });
+      if (key.startsWith('|')) continue; // no email/phone identity
+    }
     groups.set(key, [...(groups.get(key) ?? []), e]);
   }
   const out: { key: string; entries: T[] }[] = [];
   for (const [key, list] of groups) {
     if (list.length < 2) continue;
-    list.sort(
-      (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime() || b.uploadedAt.getTime() - a.uploadedAt.getTime()
+    list.sort((a, b) =>
+      keep === 'oldest'
+        ? a.uploadedAt.getTime() - b.uploadedAt.getTime() || a.id.localeCompare(b.id)
+        : b.updatedAt.getTime() - a.updatedAt.getTime() || b.uploadedAt.getTime() - a.uploadedAt.getTime()
     );
     out.push({ key, entries: list }); // entries[0] is the keeper
   }

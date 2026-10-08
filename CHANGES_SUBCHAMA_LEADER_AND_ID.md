@@ -48,3 +48,12 @@
   (downloads the selected rows, same column order the sync expects), and Clear.
 - Server actions `deleteSavingsEntries` / `rematchSavingsEntries` (max 1000 per call, `canManageSavings`).
 - Files: src/app/admin/actions.ts, src/app/admin/AdminClient.tsx
+
+## Update: duplicate detection by member name, keep the original
+- "Detect duplicates" now defaults to **Match by: Same member name** (case/spacing/punctuation-insensitive)
+  + account no. + date + period, so repeats with different/missing emails are caught. "Same email / phone"
+  is still available.
+- **Keep: Original (oldest)** is the default; "Latest update" is the alternative. Exactly one record per
+  group remains after "Delete all duplicates".
+- Entries for different periods/dates are never grouped, so a member's monthly history is safe.
+- Files: src/lib/savings-upsert.ts, src/app/admin/actions.ts, src/app/admin/AdminClient.tsx
