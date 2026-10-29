@@ -23,5 +23,7 @@ export const clerkAppearance = {
     headerTitle: 'font-headline tracking-tight',
     formButtonPrimary: 'shadow-none normal-case text-sm font-medium',
     socialButtonsBlockButton: 'border-border',
+    socialButtonsBlockButtonText: { color: 'hsl(var(--foreground))' },
+    footer: { display: 'none' },
   },
 } as const;

@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useState } from 'react';
+import Link from 'next/link';
 import { SignUp } from '@clerk/nextjs';
 import { PostAuthRedirect } from '@/components/PostAuthRedirect';
 import { CaptureAuthRedirect } from '@/components/CaptureAuthRedirect';
@@ -36,6 +37,12 @@ export default function Page() {
           <PrivacyConsent checked={agreed} onChange={setAgreed} id="signup-privacy-consent" />
         </div>
       )}
+      <p className="text-sm text-muted-foreground">
+        Already have an account?{' '}
+        <Link href="/sign-in" className="font-medium text-primary underline-offset-4 hover:underline">
+          Sign in
+        </Link>
+      </p>
       <Suspense fallback={null}>
         <CaptureAuthRedirect />
         <PostAuthRedirect />
