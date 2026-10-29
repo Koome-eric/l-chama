@@ -1,6 +1,7 @@
 import { ShieldCheck, Mail, Phone, MapPin } from 'lucide-react';
 import LChamaHeader from '@/components/LChamaHeader';
 import LChamaFooter from '@/components/LChamaFooter';
+import { LEGAL_LAST_UPDATED, LEGAL_ENTITY } from '@/lib/legal';
 
 export const metadata = {
   title: 'Privacy Policy — L-Chama',
@@ -11,8 +12,9 @@ const SECTIONS = [
   { id: 'purpose-of-collection', label: '2. Purpose & Usage' },
   { id: 'limitation-of-use', label: '3. Limitation of Data Use' },
   { id: 'data-protection', label: '4. Data Protection & Security' },
-  { id: 'your-rights', label: '5. Your Rights' },
-  { id: 'contact-us', label: '6. Contact Us' },
+  { id: 'service-providers', label: '5. Service Providers' },
+  { id: 'your-rights', label: '6. Your Rights' },
+  { id: 'contact-us', label: '7. Contact Us' },
 ];
 
 /* ────────────────────────────────────────────────────────────── */
@@ -43,6 +45,10 @@ export default function PrivacyPolicyPage() {
             <p className="mt-3 text-sm text-muted-foreground max-w-2xl">
               By registering for an account or using the L-Chama platform, you agree to the collection and use of
               information in accordance with this policy and applicable data protection laws.
+            </p>
+            <p className="mt-3 text-sm text-muted-foreground max-w-2xl">
+              Last updated {LEGAL_LAST_UPDATED}. L-Chama is a product of {LEGAL_ENTITY}, which is responsible for
+              your personal data. See also our <a href="/terms" className="underline hover:text-primary">Terms of Service</a>.
             </p>
           </div>
         </div>
@@ -163,8 +169,21 @@ export default function PrivacyPolicyPage() {
               </ul>
             </section>
 
-            <section id="your-rights" className="space-y-3 scroll-mt-24">
-              <h2 className="font-headline text-2xl font-semibold">5. Your Rights</h2>
+                        <section id="service-providers" className="space-y-3 scroll-mt-24">
+              <h2 className="font-headline text-2xl font-semibold">5. Service Providers</h2>
+              <p className="text-muted-foreground">
+                We use a small number of outside providers to run L-Chama. Each receives only the data it needs for its job.
+              </p>
+              <ul className="list-disc pl-5 text-muted-foreground space-y-1.5">
+                <li><strong className="text-foreground">Clerk:</strong> sign-in and account verification (email, phone and sign-in details).</li>
+                <li><strong className="text-foreground">Paystack and M-Pesa:</strong> card and mobile money payments, and loan disbursement.</li>
+                <li><strong className="text-foreground">Resend:</strong> transactional email such as receipts and reminders.</li>
+                <li><strong className="text-foreground">Cloudflare R2:</strong> storage for documents you upload.</li>
+              </ul>
+            </section>
+
+<section id="your-rights" className="space-y-3 scroll-mt-24">
+              <h2 className="font-headline text-2xl font-semibold">6. Your Rights</h2>
               <p className="text-muted-foreground">
                 Subject to applicable data protection legislation, you reserve the right to:
               </p>
@@ -179,7 +198,7 @@ export default function PrivacyPolicyPage() {
             </section>
 
             <section id="contact-us" className="scroll-mt-24 rounded-2xl border bg-card p-6 sm:p-8 space-y-4">
-              <h2 className="font-headline text-2xl font-semibold">6. Contact Us</h2>
+              <h2 className="font-headline text-2xl font-semibold">7. Contact Us</h2>
               <p className="text-muted-foreground">
                 If you have questions, concerns, or requests regarding this Privacy Policy or how L-Chama manages
                 your data, please reach out to our privacy team at:

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Manrope, Space_Grotesk, JetBrains_Mono } from "next/font/google";
+import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "@/components/ui/toaster";
 import { clerkLocalization } from "@/lib/clerk-localization";
@@ -12,16 +12,17 @@ import "./globals.css";
 // plain string so it can't accidentally depend on any bundled module.
 const THEME_BOOT_SCRIPT = `(function(){try{var s=localStorage.getItem('lchama-theme');var d=s?s==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;if(d){document.documentElement.classList.add('dark');document.documentElement.style.colorScheme='dark'}else{document.documentElement.style.colorScheme='light'}}catch(e){}})()`;
 
-// Space Grotesk carries the headline personality — a geometric grotesk
-// with just enough character to feel like a fintech product rather than
-// a generic SaaS template. Manrope is the body face: humanist and warm,
-// so the chama's community feel isn't lost under the financial chrome.
-// JetBrains Mono is reserved specifically for money figures and ledger
-// data (balances, ROI, repayment tables) — tabular numerals give every
-// KES amount the precision of a bank statement.
-const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-headline" });
-const manrope = Manrope({ subsets: ["latin"], variable: "--font-sans" });
-const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" });
+// Plus Jakarta Sans for headlines: a geometric sans with open, confident
+// letterforms common in modern fintech. Inter stays for body copy and figures
+// (excellent tabular numerals for money). The two are loaded as CSS variables
+// and mapped to Tailwind's font-headline / font-sans in tailwind.config.ts.
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+const jakarta = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  variable: "--font-jakarta",
+  weight: ["500", "600", "700", "800"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "L-CHAMA — Save Together, Borrow Together",
@@ -35,7 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <html
         lang="en"
         suppressHydrationWarning
-        className={`${manrope.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}
+        className={`${inter.variable} ${jakarta.variable}`}
       >
         <head>
           <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />

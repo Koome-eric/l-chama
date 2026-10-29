@@ -19,17 +19,24 @@ export default function LChamaHeader() {
             width={155}
             height={77}
             priority
-            className="h-9 w-auto"
+            className="h-9 w-auto dark:hidden"
+          />
+          <Image
+            src="/lchama-logo-dark.png"
+            alt="L-Chama by Ludeva"
+            width={155}
+            height={77}
+            priority
+            className="hidden h-9 w-auto dark:block"
           />
         </Link>
 
         <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-muted-foreground">
-          <Link href="/contact" className="hover:text-foreground transition-colors">
-            Contact
-          </Link>
-          <Link href="/privacy" className="hover:text-foreground transition-colors">
-            Privacy Policy
-          </Link>
+          <Link href="/#how-it-works" className="hover:text-foreground transition-colors">How it works</Link>
+          <Link href="/products" className="hover:text-foreground transition-colors">Products</Link>
+          <Link href="/loans" className="hover:text-foreground transition-colors">Loans</Link>
+          <Link href="/diaspora" className="hover:text-foreground transition-colors">Diaspora</Link>
+          <Link href="/contact" className="hover:text-foreground transition-colors">Contact</Link>
         </nav>
 
         <div className="flex items-center gap-3">

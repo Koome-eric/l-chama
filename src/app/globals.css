@@ -3,83 +3,78 @@
 @tailwind utilities;
 
 @layer base {
+  /* L-Chama uses Ludeva's design tokens exactly (see ludeva/src/app/globals.css)
+     so the two sites read as one brand: same blue primary, same neutral
+     slate surfaces, same borders, same dark-mode navy. */
   :root {
-    /* Neutral surface — cool slate rather than green-tinted grays, for a
-       crisper fintech look. Primary carries all the "money/trust" color. */
-    --background: 210 20% 98%;
-    --foreground: 222 30% 11%;
+    --background: 220 20% 96%;
+    --foreground: 224 71% 4%;
     --card: 0 0% 100%;
-    --card-foreground: 222 30% 11%;
+    --card-foreground: 224 71% 4%;
 
-    /* Brand color — matched to Ludeva's primary blue (#001030 navy dropped
-       in favor of Ludeva's actual brand hsl(220, 85%, 55%)) so L Chama
-       reads as the same brand family, not a different-colored sub-app. */
     --primary: 220 85% 55%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 25% 95%;
-    --secondary-foreground: 222 30% 15%;
+    --secondary: 220 10% 90%;
+    --secondary-foreground: 224 71% 4%;
 
-    --muted: 210 20% 95%;
-    --muted-foreground: 215 15% 45%;
+    --muted: 220 10% 90%;
+    --muted-foreground: 220 10% 40%;
 
-    --accent: 210 25% 95%;
-    --accent-foreground: 222 30% 15%;
+    /* Hover/selected surface. Ludeva's violet accent is kept separate
+       (--violet) so ghost buttons and menus don't turn purple on hover. */
+    --accent: 220 10% 90%;
+    --accent-foreground: 224 71% 4%;
+    --violet: 250 85% 60%;
 
-    /* Warm gold — reserved for money/campaign highlights (raised amounts,
-       progress bars, verified badges) so it reads as "value" against the
-       cooler primary/neutral palette. */
+    /* Ludeva's amber "warning" doubles as the money/value highlight. */
     --gold: 38 92% 50%;
-    --gold-foreground: 26 40% 15%;
+    --gold-foreground: 38 100% 95%;
 
-    /* Chama Green — pulled from the L-Chama mark's own icon (the trio of
-       people), not a generic "success green." Reserved for trust states
-       that are specific to a chama: a loan fully guaranteed, a repayment
-       cleared, a member's role confirmed. Keeps "money moving" (gold)
-       visually distinct from "people vouching for people" (green). */
-    --chama-green: 160 55% 30%;
+    /* Trust states (loan guaranteed, repayment cleared): Ludeva's chart
+       teal (173 58% 39%), darkened so text on white passes contrast. */
+    --chama-green: 173 58% 30%;
     --chama-green-foreground: 0 0% 100%;
 
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 214 20% 90%;
-    --input: 214 20% 88%;
+    --border: 220 13% 89%;
+    --input: 220 13% 89%;
     --ring: 220 85% 55%;
-    --radius: 1rem;
+    --radius: 0.5rem;
   }
 
   .dark {
-    --background: 222 32% 7%;
-    --foreground: 210 20% 96%;
-    --card: 222 28% 10%;
-    --card-foreground: 210 20% 96%;
+    --background: 224 71% 4%;
+    --foreground: 210 40% 98%;
+    --card: 220 13% 11%;
+    --card-foreground: 210 40% 98%;
 
-    /* Same Ludeva brand blue, matching Ludeva's own dark-mode primary
-       (hsl(217.2, 91.2%, 59.8%)) so both apps look identical in dark mode too. */
     --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 0 0% 100%;
+    --primary-foreground: 210 40% 98%;
 
-    --secondary: 222 20% 15%;
-    --secondary-foreground: 210 20% 96%;
+    --secondary: 220 13% 18%;
+    --secondary-foreground: 210 40% 98%;
 
-    --muted: 222 20% 15%;
-    --muted-foreground: 215 15% 65%;
+    --muted: 220 13% 18%;
+    --muted-foreground: 220 10% 60%;
 
-    --accent: 222 20% 16%;
-    --accent-foreground: 210 20% 96%;
+    --accent: 220 13% 18%;
+    --accent-foreground: 210 40% 98%;
+    --violet: 250 85% 60%;
 
-    --gold: 38 92% 55%;
-    --gold-foreground: 26 40% 12%;
+    --gold: 38 92% 50%;
+    --gold-foreground: 38 100% 95%;
 
-    --chama-green: 160 50% 42%;
+    --chama-green: 173 58% 45%;
     --chama-green-foreground: 0 0% 100%;
 
-    --destructive: 0 62% 45%;
-    --destructive-foreground: 0 0% 96%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
 
-    --border: 222 18% 18%;
-    --input: 222 18% 18%;
+    --border: 220 13% 18%;
+    --input: 220 13% 18%;
     --ring: 217.2 91.2% 59.8%;
   }
 
@@ -91,13 +86,26 @@
   }
 }
 
+@layer components {
+  /* Headline refinement: Plus Jakarta Sans reads best slightly tightened at
+     display sizes. In the components layer so any Tailwind tracking-* or
+     leading-* utility on an element still wins. */
+  .font-headline {
+    letter-spacing: -0.022em;
+  }
+  .font-headline.font-bold,
+  .font-headline.font-semibold {
+    text-wrap: balance;
+  }
+}
+
 @layer utilities {
   /* Subtle mesh-gradient wash used behind hero/stat sections for a modern
      fintech feel without needing image assets. */
   .bg-fintech-mesh {
     background-image:
       radial-gradient(circle at 15% 20%, hsl(var(--primary) / 0.14), transparent 45%),
-      radial-gradient(circle at 85% 10%, hsl(var(--gold) / 0.14), transparent 40%),
+      radial-gradient(circle at 85% 10%, hsl(var(--violet) / 0.10), transparent 40%),
       radial-gradient(circle at 50% 100%, hsl(var(--primary) / 0.08), transparent 50%);
   }
 
@@ -146,9 +154,9 @@
      align like a real statement — applied to numbers only, never body
      copy, so it stays a deliberate accent rather than a font swap. */
   .font-figures {
-    font-family: var(--font-mono), monospace;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.01em;
+    font-family: var(--font-inter), sans-serif;
+    font-variant-numeric: tabular-nums lining-nums;
+    letter-spacing: -0.02em;
   }
 
   .glass-card {
@@ -180,5 +188,18 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+@layer utilities {
+  /* Ludeva's dark navy (its dark-mode background) with a soft blue/violet
+     glow, for the landing page's dark bands. Fixed in both themes so
+     white-on-navy contrast never depends on the theme toggle. */
+  .bg-brand-dark {
+    background-color: hsl(224 71% 4%);
+    background-image:
+      radial-gradient(circle at 85% 0%, hsl(var(--primary) / 0.35), transparent 50%),
+      radial-gradient(circle at 0% 100%, hsl(var(--violet) / 0.22), transparent 45%);
+    color: hsl(210 40% 98%);
   }
 }

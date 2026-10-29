@@ -50,6 +50,8 @@ const config: Config = {
           foreground: "hsl(var(--card-foreground))",
         },
 
+        violet: "hsl(var(--violet))",
+
         chama: {
           DEFAULT: "hsl(var(--chama-green))",
           foreground: "hsl(var(--chama-green-foreground))",
@@ -73,9 +75,10 @@ const config: Config = {
       },
 
       fontFamily: {
-        sans: ["var(--font-sans)", "sans-serif"],
-        headline: ["var(--font-headline)", "sans-serif"],
-        mono: ["var(--font-mono)", "monospace"],
+        sans: ["var(--font-inter)", "sans-serif"],
+        body: ["var(--font-inter)", "sans-serif"],
+        headline: ["var(--font-jakarta)", "var(--font-inter)", "sans-serif"],
+        mono: ["ui-monospace", "monospace"],
       },
     },
   },

@@ -998,3 +998,21 @@ model AdminAccount {
 
   @@map("admin_account")
 }
+
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  actorEmail String?
+  actorKind  String   @default("clerk")
+  action     String
+  outcome    String   @default("requested")
+  targetType String?
+  targetId   String?
+  detail     String?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorEmail, action, outcome, createdAt])
+  @@map("admin_audit_log")
+}

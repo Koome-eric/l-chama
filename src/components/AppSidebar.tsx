@@ -123,7 +123,14 @@ export function AppSidebar({
               alt="L-Chama"
               width={66}
               height={77}
-              className="h-8 w-auto shrink-0"
+              className="h-8 w-auto shrink-0 dark:hidden"
+            />
+            <Image
+              src="/lchama-icon-dark.png"
+              alt="L-Chama"
+              width={66}
+              height={77}
+              className="hidden h-8 w-auto shrink-0 dark:block"
             />
             <span className="font-headline text-lg font-bold whitespace-nowrap group-data-[collapsible=icon]:hidden">
               L-CHAMA

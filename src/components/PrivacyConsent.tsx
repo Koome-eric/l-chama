@@ -23,7 +23,7 @@ export function PrivacyConsent({
         className="mt-0.5 h-4 w-4 shrink-0 accent-[hsl(var(--primary))]"
       />
       <span>
-        ✅ I have read and agree to the L-Chama{' '}
+        I have read and agree to the L-Chama{' '}
         <a
           href="/privacy"
           target="_blank"
@@ -32,6 +32,16 @@ export function PrivacyConsent({
           onClick={(e) => e.stopPropagation()}
         >
           Privacy Policy
+        </a>{' '}
+        and{' '}
+        <a
+          href="/terms"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline text-primary hover:opacity-80"
+          onClick={(e) => e.stopPropagation()}
+        >
+          Terms of Service
         </a>
         . <span className="text-muted-foreground">(I Agree)</span>
       </span>

@@ -16,6 +16,12 @@ const isPublicRoute = createRouteMatcher([
   // Contact page — same reasoning; anyone should be able to reach the
   // team without signing up first.
   "/contact",
+  // Public information pages — fees, rates and legal terms must be readable
+  // before sign-up (website audit: "make trust visible before sign-up").
+  "/terms",
+  "/products",
+  "/loans",
+  "/diaspora",
   // Every API route validates its own caller (Clerk currentUser(),
   // x-sync-secret header, or a Paystack signature) rather than relying
   // on a Clerk session — several are called by things that don't have

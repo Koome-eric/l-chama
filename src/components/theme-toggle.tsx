@@ -31,27 +31,13 @@ export function ThemeToggle({ className }: { className?: string }) {
         className
       )}
     >
-      <Sun
-        aria-hidden
-        className={cn(
-          'absolute left-[7px] h-3.5 w-3.5 transition-opacity duration-300',
-          isDark ? 'opacity-0' : 'text-amber-500 opacity-70'
-        )}
-      />
-      <Moon
-        aria-hidden
-        className={cn(
-          'absolute right-[7px] h-3.5 w-3.5 transition-opacity duration-300',
-          isDark ? 'text-primary opacity-80' : 'opacity-0'
-        )}
-      />
-
       <motion.span
         aria-hidden
-        animate={{ x: isDark ? 24 : 2 }}
+        initial={false}
+        animate={{ x: isDark ? 24 : 2, y: '-50%' }}
         transition={{ type: 'spring', stiffness: 480, damping: 30 }}
         className={cn(
-          'absolute top-1/2 z-10 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full',
+          'absolute left-0 top-1/2 z-10 flex h-6 w-6 items-center justify-center rounded-full',
           isDark ? 'bg-primary text-primary-foreground shadow-md shadow-primary/40' : 'bg-white text-amber-500 shadow-md shadow-amber-900/10'
         )}
       >

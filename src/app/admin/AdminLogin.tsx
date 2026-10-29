@@ -32,7 +32,7 @@ export function AdminLogin() {
 
       <div className="relative w-full max-w-md">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
-          <Image src="/lchama-icon.png" alt="L-Chama" width={66} height={77} className="h-12 w-auto" />
+          <Image src="/lchama-icon-dark.png" alt="L-Chama" width={66} height={77} className="h-12 w-auto" />
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/50">L-Chama</p>
             <h1 className="font-headline text-2xl font-bold text-white">Admin Control Center</h1>
