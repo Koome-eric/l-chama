@@ -141,7 +141,11 @@ export function AccountsClient({
                 <p>
                   <span className="font-sans text-muted-foreground">Return: </span>
                   <span className="font-semibold text-primary">
-                    {p.roiMax ? `${p.roi}–${p.roiMax}` : `Up to ${p.roi}`}% p.a.
+                    {p.type === 'STOCK'
+                      ? `Above ${p.roi}% p.a.`
+                      : p.roiMax
+                        ? `${p.roi}–${p.roiMax}% p.a.`
+                        : `Up to ${p.roi}% p.a.`}
                   </span>
                 </p>
                 <p>

@@ -24,7 +24,7 @@ const TERMS = [
     h: 'Contributions, savings and products',
     p: [
       'Contributions and deposits are recorded on your chama’s ledger. Rates shown on our products page are annual, indicative and not guaranteed, and they carry an effective date.',
-      'Some products have lock-in periods, for example a minimum of 12 months for MMF. You agree to the conditions shown for a product before you invest.',
+      'Some products have lock-in periods. You agree to the conditions shown for a product before you invest.',
     ],
   },
   {

@@ -30,7 +30,7 @@ const FAQS = [
   },
   {
     q: 'What\u2019s the difference between Savings and the investment products?',
-    a: 'Savings Account is your chama\u2019s day-to-day operating fund \u2014 flexible, no lock-in, tiered interest on the average balance. MMF and the Junior Account are longer-horizon products with their own lock-in periods and higher rates, for capital your chama isn\u2019t touching month to month.',
+    a: 'Savings Account is your chama\u2019s day-to-day operating fund \u2014 flexible and without a lock-in period. Shares and Fixed Income Accounts are longer-horizon investments for capital your chama is not using month to month. The Junior Account helps families save for a child\u2019s future.',
   },
   {
     q: 'How much does it cost to start a chama?',

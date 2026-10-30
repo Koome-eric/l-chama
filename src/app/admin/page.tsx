@@ -149,7 +149,7 @@ export default async function AdminPage() {
 
   const productData = products.map((p: (typeof products)[number]) => ({
     id: p.id,
-    name: p.name,
+    name: p.type === 'MMF' ? 'Legacy investment' : p.name,
     type: p.type,
     description: p.description,
     roi: p.roi,

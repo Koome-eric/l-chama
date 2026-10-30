@@ -2,29 +2,36 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-// Seeds the default "Links your chama to the MMF" product so /invest
-// isn't empty on a fresh install. Run with `npx prisma db seed` (wired
+// Seeds the default fixed-income product so /invest isn't empty on a fresh install.
+// Run with `npx prisma db seed` (wired
 // up in package.json's `prisma.seed` field) or `npx tsx prisma/seed.ts`.
 async function main() {
   await prisma.investmentProduct.upsert({
-    where: { id: 'ludeva-mmf-default' },
-    update: {},
+    where: { id: 'ludeva-fixed-income-account' },
+    update: {
+      name: 'Fixed Income Account',
+      type: 'BOND',
+      description: 'Fixed-income investments for your chama, earning 13% p.a.',
+      roi: 13,
+      roiMax: null,
+      duration: 12,
+      isActive: true,
+    },
     create: {
-      id: 'ludeva-mmf-default',
-      name: 'Money Market Fund',
-      type: 'MMF',
-      description:
-        "Your chama's pooled fund invested directly into our flagship Money Market Fund — the same MMF individual members use.",
-      roi: 9,
-      roiMax: 13,
-      duration: 1,
+      id: 'ludeva-fixed-income-account',
+      name: 'Fixed Income Account',
+      type: 'BOND',
+      description: 'Fixed-income investments for your chama, earning 13% p.a.',
+      roi: 13,
+      roiMax: null,
+      duration: 12,
       minAmount: 1000,
       maxAmount: null,
       isActive: true,
     },
   });
 
-  console.log('✅ Seeded Money Market Fund product.');
+  console.log('✅ Seeded Fixed Income Account.');
 
   // ── Personal Ludeva accounts (member dashboard → /accounts) ──
   // Fixed ids so re-running this is always safe (upsert), and so the
@@ -32,15 +39,21 @@ async function main() {
   // /accounts stays stable even if an admin renames one later.
   await prisma.investmentProduct.upsert({
     where: { id: 'ludeva-shares-account' },
-    update: { name: 'Shares Account', type: 'STOCK', roi: 9, roiMax: 13 },
+    update: {
+      name: 'Shares Account',
+      type: 'STOCK',
+      description: 'Invest in shares through your chama, with annual returns above 9%.',
+      roi: 9,
+      roiMax: null,
+      isActive: true,
+    },
     create: {
       id: 'ludeva-shares-account',
       name: 'Shares Account',
       type: 'STOCK',
-      description:
-        'Buy shares in Ludeva and earn a dividend on your holding — the same shares product Ludeva members invest in individually.',
+      description: 'Invest in shares through your chama, with annual returns above 9%.',
       roi: 9,
-      roiMax: 13,
+      roiMax: null,
       duration: 12,
       minAmount: 1000,
       maxAmount: null,
@@ -50,13 +63,20 @@ async function main() {
 
   await prisma.investmentProduct.upsert({
     where: { id: 'ludeva-savings-account' },
-    update: { name: 'Savings Account', type: 'SAVINGS', roi: 7, roiMax: null },
+    update: {
+      name: 'Savings Account',
+      type: 'SAVINGS',
+      description: 'A flexible savings account earning 5% p.a. — top up any time via M-Pesa or card.',
+      roi: 5,
+      roiMax: null,
+      isActive: true,
+    },
     create: {
       id: 'ludeva-savings-account',
       name: 'Savings Account',
       type: 'SAVINGS',
-      description: 'A flexible savings account earning up to 7% p.a. — top up any time via M-Pesa or card.',
-      roi: 7,
+      description: 'A flexible savings account earning 5% p.a. — top up any time via M-Pesa or card.',
+      roi: 5,
       roiMax: null,
       duration: 1,
       minAmount: 500,
@@ -83,7 +103,12 @@ async function main() {
     },
   });
 
-  console.log('✅ Seeded Shares, Savings, and Ludeva Junior accounts.');
+  await prisma.investmentProduct.updateMany({
+    where: { type: 'MMF', isActive: true },
+    data: { isActive: false },
+  });
+
+  console.log('✅ Seeded Shares, Savings, Fixed Income, and Ludeva Junior accounts.');
 }
 
 main()

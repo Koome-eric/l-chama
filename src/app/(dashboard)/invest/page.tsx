@@ -3,8 +3,9 @@ import { requirePanelAccess } from '@/lib/require-panel-access';
 import { InvestClient } from './InvestClient';
 import { Suspense } from 'react';
 
-const POOLED_TYPES = ['MMF', 'STOCK', 'BOND', 'FIXED_DEPOSIT'] as const;
+const POOLED_TYPES = ['STOCK', 'BOND', 'FIXED_DEPOSIT'] as const;
 type PooledProductType = (typeof POOLED_TYPES)[number];
+type InvestmentProductType = PooledProductType | 'MMF';
 
 export default async function InvestPage() {
   const { ctx } = await requirePanelAccess('/invest');
@@ -39,8 +40,8 @@ export default async function InvestPage() {
     })),
     investments: investments.map((i) => ({
       id: i.id,
-      productName: i.product.name,
-      productType: i.product.type as PooledProductType,
+      productName: i.product.type === 'MMF' ? 'Legacy investment' : i.product.name,
+      productType: i.product.type as InvestmentProductType,
       amount: i.amount,
       status: i.status,
       investedByName: i.investedBy.fullName || i.investedBy.email || 'Unknown member',
@@ -55,7 +56,7 @@ export default async function InvestPage() {
         <h1 className="font-headline text-2xl font-semibold">Invest</h1>
         <p className="text-muted-foreground">
           Grow your chama's pooled fund by putting it into a Ludeva investment product — the same
-          MMF, stocks, bonds, and fixed deposit products Ludeva members invest in individually.
+          shares and fixed-income products Ludeva members invest in individually.
         </p>
       </div>
       <Suspense fallback={null}>

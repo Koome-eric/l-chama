@@ -358,9 +358,9 @@ type Stats = {
 type Section = 'overview' | 'organisations' | 'campaigns' | 'products' | 'reports' | 'savings' | 'payments' | 'junior' | 'ludeva-members' | 'admins';
 
 const TYPE_LABEL: Record<ProductType, string> = {
-  MMF: 'Money Market Fund',
+  MMF: 'Legacy product',
   STOCK: 'Shares Account',
-  BOND: 'Bonds',
+  BOND: 'Fixed Income Account',
   FIXED_DEPOSIT: 'Fixed Deposit',
   SAVINGS: 'Savings Account',
   JUNIOR: 'Ludeva Junior Account',
@@ -1371,7 +1371,7 @@ function CampaignsAdminSection({ campaigns }: { campaigns: CampaignRow[] }) {
 
 const EMPTY_PRODUCT_FORM = {
   name: '',
-  type: 'MMF' as ProductType,
+  type: 'STOCK' as ProductType,
   description: '',
   roi: '',
   roiMax: '',
@@ -1489,7 +1489,7 @@ function ProductsAdminSection({ products }: { products: ProductRow[] }) {
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
             {(Object.keys(TYPE_LABEL) as ProductType[]).map((t) => (
-              <SelectItem key={t} value={t}>{TYPE_LABEL[t]}</SelectItem>
+              <SelectItem key={t} value={t} disabled={t === 'MMF'}>{TYPE_LABEL[t]}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -1504,7 +1504,7 @@ function ProductsAdminSection({ products }: { products: ProductRow[] }) {
           <Input id="p-roi" type="number" value={form.roi} onChange={(e) => setForm((f) => ({ ...f, roi: e.target.value }))} />
         </div>
         <div>
-          <Label htmlFor="p-roiMax">ROI % p.a. max (optional, e.g. 13 for "9–13%")</Label>
+          <Label htmlFor="p-roiMax">ROI % p.a. max (optional, for a rate range)</Label>
           <Input id="p-roiMax" type="number" value={form.roiMax} onChange={(e) => setForm((f) => ({ ...f, roiMax: e.target.value }))} />
         </div>
         <div>

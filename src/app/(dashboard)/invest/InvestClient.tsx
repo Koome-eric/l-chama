@@ -33,7 +33,7 @@ import type { ChamaPermissions } from '@/lib/chama';
 type Product = {
   id: string;
   name: string;
-  type: 'MMF' | 'STOCK' | 'BOND' | 'FIXED_DEPOSIT';
+  type: 'STOCK' | 'BOND' | 'FIXED_DEPOSIT';
   description: string | null;
   roi: number;
   roiMax: number | null;
@@ -45,7 +45,7 @@ type Product = {
 type Investment = {
   id: string;
   productName: string;
-  productType: Product['type'];
+  productType: Product['type'] | 'MMF';
   amount: number;
   status: 'ACTIVE' | 'COMPLETED';
   investedByName: string | null;
@@ -61,10 +61,10 @@ type Data = {
   investments: Investment[];
 };
 
-const TYPE_LABEL: Record<Product['type'], string> = {
-  MMF: 'Money Market Fund',
-  STOCK: 'Stocks',
-  BOND: 'Bonds',
+const TYPE_LABEL: Record<Investment['productType'], string> = {
+  MMF: 'Legacy investment',
+  STOCK: 'Shares Account',
+  BOND: 'Fixed Income Account',
   FIXED_DEPOSIT: 'Fixed Deposit',
 };
 
@@ -81,7 +81,7 @@ export function InvestClient({ data }: { data: Data }) {
   const canViewPool = data.isOwner || data.permissions.canViewPooledFunds;
   const canWithdraw = data.isOwner || data.permissions.canWithdraw;
 
-  // Coming from a landing-page product link (?type=MMF) — scroll to that
+  // Coming from a public product link (?type=STOCK or ?type=BOND) — scroll to that
   // product and, if there's exactly one match and the member can invest,
   // open the invest dialog for it automatically.
   useEffect(() => {
@@ -178,7 +178,7 @@ export function InvestClient({ data }: { data: Data }) {
                   {p.description && <CardDescription>{p.description}</CardDescription>}
                 </CardHeader>
                 <CardContent className="space-y-1 text-sm font-figures">
-                  <p><span className="font-sans text-muted-foreground">ROI:</span> <span className="font-semibold text-primary">{p.roiMax ? `${p.roi}–${p.roiMax}` : p.roi}% p.a.</span></p>
+                  <p><span className="font-sans text-muted-foreground">ROI:</span> <span className="font-semibold text-primary">{p.type === 'STOCK' ? `Above ${p.roi}%` : p.roiMax ? `${p.roi}–${p.roiMax}` : `${p.roi}%`} p.a.</span></p>
                   <p><span className="font-sans text-muted-foreground">Term:</span> {p.duration} month{p.duration === 1 ? '' : 's'}</p>
                   <p>
                     <span className="font-sans text-muted-foreground">Range:</span> {formatKES(p.minAmount)}
