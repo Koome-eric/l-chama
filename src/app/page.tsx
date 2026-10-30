@@ -9,6 +9,8 @@ import { HeroReveal, HeroRevealItem } from '@/components/motion/HeroReveal';
 import { CountUp } from '@/components/motion/CountUp';
 import { LandingFAQ } from '@/components/LandingFAQ';
 import { getVisitorState } from '@/lib/landing-auth';
+import { PRODUCTS, LOAN_INTEREST, PROCESSING_FEE, WITHDRAWAL_FEE } from '@/lib/landing-content';
+import { RATES_EFFECTIVE } from '@/lib/legal';
 
 const FEATURES = [
   {
@@ -34,9 +36,23 @@ const STEPS = [
   { title: 'Save, guarantee, borrow', body: 'Members contribute each month. A loan needs two guarantors, then your officials approve it and funds are disbursed by M-Pesa.' },
 ];
 
+// Headline figures for the "at a glance" strip. Product rates come straight
+// from landing-content, so they match /products exactly.
+const GLANCE = [
+  ...PRODUCTS.filter((p) => p.rate).map((p) => ({
+    label: p.name,
+    figure: p.rate as string,
+    note: 'per year',
+  })),
+  { label: 'Loan interest', figure: LOAN_INTEREST, note: 'per month, up to 6 months' },
+  { label: 'Loan processing fee', figure: PROCESSING_FEE, note: 'once, on the loan amount' },
+  { label: 'Withdrawal fee', figure: WITHDRAWAL_FEE, note: 'external chamas; no other hidden charges' },
+];
+
 const EXPLORE = [
-  { title: 'Products and rates', body: 'Shares, savings, fixed income, junior accounts and last expense cover, with the rate and its effective date.', href: '/products' },
+  { title: 'Products and rates', body: 'Savings, MMF, junior accounts and last expense cover, with the rate and its effective date.', href: '/products' },
   { title: 'Loans', body: 'Terms, fees and how guarantors work, stated plainly before you sign up.', href: '/loans' },
+  { title: 'Fundraising', body: 'Start or support a community campaign for welfare, medical costs or education.', href: '/fundraising' },
   { title: 'Diaspora chamas', body: 'Contribute, guarantee and vote from another country or time zone.', href: '/diaspora' },
 ];
 
@@ -80,9 +96,9 @@ export default async function LandingPage() {
                     ) : (
                       <ul className="divide-y rounded-2xl border bg-card/80 backdrop-blur-sm">
                         {[
-                          { t: 'Start a chama', d: 'Set up your group in minutes, free.', href: '/sign-up', primary: true },
-                          { t: 'Join my chama', d: 'Already invited? Open your invite link, or sign in.', href: '/sign-in' },
-                          { t: 'Explore products', d: 'Shares, savings, fixed income, cover and loans.', href: '/products' },
+                          { t: 'Start a chama', d: 'Set up your group in minutes, free.', href: '/start', primary: true },
+                          { t: 'Join my chama', d: 'Already invited? Paste your invite link.', href: '/join' },
+                          { t: 'Explore products', d: 'Savings, MMF, junior accounts, cover and loans.', href: '/products' },
                         ].map((o) => (
                           <li key={o.t}>
                             <Link
@@ -176,11 +192,40 @@ export default async function LandingPage() {
           </div>
         </section>
 
+        {/* RATES AND FEES — the headline figures, up front */}
+        <section aria-labelledby="rates-heading" className="border-y bg-card py-16 md:py-24">
+          <div className="container mx-auto px-4">
+            <h2 id="rates-heading" className="font-headline text-3xl md:text-4xl font-bold max-w-2xl leading-tight">
+              Rates and fees, up front.
+            </h2>
+            <p className="mt-3 max-w-2xl text-muted-foreground">
+              Rates effective {RATES_EFFECTIVE}. They are annual, indicative and not guaranteed, and can change.
+            </p>
+            <dl className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {GLANCE.map((g) => (
+                <div key={g.label} className="rounded-2xl border bg-background p-6">
+                  <dt className="text-sm text-muted-foreground">{g.label}</dt>
+                  <dd className="mt-2 font-figures font-headline text-3xl font-bold">{g.figure}</dd>
+                  <dd className="mt-1 text-sm text-muted-foreground">{g.note}</dd>
+                </div>
+              ))}
+            </dl>
+            <div className="mt-8 flex flex-wrap gap-x-8 gap-y-3 text-sm font-medium">
+              <Link href="/products" className="inline-flex items-center gap-1.5 text-primary hover:underline underline-offset-4">
+                All products and rates <ArrowRight className="h-4 w-4" aria-hidden />
+              </Link>
+              <Link href="/loans" className="inline-flex items-center gap-1.5 text-primary hover:underline underline-offset-4">
+                Loan terms and fees <ArrowRight className="h-4 w-4" aria-hidden />
+              </Link>
+            </div>
+          </div>
+        </section>
+
         {/* EXPLORE — detail lives on dedicated pages */}
         <section className="py-16 md:py-24">
           <div className="container mx-auto px-4">
             <h2 className="font-headline text-3xl md:text-4xl font-bold max-w-xl leading-tight">
-              See the rates, fees and rules first.
+              More to explore.
             </h2>
             <ul className="mt-10 divide-y rounded-2xl border bg-card">
               {EXPLORE.map((x) => (

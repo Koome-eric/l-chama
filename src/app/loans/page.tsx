@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { PublicPage } from '@/components/PublicPage';
 import { Button } from '@/components/ui/button';
-import { LOAN_TERMS, LOAN_STEPS } from '@/lib/landing-content';
+import { LOAN_TERMS, LOAN_STEPS, WITHDRAWAL_FEE } from '@/lib/landing-content';
 import { getVisitorState } from '@/lib/landing-auth';
 
 export const metadata = { title: 'Loans — L-Chama' };
@@ -28,9 +28,9 @@ export default async function LoansPage() {
             ))}
           </dl>
           <div className="border-t-2 border-gold/40 bg-gold/10 px-6 py-5">
-            <p className="font-headline font-semibold">Platform withdrawal fee: 5%</p>
+            <p className="font-headline font-semibold">Platform withdrawal fee: {WITHDRAWAL_FEE}</p>
             <p className="mt-1.5 text-sm text-muted-foreground">
-              A flat 5% fee applies to standard withdrawals, including campaign fund withdrawals, for external chamas
+              A flat {WITHDRAWAL_FEE} fee applies to standard withdrawals, including campaign fund withdrawals, for external chamas
               (chamas not built directly by Ludeva Plc). There are no other hidden charges.
             </p>
             <p className="mt-2 text-xs text-muted-foreground">

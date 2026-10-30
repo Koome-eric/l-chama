@@ -5,27 +5,19 @@
 export const PRODUCTS = [
   {
     name: 'Savings Account',
-    rate: '5%',
-    rateNote: 'per year',
+    rate: '5% – 7%',
+    rateNote: 'per year, tiered by average monthly balance',
     summary: 'Flexible account for day-to-day group funds.',
-    points: ['5% annual interest', 'No lock-in period', 'No monthly ledger fees'],
+    points: ['Tiered interest on your average monthly balance', 'No lock-in period', 'No monthly ledger fees'],
     target: '/savings',
   },
   {
-    name: 'Shares Account',
-    rate: 'Above 9%',
-    rateNote: 'per year',
-    summary: 'A share investment account for your chama.',
-    points: ['Annual returns above 9%', 'Invest through your chama', 'View holdings from your dashboard'],
-    target: '/invest?type=STOCK',
-  },
-  {
-    name: 'Fixed Income Account',
-    rate: '13%',
-    rateNote: 'per year',
-    summary: 'A fixed-income investment option for your chama.',
-    points: ['13% annual return', 'Invest through your chama', 'View holdings from your dashboard'],
-    target: '/invest?type=BOND',
+    name: 'MMF',
+    rate: '9% – 13%',
+    rateNote: 'per year, varies with the fund',
+    summary: 'Money market fund for capital your chama is not touching.',
+    points: ['Daily interest compounding', 'Automated interest generation', 'Minimum lock-in of 12 months'],
+    target: '/invest?type=MMF',
   },
   {
     name: 'Junior Account',
@@ -48,9 +40,15 @@ export const PRODUCTS = [
   },
 ] as const;
 
+// Headline figures, defined once and used by the home page, /loans and
+// /products.
+export const LOAN_INTEREST = '2.5%';
+export const PROCESSING_FEE = '2.5%';
+export const WITHDRAWAL_FEE = '5%';
+
 export const LOAN_TERMS = [
-  { label: 'Interest', value: '2.5% per month' },
-  { label: 'Processing fee', value: '2.5% once, on the loan amount' },
+  { label: 'Interest', value: `${LOAN_INTEREST} per month` },
+  { label: 'Processing fee', value: `${PROCESSING_FEE} once, on the loan amount` },
   { label: 'Repayment', value: 'Up to 6 months, repaid weekly' },
   { label: 'Approval', value: 'Two member guarantors, then your chama officials' },
   { label: 'Disbursement', value: 'By M-Pesa once approved' },

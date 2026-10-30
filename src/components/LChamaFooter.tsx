@@ -5,10 +5,12 @@ const COLUMNS = [
   {
     title: 'Chama',
     links: [
-      { label: 'Start a chama', href: '/sign-up' },
+      { label: 'Start a chama', href: '/start' },
+      { label: 'Join my chama', href: '/join' },
       { label: 'Sign in', href: '/sign-in' },
       { label: 'Products and rates', href: '/products' },
       { label: 'Loans', href: '/loans' },
+      { label: 'Fundraising', href: '/fundraising' },
       { label: 'Diaspora chamas', href: '/diaspora' },
     ],
   },

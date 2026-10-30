@@ -19,6 +19,9 @@ const isPublicRoute = createRouteMatcher([
   // Public information pages — fees, rates and legal terms must be readable
   // before sign-up (website audit: "make trust visible before sign-up").
   "/terms",
+  "/start",
+  "/join",
+  "/fundraising",
   "/products",
   "/loans",
   "/diaspora",

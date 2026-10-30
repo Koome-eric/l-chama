@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { getChamaContext } from '@/lib/chama';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
+import { ClerkScope } from '@/components/ClerkScope';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   // Best-effort only — this layout also wraps the onboarding pages,
@@ -24,10 +25,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   return (
-    <SidebarProvider>
-      <Suspense fallback={null}>
-        <AppSidebar hasLastRespectCover={hasLastRespectCover}>{children}</AppSidebar>
-      </Suspense>
-    </SidebarProvider>
+    <ClerkScope>
+      <SidebarProvider>
+        <Suspense fallback={null}>
+          <AppSidebar hasLastRespectCover={hasLastRespectCover}>{children}</AppSidebar>
+        </Suspense>
+      </SidebarProvider>
+    </ClerkScope>
   );
 }

@@ -27,8 +27,8 @@
 2. Set `RATES_AS_AT` in `src/lib/marketing-content.ts` (placeholder 26 Oct 2026) and confirm the rates are right.
 3. Test after deploy: /, /start, /join, /products, /loans, /fundraising, /diaspora, /sign-in, /sign-up, /invite/<token>,
    /admin, /panel. Clerk's browser SDK now loads only on sign-in, sign-up, invite, admin and the signed-in app.
-4. Fonts changed to Inter + Roboto Slab (same as Ludeva) and neutral colours now match Ludeva's tokens; revert in
-   `src/app/layout.tsx` / `globals.css` if you prefer the old look.
+4. Fonts are Inter (text and figures) + Plus Jakarta Sans (headlines), and neutral colours match Ludeva's tokens;
+   revert in `src/app/layout.tsx` / `globals.css` if you prefer the old look.
 
 ## Homepage restructure
 - New public pages: /start (steps + contribution levels), /join (paste invite link), /products, /loans,
@@ -48,3 +48,26 @@
 - Login throttle now also counts failures in the database (shared across instances), on top of the in-memory one.
 - Step-up: password re-entry for create/edit/permissions/delete of admin accounts (email+password sessions only;
   Clerk platform admins rely on Clerk).
+
+---
+# Round 4 — navigation, rates on the home page, FAQ, Clerk scope
+
+## What changed
+- **Mobile menu:** `src/components/MobileNav.tsx`. Below the `xl` breakpoint the header shows a menu button; the panel
+  closes on Escape, on route change and when a link is chosen.
+- **New pages linked and public:** header (Join my chama, Fundraising, and "Start a Chama" as the main button), home hero
+  (Start a chama -> /start, Join my chama -> /join), Explore list (adds Fundraising) and footer. `/start`, `/join` and
+  `/fundraising` are now public routes in `src/middleware.ts` (before this, signed-out visitors were sent to /sign-in).
+- **Rates and fees on the home page:** a "Rates and fees, up front" section. Figures come from `src/lib/landing-content.ts`
+  (`PRODUCTS`, `LOAN_INTEREST`, `PROCESSING_FEE`, `WITHDRAWAL_FEE`) and the date from `src/lib/legal.ts`, so the home page,
+  /products and /loans always agree.
+- **Shorter FAQ answers** in `src/components/LandingFAQ.tsx`.
+- **Clerk loads only where needed:** `ClerkProvider` moved out of the root layout into `src/components/ClerkScope.tsx`, used by
+  the sign-in, sign-up, invite, admin and (dashboard) layouts. `LChamaHeader` is now a server component that reads the session
+  with `auth()`, so public pages ship no Clerk browser code. If you add a page that uses a Clerk hook or component
+  (`useUser`, `<UserButton />`, ...), put it under a layout that wraps `<ClerkScope>`.
+
+## Cleanup still open
+- `src/lib/marketing-content.ts` is no longer imported anywhere (superseded by `landing-content.ts`) and holds an older rates date.
+- `public/hero-chama.png`, `hero-chama-v3.png` (2.5 MB each) and `hero-chama.webp` are not used by any page.
+- `migrate-clerk-ids.cjs` has a hard-coded local log path and real user IDs; do not deploy it.

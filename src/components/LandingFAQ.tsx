@@ -9,32 +9,32 @@ import { cn } from '@/lib/utils';
 // generic SaaS filler — see /panel, /lib/chama.ts and /lib/chama-levels.ts.
 const FAQS = [
   {
-    q: 'How does a loan actually get approved?',
-    a: "No credit score — your chama vouches for you instead. A loan request needs two other members to guarantee it, each signing with their typed full name. Once a 2.5% processing fee is confirmed received, your Team Leader (or anyone with approval permission) approves it and funds move from the shared loan account. Interest is fixed at 2.5% per month, capped at 6 months, repaid weekly.",
+    q: 'How does a loan get approved?',
+    a: 'Two other members guarantee your request, then your chama\u2019s officials approve it once the 2.5% processing fee is confirmed. There is no credit score. Interest is 2.5% a month for up to 6 months, repaid weekly.',
   },
   {
-    q: 'What happens if a loan isn\u2019t repaid?',
-    a: 'Guarantors are personally liable up to the amount they signed for, which is why guarantors see the full repayment schedule and can track it week by week. It keeps underwriting social rather than paper-based, but it also means only guarantee what you\u2019d be able to cover yourself.',
+    q: 'What if a loan isn\u2019t repaid?',
+    a: 'Guarantors are liable for the amount they signed for, and they can follow the repayment schedule week by week. Only guarantee what you could cover yourself.',
   },
   {
-    q: 'Where do my savings numbers on the dashboard come from?',
-    a: 'Every deposit and payout entry your admin records \u2014 by hand or synced from your chama\u2019s Savings Data sheet \u2014 rolls straight into your dashboard: total funds, the milestone bar, the funds-growth chart, and the contributor leaderboard. Nothing on there is a placeholder; it\u2019s all computed from those entries.',
+    q: 'Where do my dashboard numbers come from?',
+    a: 'From the deposits and payouts your admin records, by hand or synced from your chama\u2019s savings sheet. Totals, charts and the leaderboard are all calculated from those entries.',
   },
   {
     q: 'Can members outside Kenya join?',
-    a: 'Yes. Diaspora chamas run the same way, just flagged on your chama profile so contribution reminders and reporting account for members spread across time zones.',
+    a: 'Yes. Diaspora chamas work the same way, and reminders and reports take time zones into account.',
   },
   {
-    q: 'Is one chama\u2019s money ever visible to another?',
-    a: 'No. Each chama\u2019s membership, permissions, loan account and savings entries are scoped to that team only \u2014 members and admins can only ever see the group they belong to.',
+    q: 'Can another chama see my chama\u2019s money?',
+    a: 'No. Each chama\u2019s members, loans and savings are visible only to that group.',
   },
   {
-    q: 'What\u2019s the difference between Savings and the investment products?',
-    a: 'Savings Account is your chama\u2019s day-to-day operating fund \u2014 flexible and without a lock-in period. Shares and Fixed Income Accounts are longer-horizon investments for capital your chama is not using month to month. The Junior Account helps families save for a child\u2019s future.',
+    q: 'Savings or investment products: which one?',
+    a: 'Savings is for everyday group funds, with no lock-in. MMF and the Junior Account pay more but lock your money in for a set period.',
   },
   {
-    q: 'How much does it cost to start a chama?',
-    a: 'There\u2019s no signup fee. Every chama picks a monthly contribution level at setup \u2014 members contribute the same amount each month \u2014 and that level is what determines your chama\u2019s tier, not a platform charge.',
+    q: 'What does it cost to start a chama?',
+    a: 'Nothing. There is no signup fee. You pick a monthly contribution level, and every member pays that same amount each month.',
   },
 ] as const;
 
@@ -50,8 +50,7 @@ export function LandingFAQ() {
               Questions, answered plainly.
             </h2>
             <p className="mt-3 text-muted-foreground max-w-sm">
-              How the loan guarantees, the savings dashboard, and the rest of L-Chama actually
-              work under the hood.
+              Loans, savings and how your chama’s money is kept.
             </p>
           </div>
 
