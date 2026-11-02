@@ -46,7 +46,8 @@ export default async function AdminPage() {
     prisma.campaign.findMany({ include: { creator: true }, orderBy: { createdAt: 'desc' } }),
     prisma.investmentProduct.findMany({ orderBy: { createdAt: 'desc' } }),
     prisma.memberReport.findMany({ include: { team: true }, orderBy: { uploadedAt: 'desc' }, take: 200 }),
-    prisma.savingsEntry.findMany({ include: { team: true }, orderBy: { uploadedAt: 'desc' }, take: 200 }),
+    // No `take` cap: the Savings screen must show every synced row (a cap of 200 hid half of a 400-row push).
+    prisma.savingsEntry.findMany({ include: { team: true }, orderBy: { uploadedAt: 'desc' } }),
     prisma.user.count(),
     prisma.loanAccount.aggregate({ _sum: { balance: true } }),
     prisma.payment.findMany({

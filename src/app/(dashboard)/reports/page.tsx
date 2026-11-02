@@ -118,7 +118,7 @@ export default async function ReportsPage() {
                 <div>
                   <p className="font-medium">{r.memberName || r.memberEmail}</p>
                   <p className="text-muted-foreground">
-                    {r.periodLabel || r.date || '—'} · Principal {r.principal || '—'} · ROI {r.roi || '—'}
+                    {r.periodLabel || r.date || '—'} · Contribution {r.principal || '—'} · ROI {r.roi || '—'}
                   </p>
                 </div>
                 {r.closingBal && <Badge variant="secondary">Closing: {r.closingBal}</Badge>}

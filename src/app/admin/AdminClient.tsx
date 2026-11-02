@@ -2047,7 +2047,7 @@ function MemberReportsAdminSection({ reports }: { reports: ReportRow[] }) {
                   <TableHead>Member</TableHead>
                   <TableHead className="hidden sm:table-cell">Chama</TableHead>
                   <TableHead className="hidden md:table-cell">Period</TableHead>
-                  <TableHead>Principal</TableHead>
+                  <TableHead>Contribution</TableHead>
                   <TableHead className="hidden lg:table-cell">ROI</TableHead>
                   <TableHead>Closing Bal.</TableHead>
                   <TableHead className="text-right">Action</TableHead>
@@ -2099,7 +2099,7 @@ const SAVINGS_FORM_FIELDS: { key: keyof SavingsEntryForm; label: string; placeho
   { key: 'deposit', label: 'Deposit' },
   { key: 'payout', label: 'Payout' },
   { key: 'closingBalance', label: 'Closing balance' },
-  { key: 'periodLabel', label: 'Period', placeholder: 'Aug 2026' },
+  // Period isn't entered by hand — it's the same as Date (see handleSave).
   { key: 'notes', label: 'Notes' },
 ];
 
@@ -2359,7 +2359,8 @@ function SavingsAdminSection({ entries }: { entries: SavingsRow[] }) {
           await updateSavingsEntry(editingId, form);
           toast({ title: 'Entry updated' });
         } else {
-          await createSavingsEntry(form);
+          // Period is the same as Date, so it isn't asked for — mirror it.
+          await createSavingsEntry({ ...form, periodLabel: form.date.trim() });
           toast({ title: 'Entry added' });
         }
         setDialogOpen(false);
