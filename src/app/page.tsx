@@ -50,7 +50,7 @@ const GLANCE = [
 ];
 
 const EXPLORE = [
-  { title: 'Products and rates', body: 'Savings, MMF, junior accounts and last expense cover, with the rate and its effective date.', href: '/products' },
+  { title: 'Products and rates', body: 'Savings, shares, junior accounts and last expense cover, with the rate and its effective date.', href: '/products' },
   { title: 'Loans', body: 'Terms, fees and how guarantors work, stated plainly before you sign up.', href: '/loans' },
   { title: 'Fundraising', body: 'Start or support a community campaign for welfare, medical costs or education.', href: '/fundraising' },
   { title: 'Diaspora chamas', body: 'Contribute, guarantee and vote from another country or time zone.', href: '/diaspora' },
@@ -98,7 +98,7 @@ export default async function LandingPage() {
                         {[
                           { t: 'Start a chama', d: 'Set up your group in minutes, free.', href: '/start', primary: true },
                           { t: 'Join my chama', d: 'Already invited? Paste your invite link.', href: '/join' },
-                          { t: 'Explore products', d: 'Savings, MMF, junior accounts, cover and loans.', href: '/products' },
+                          { t: 'Explore products', d: 'Savings, shares, junior accounts, cover and loans.', href: '/products' },
                         ].map((o) => (
                           <li key={o.t}>
                             <Link

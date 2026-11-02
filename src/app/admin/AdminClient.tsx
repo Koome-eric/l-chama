@@ -198,7 +198,7 @@ type CampaignRow = {
   createdAt: string;
 };
 
-type ProductType = 'MMF' | 'STOCK' | 'BOND' | 'FIXED_DEPOSIT' | 'SAVINGS' | 'JUNIOR';
+type ProductType = 'STOCK' | 'BOND' | 'FIXED_DEPOSIT' | 'SAVINGS' | 'JUNIOR';
 
 type ProductRow = {
   id: string;
@@ -358,7 +358,6 @@ type Stats = {
 type Section = 'overview' | 'organisations' | 'campaigns' | 'products' | 'reports' | 'savings' | 'payments' | 'junior' | 'ludeva-members' | 'admins';
 
 const TYPE_LABEL: Record<ProductType, string> = {
-  MMF: 'Legacy product',
   STOCK: 'Shares Account',
   BOND: 'Fixed Income Account',
   FIXED_DEPOSIT: 'Fixed Deposit',
@@ -1381,7 +1380,6 @@ const EMPTY_PRODUCT_FORM = {
 };
 
 const PRODUCT_TONE: Record<ProductType, string> = {
-  MMF: 'bg-primary/10 text-primary',
   STOCK: 'bg-gold/15 text-gold',
   BOND: 'bg-chama/10 text-chama',
   FIXED_DEPOSIT: 'bg-destructive/10 text-destructive',
@@ -1489,7 +1487,7 @@ function ProductsAdminSection({ products }: { products: ProductRow[] }) {
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
             {(Object.keys(TYPE_LABEL) as ProductType[]).map((t) => (
-              <SelectItem key={t} value={t} disabled={t === 'MMF'}>{TYPE_LABEL[t]}</SelectItem>
+              <SelectItem key={t} value={t}>{TYPE_LABEL[t]}</SelectItem>
             ))}
           </SelectContent>
         </Select>

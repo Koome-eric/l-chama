@@ -5,7 +5,6 @@ import { Suspense } from 'react';
 
 const POOLED_TYPES = ['STOCK', 'BOND', 'FIXED_DEPOSIT'] as const;
 type PooledProductType = (typeof POOLED_TYPES)[number];
-type InvestmentProductType = PooledProductType | 'MMF';
 
 export default async function InvestPage() {
   const { ctx } = await requirePanelAccess('/invest');
@@ -40,8 +39,8 @@ export default async function InvestPage() {
     })),
     investments: investments.map((i) => ({
       id: i.id,
-      productName: i.product.type === 'MMF' ? 'Legacy investment' : i.product.name,
-      productType: i.product.type as InvestmentProductType,
+      productName: i.product.name,
+      productType: i.product.type as PooledProductType,
       amount: i.amount,
       status: i.status,
       investedByName: i.investedBy.fullName || i.investedBy.email || 'Unknown member',

@@ -28,7 +28,7 @@ export async function investPooledFunds(input: { productId: string; amount: numb
   }
 
   const product = await prisma.investmentProduct.findUnique({ where: { id: input.productId } });
-  if (!product || !product.isActive || product.type === 'MMF') {
+  if (!product || !product.isActive) {
     throw new Error('This investment product is not available.');
   }
   if (!Number.isFinite(input.amount) || input.amount <= 0) throw new Error('Enter a valid amount.');

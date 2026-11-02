@@ -82,11 +82,8 @@ async function main() {
     where: {
       isActive: true,
       OR: [
-        { type: 'MMF' },
         { type: 'FIXED_DEPOSIT' },
         { type: 'BOND', id: { not: 'ludeva-fixed-income-account' } },
-        { name: { contains: 'MMF', mode: 'insensitive' } },
-        { name: { contains: 'Money Market', mode: 'insensitive' } },
         { name: { contains: 'Fixed Deposit', mode: 'insensitive' } },
       ],
     },

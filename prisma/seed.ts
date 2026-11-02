@@ -103,11 +103,6 @@ async function main() {
     },
   });
 
-  await prisma.investmentProduct.updateMany({
-    where: { type: 'MMF', isActive: true },
-    data: { isActive: false },
-  });
-
   console.log('✅ Seeded Shares, Savings, Fixed Income, and Ludeva Junior accounts.');
 }
 

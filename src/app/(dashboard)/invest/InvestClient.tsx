@@ -45,7 +45,7 @@ type Product = {
 type Investment = {
   id: string;
   productName: string;
-  productType: Product['type'] | 'MMF';
+  productType: Product['type'];
   amount: number;
   status: 'ACTIVE' | 'COMPLETED';
   investedByName: string | null;
@@ -62,7 +62,6 @@ type Data = {
 };
 
 const TYPE_LABEL: Record<Investment['productType'], string> = {
-  MMF: 'Legacy investment',
   STOCK: 'Shares Account',
   BOND: 'Fixed Income Account',
   FIXED_DEPOSIT: 'Fixed Deposit',

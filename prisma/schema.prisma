@@ -577,14 +577,13 @@ model Campaign {
 
 // ─────────────────────────────────────────────
 // Investment Products — the same catalog concept as Ludeva's
-// InvestmentProduct (MMF, stocks, bonds, fixed deposits). L Chama runs
+// InvestmentProduct (shares, bonds, fixed deposits). L Chama runs
 // its own database, so this is a local copy of the product catalog
 // (managed by an L Chama admin) rather than a live cross-app join —
 // see /admin's "Investment Products" tab. A chama invests pooled funds
 // from its loan account into one of these via TeamInvestment.
 // ─────────────────────────────────────────────
 enum FundType {
-  MMF
   STOCK
   BOND
   FIXED_DEPOSIT

@@ -30,7 +30,7 @@ const FAQS = [
   },
   {
     q: 'Savings or investment products: which one?',
-    a: 'Savings is for everyday group funds, with no lock-in. MMF and the Junior Account pay more but lock your money in for a set period.',
+    a: 'Savings is for everyday group funds, with no lock-in. The Shares Account and the Junior Account pay more but lock your money in for a set period.',
   },
   {
     q: 'What does it cost to start a chama?',

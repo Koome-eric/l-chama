@@ -12,12 +12,12 @@ export const PRODUCTS = [
     target: '/savings',
   },
   {
-    name: 'MMF',
-    rate: '9% – 13%',
-    rateNote: 'per year, varies with the fund',
-    summary: 'Money market fund for capital your chama is not touching.',
-    points: ['Daily interest compounding', 'Automated interest generation', 'Minimum lock-in of 12 months'],
-    target: '/invest?type=MMF',
+    name: 'Shares Account',
+    rate: 'Above 9%',
+    rateNote: 'per year',
+    summary: 'Invest your chama’s funds in shares.',
+    points: ['Annual returns above 9%', 'Holdings tracked from your dashboard', 'Invest pooled chama funds from your loan account'],
+    target: '/invest?type=STOCK',
   },
   {
     name: 'Junior Account',

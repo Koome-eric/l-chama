@@ -425,13 +425,13 @@ export async function unverifyCampaign(campaignId: string) {
 
 // ─────────────────────────────────────────────
 // Investment Products — local product catalog (mirrors Ludeva's
-// InvestmentProduct: MMF, stocks, bonds, fixed deposits) that chamas
+// InvestmentProduct: shares, bonds, fixed deposits) that chamas
 // invest their pooled fund into from /invest.
 // ─────────────────────────────────────────────
 
 export async function createInvestmentProduct(input: {
   name: string;
-  type: 'MMF' | 'STOCK' | 'BOND' | 'FIXED_DEPOSIT' | 'SAVINGS' | 'JUNIOR';
+  type: 'STOCK' | 'BOND' | 'FIXED_DEPOSIT' | 'SAVINGS' | 'JUNIOR';
   description?: string;
   roi: number;
   roiMax?: number | null;
@@ -474,7 +474,7 @@ export async function updateInvestmentProduct(
   productId: string,
   input: {
     name: string;
-    type: 'MMF' | 'STOCK' | 'BOND' | 'FIXED_DEPOSIT' | 'SAVINGS' | 'JUNIOR';
+    type: 'STOCK' | 'BOND' | 'FIXED_DEPOSIT' | 'SAVINGS' | 'JUNIOR';
     description?: string;
     roi: number;
     roiMax?: number | null;

@@ -11,3 +11,13 @@ Existing WithdrawalRequest rows keep the feeAmount/netAmount they were created w
 
 Copy updated: landing-content.ts (home + /loans), fundraising, terms, give/[id], profile + onboarding,
 admin badges/notifications, withdraw + campaign + panel calculators, schema comment.
+
+---
+# MMF removed entirely
+
+- Public catalog: "MMF" card in landing-content.ts is now "Shares Account" (Above 9%, /invest?type=STOCK); home copy + FAQ updated.
+- Code: `MMF` removed from the FundType enum (schema.prisma), admin + invest types/labels, the "Legacy investment" special cases, seed.ts and update-products.ts.
+- `scripts/mmf-push.gs` renamed to `scripts/member-data-push.gs` (same logic; it feeds /api/member-reports/sync).
+- **Deploy step:** run `npx tsx prisma/remove-mmf.ts` BEFORE `npx prisma db push`. It moves any existing MMF products to
+  FIXED_DEPOSIT, renamed "Legacy investment", inactive — so old chama investments stay intact. Without it, db push will refuse
+  to drop the enum value.
