@@ -412,7 +412,7 @@ const SECTION_META: Record<Section, { title: string; description: string }> = {
   products: { title: 'Investment Products', description: 'Manage the catalog chamas invest their pooled fund into.' },
   payments: { title: 'Payments', description: 'M-Pesa and Visa card requests from member accounts, awaiting confirmation.' },
   junior: { title: 'Junior Accounts', description: "Review Ludeva Junior Account applications and their KYC documents." },
-  'ludeva-members': { title: 'Ludeva Members', description: 'Confirm claimed Ludeva Plc membership numbers — only verified members get the 5% withdrawal fee.' },
+  'ludeva-members': { title: 'Ludeva Members', description: 'Confirm claimed Ludeva Plc membership numbers.' },
   reports: { title: 'Member Reports', description: 'Sync and review performance data from Google Sheets.' },
   savings: { title: 'Savings Accounts', description: 'Sync, correct, or manually add running-balance Savings entries.' },
   admins: { title: 'Admins', description: 'Create, edit and remove the admins who can sign in to this panel.' },
@@ -1143,7 +1143,7 @@ function OrganisationsAdminSection({ teams }: { teams: TeamRow[] }) {
                 <div>
                   <p className="text-sm font-medium">Ludeva Plc member chama</p>
                   <p className="text-xs text-muted-foreground">
-                    Member chamas withdraw by email (no in-app flow, no fee) instead of the standard 5% withdrawal fee.
+                    Member chamas withdraw by email (no in-app flow, no fee) instead of the standard 2.5% in-app withdrawal fee.
                   </p>
                 </div>
                 <Button
@@ -2952,8 +2952,8 @@ function JuniorAdminSection({ applications }: { applications: JuniorApplicationR
 
 /* ────────────────────────────────────────────────────────────── */
 /*  Ludeva Membership confirmation — the other half of the           */
-/*  "toll free for existing Ludeva members, 5% flat otherwise"      */
-/*  withdrawal fee (see src/lib/withdrawal-fee.ts). A claim submitted*/
+/*  membership record (no longer affects the 2.5% flat withdrawal   */
+/*  fee — see src/lib/withdrawal-fee.ts). A claim submitted         */
 /*  at onboarding or /profile sits PENDING until an admin confirms   */
 /*  or rejects the number given here.                                */
 /* ────────────────────────────────────────────────────────────── */
@@ -3051,8 +3051,8 @@ function LudevaMembersAdminSection({ members }: { members: LudevaMemberRow[] }) 
                   {m.ludevaMembershipStatus === 'PENDING'
                     ? 'Pending confirmation'
                     : m.ludevaMembershipStatus === 'VERIFIED'
-                      ? 'Verified — Toll free'
-                      : 'Rejected — 5% fee'}
+                      ? 'Verified'
+                      : 'Rejected'}
                 </Badge>
               </div>
             </CardHeader>

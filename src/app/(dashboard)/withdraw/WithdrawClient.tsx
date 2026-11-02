@@ -2,7 +2,6 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { ArrowUpFromLine, CheckCircle2, XCircle, Clock, ShieldCheck, Mail } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -86,16 +85,7 @@ export function WithdrawClient({ state, canRequest }: { state: WithdrawState; ca
       </Card>
 
       <p className="text-xs text-muted-foreground">
-        Your withdrawal fee rate: <span className="font-semibold text-foreground">{(state.myWithdrawalFeeRate * 100).toFixed(1)}%</span>
-        {state.myWithdrawalFeeRate > 0 && (
-          <>
-            {' '}— Ludeva Plc members withdraw toll free.{' '}
-            <Link href="/profile" className="underline">
-              Add your Ludeva membership number
-            </Link>{' '}
-            to qualify, once confirmed by an admin.
-          </>
-        )}
+        Withdrawal fee: <span className="font-semibold text-foreground">{(state.myWithdrawalFeeRate * 100).toFixed(1)}%</span>
       </p>
 
       <SignatoriesCard state={state} onSaved={() => router.refresh()} toast={toast} />

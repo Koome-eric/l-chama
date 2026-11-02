@@ -8,18 +8,14 @@
 // lchama@ludevaplc.co.ke / invst@ludevaplc.co.ke instead of using the
 // in-app withdrawal flow at all — see /withdraw and withdrawals.ts.
 //
-// Two-tier, based on the withdrawal REQUESTER's own confirmed Ludeva
-// membership (User.ludevaMembershipStatus — see schema.prisma and
-// /onboarding/profile): an existing, admin-verified Ludeva Plc member
-// withdraws toll free; everyone else (never claimed, still pending
-// admin confirmation, or rejected) pays the standard flat rate. Only a
-// VERIFIED status counts as "already a member" — PENDING isn't
-// confirmed yet, so it doesn't get the discount.
-export const LUDEVA_MEMBER_WITHDRAWAL_FEE_RATE = 0;
-export const NON_MEMBER_WITHDRAWAL_FEE_RATE = 0.05;
+// One flat rate for every user. Ludeva Plc membership status no longer
+// changes the fee (it used to be 0% for VERIFIED members, 5% otherwise).
+export const WITHDRAWAL_FEE_RATE = 0.025;
 
 export type LudevaMembershipStatusLike = 'NONE' | 'PENDING' | 'VERIFIED' | 'REJECTED' | null | undefined;
 
-export function withdrawalFeeRateFor(status: LudevaMembershipStatusLike): number {
-  return status === 'VERIFIED' ? LUDEVA_MEMBER_WITHDRAWAL_FEE_RATE : NON_MEMBER_WITHDRAWAL_FEE_RATE;
+// The status argument is kept so existing call sites don't change, but it
+// is intentionally ignored: the rate is the same for everyone.
+export function withdrawalFeeRateFor(_status?: LudevaMembershipStatusLike): number {
+  return WITHDRAWAL_FEE_RATE;
 }

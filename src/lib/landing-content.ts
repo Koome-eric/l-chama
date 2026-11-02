@@ -44,7 +44,7 @@ export const PRODUCTS = [
 // /products.
 export const LOAN_INTEREST = '2.5%';
 export const PROCESSING_FEE = '2.5%';
-export const WITHDRAWAL_FEE = '5%';
+export const WITHDRAWAL_FEE = '2.5%';
 
 export const LOAN_TERMS = [
   { label: 'Interest', value: `${LOAN_INTEREST} per month` },

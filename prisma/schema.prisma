@@ -166,7 +166,7 @@ model Team {
   // the chama itself. A Ludeva-member chama withdraws by emailing
   // lchama@ludevaplc.co.ke / invst@ludevaplc.co.ke instead of the in-app
   // 3-signatory flow, and pays no platform withdrawal fee — that flow
-  // and its flat fee (see PLATFORM_WITHDRAWAL_FEE_RATE) are for external
+  // and its flat fee (see WITHDRAWAL_FEE_RATE in src/lib/withdrawal-fee.ts) are for external
   // / non-member chamas only. Defaults to false (external) since that's
   // every chama that signs up on this platform on its own.
   isLudevaMember Boolean @default(false)

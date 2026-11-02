@@ -13,8 +13,7 @@ import type { SignatoryRole, WithdrawalScope } from '@prisma/client';
 /*  Secretary each get one vote; a payout only fires once both have */
 /*  APPROVED, and either REJECTED kills the request.                */
 /*  Campaign and external-chama payouts take a platform fee based on */
-/*  the REQUESTER's own confirmed Ludeva membership — toll free for a */
-/*  verified member, 5% flat for everyone else (see withdrawal-fee.ts). */
+/*  a flat 2.5% for every requester (see withdrawal-fee.ts).          */
 /*  A Ludeva-member chama (Team.isLudevaMember) never reaches this   */
 /*  engine at all — it withdraws by emailing lchama@ludevaplc.co.ke /  */
 /*  invst@ludevaplc.co.ke instead, so createWithdrawalRequest refuses  */

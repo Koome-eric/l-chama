@@ -1060,8 +1060,9 @@ export async function decideJuniorApplication(
 }
 
 // Confirm or reject a member's self-claimed Ludeva Plc membership
-// number (submitted at onboarding or from /profile). Only a VERIFIED
-// status gets the toll-free withdrawal — see src/lib/withdrawal-fee.ts.
+// number (submitted at onboarding or from /profile). This does
+// not affect the withdrawal fee (flat 2.5% for everyone — see
+// src/lib/withdrawal-fee.ts).
 export async function decideLudevaMembership(userId: string, decision: 'VERIFIED' | 'REJECTED', reason?: string) {
   await requirePermission('canManageLudevaMembers');
 
@@ -1084,8 +1085,8 @@ export async function decideLudevaMembership(userId: string, decision: 'VERIFIED
     userId,
     decision === 'VERIFIED' ? 'Ludeva membership confirmed' : 'Ludeva membership not confirmed',
     decision === 'VERIFIED'
-      ? `Your Ludeva Plc membership number (${user.ludevaMemberNumber}) was confirmed. You now withdraw toll free.`
-      : `We could not confirm the Ludeva Plc membership number you provided.${reason ? ` ${reason}` : ''} You'll pay the standard 5% withdrawal fee — contact lchama@ludevaplc.co.ke if you believe this is a mistake.`
+      ? `Your Ludeva Plc membership number (${user.ludevaMemberNumber}) was confirmed.`
+      : `We could not confirm the Ludeva Plc membership number you provided.${reason ? ` ${reason}` : ''} Contact lchama@ludevaplc.co.ke if you believe this is a mistake.`
   );
 
   revalidatePath('/admin');

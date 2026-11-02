@@ -37,7 +37,7 @@ const TERMS = [
   {
     h: 'Fees',
     p: [
-      'A flat 5% platform fee applies to standard withdrawals, including campaign fund withdrawals, for external chamas (chamas not built directly by Ludeva Plc). Chamas built directly by Ludeva Plc follow the Second Cycle Withdrawal Policy and are exempt. Standard withdrawals need 24 hours’ notice.',
+      'A flat 2.5% platform fee applies to standard withdrawals, including campaign fund withdrawals, for external chamas (chamas not built directly by Ludeva Plc). Chamas built directly by Ludeva Plc follow the Second Cycle Withdrawal Policy and are exempt. Standard withdrawals need 24 hours’ notice.',
     ],
   },
   {

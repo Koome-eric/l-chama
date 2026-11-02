@@ -36,7 +36,7 @@ export default async function FundraisingPage() {
               </Link>
             </Button>
             <p className="mt-4 text-sm text-muted-foreground">
-              A 5% platform fee applies to campaign fund withdrawals for external chamas. See{' '}
+              A 2.5% platform fee applies to campaign fund withdrawals for external chamas. See{' '}
               <Link href="/loans" className="underline hover:text-primary">loan terms &amp; fees</Link>.
             </p>
           </div>

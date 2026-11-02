@@ -177,7 +177,7 @@ export function ProfileClient({ defaultEmail }: { defaultEmail?: string }) {
             <span>
               I'm an existing Ludeva Plc member
               <span className="block text-xs text-muted-foreground mt-0.5">
-                Confirmed Ludeva members withdraw toll free (5% otherwise).
+                Optional — an admin will confirm your membership number.
               </span>
             </span>
           </label>

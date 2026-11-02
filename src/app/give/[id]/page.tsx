@@ -124,7 +124,7 @@ export default async function GivePage({ params }: { params: Promise<{ id: strin
           </CardContent>
         </Card>
 
-        <p className="text-center text-xs text-muted-foreground pb-6">Giving and campaign creation are always free — L-Chama takes a flat 3% fee only when the organizer withdraws.</p>
+        <p className="text-center text-xs text-muted-foreground pb-6">Giving and campaign creation are always free — L-Chama takes a flat 2.5% fee only when the organizer withdraws.</p>
       </div>
     </div>
   );
