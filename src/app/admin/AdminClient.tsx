@@ -2046,9 +2046,8 @@ function MemberReportsAdminSection({ reports }: { reports: ReportRow[] }) {
                 <TableRow>
                   <TableHead>Member</TableHead>
                   <TableHead className="hidden sm:table-cell">Chama</TableHead>
-                  <TableHead className="hidden md:table-cell">Period</TableHead>
                   <TableHead>Contribution</TableHead>
-                  <TableHead className="hidden lg:table-cell">ROI</TableHead>
+                  <TableHead className="hidden lg:table-cell">Return</TableHead>
                   <TableHead>Closing Bal.</TableHead>
                   <TableHead className="text-right">Action</TableHead>
                 </TableRow>
@@ -2062,9 +2061,6 @@ function MemberReportsAdminSection({ reports }: { reports: ReportRow[] }) {
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
                       {r.teamName ? r.teamName : <span className="text-xs text-muted-foreground">Unmatched</span>}
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                      {r.periodLabel || r.date || '—'}
                     </TableCell>
                     <TableCell className="font-figures text-sm">{r.principal || '—'}</TableCell>
                     <TableCell className="hidden lg:table-cell font-figures text-sm">{r.roi || '—'}</TableCell>
@@ -2542,7 +2538,6 @@ function SavingsAdminSection({ entries }: { entries: SavingsRow[] }) {
                   </TableHead>
                   <TableHead>Member</TableHead>
                   <TableHead className="hidden sm:table-cell">Chama</TableHead>
-                  <TableHead className="hidden md:table-cell">Period</TableHead>
                   <TableHead className="hidden lg:table-cell">Opening</TableHead>
                   <TableHead className="hidden lg:table-cell">Deposit</TableHead>
                   <TableHead className="hidden xl:table-cell">Payout</TableHead>
@@ -2565,9 +2560,6 @@ function SavingsAdminSection({ entries }: { entries: SavingsRow[] }) {
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
                       {r.teamName ? r.teamName : <span className="text-xs text-muted-foreground">Unmatched</span>}
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                      {r.periodLabel || r.date || '—'}
                     </TableCell>
                     <TableCell className="hidden lg:table-cell font-figures text-sm">{r.openingBalance || '—'}</TableCell>
                     <TableCell className="hidden lg:table-cell font-figures text-sm">{r.deposit || '—'}</TableCell>

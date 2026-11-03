@@ -21,3 +21,11 @@ admin badges/notifications, withdraw + campaign + panel calculators, schema comm
 - **Deploy step:** run `npx tsx prisma/remove-mmf.ts` BEFORE `npx prisma db push`. It moves any existing MMF products to
   FIXED_DEPOSIT, renamed "Legacy investment", inactive — so old chama investments stay intact. Without it, db push will refuse
   to drop the enum value.
+
+---
+# Investment report tables: Period removed, ROI -> Return
+
+- Admin > Member reports (investments table): "Period" column removed, "ROI" header now "Return" (the column was already "Contribution").
+- Member Reports page > "Member Performance — Investments": rows now read "Contribution X · Return Y" (period text removed).
+- Not changed: the savings table's Period column, product ROI-rate labels, and the CSV/sync field names (principal, roi, period), which the Google Sheets sync depends on.
+- Admin > Savings table: "Period" column also removed (member-facing savings lists still title each entry by its date).
