@@ -330,6 +330,7 @@ export function TeamMembersSection({
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
+                <TableHead>Phone</TableHead>
                 <TableHead>Ludeva No.</TableHead>
                 <TableHead>Role</TableHead>
                 {(canRemove || canManagePermissions) && <TableHead className="text-right">Actions</TableHead>}
@@ -339,7 +340,13 @@ export function TeamMembersSection({
               <TableRow>
                 <TableCell className="font-medium">{team.owner.fullName || '—'}</TableCell>
                 <TableCell>{team.owner.email}</TableCell>
-                <TableCell>{team.owner.ludevaNumber || '—'}</TableCell>
+                <TableCell>{team.owner.phone || '—'}</TableCell>
+                <TableCell>
+                  {team.owner.ludevaNumber || '—'}
+                  {team.owner.ludevaNumber && !team.owner.ludevaVerified && (
+                    <span className="ml-1 text-xs text-muted-foreground">(unverified)</span>
+                  )}
+                </TableCell>
                 <TableCell>
                   <Badge className="gap-1"><ShieldCheck className="h-3 w-3" /> Team Leader</Badge>
                 </TableCell>
@@ -352,7 +359,13 @@ export function TeamMembersSection({
                     {m.userId === currentUserId && <span className="text-muted-foreground"> (you)</span>}
                   </TableCell>
                   <TableCell>{m.email}</TableCell>
-                  <TableCell>{m.ludevaNumber || '—'}</TableCell>
+                  <TableCell>{m.phone || '—'}</TableCell>
+                  <TableCell>
+                    {m.ludevaNumber || '—'}
+                    {m.ludevaNumber && !m.ludevaVerified && (
+                      <span className="ml-1 text-xs text-muted-foreground">(unverified)</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Badge variant="secondary">{roleSummary(m)}</Badge>
                   </TableCell>

@@ -40,6 +40,8 @@ export default async function SubChamasPage() {
         userId: m.userId,
         fullName: m.user.fullName,
         email: m.user.email ?? 'Unknown email',
+        phone: m.user.phone ?? null,
+        ludevaNumber: m.user.ludevaMemberNumber?.trim() || null,
       })),
     })),
     unassigned: unassigned.map((m) => ({

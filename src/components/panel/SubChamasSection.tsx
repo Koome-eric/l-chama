@@ -214,13 +214,15 @@ export function SubChamasSection({ data }: { data: SubChamasData }) {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Ludeva No.</TableHead>
                   {canManageThis(st) && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {st.members.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={canManageThis(st) ? 3 : 2} className="text-center text-muted-foreground">
+                    <TableCell colSpan={canManageThis(st) ? 5 : 4} className="text-center text-muted-foreground">
                       No members yet.
                     </TableCell>
                   </TableRow>
@@ -229,6 +231,8 @@ export function SubChamasSection({ data }: { data: SubChamasData }) {
                     <TableRow key={m.subTeamMembershipId}>
                       <TableCell className="font-medium">{m.fullName || '—'}</TableCell>
                       <TableCell>{m.email}</TableCell>
+                      <TableCell>{m.phone || '—'}</TableCell>
+                      <TableCell>{m.ludevaNumber || '—'}</TableCell>
                       {canManageThis(st) && (
                         <TableCell className="text-right space-x-1">
                           {data.canManage && data.subTeams.length > 1 && (

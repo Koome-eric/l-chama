@@ -29,3 +29,11 @@ admin badges/notifications, withdraw + campaign + panel calculators, schema comm
 - Member Reports page > "Member Performance — Investments": rows now read "Contribution X · Return Y" (period text removed).
 - Not changed: the savings table's Period column, product ROI-rate labels, and the CSV/sync field names (principal, roi, period), which the Google Sheets sync depends on.
 - Admin > Savings table: "Period" column also removed (member-facing savings lists still title each entry by its date).
+
+---
+# Chama members can see each other's Phone + Ludeva number
+
+- Team Members page (/team): new "Phone" column; "Ludeva No." now shows the number a member entered even before admin verification
+  (marked "(unverified)" until verified). Previously only VERIFIED numbers showed, so most rows were blank.
+- Sub-Chamas page: member tables gain Phone + Ludeva No. columns.
+- Still hidden from chama members: ID/passport numbers (admin-only).

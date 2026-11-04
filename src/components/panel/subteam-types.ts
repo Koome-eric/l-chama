@@ -10,6 +10,8 @@ export type SubTeamMemberRow = {
   userId: string;
   fullName: string | null;
   email: string;
+  phone: string | null;
+  ludevaNumber: string | null;
 };
 
 export type SubTeamRow = {
