@@ -103,6 +103,10 @@ export function TeamMembersSection({
     startTransition(async () => {
       try {
         const res = await inviteChamaMember(inviteEmail, invitePerms);
+        if (!res.ok) {
+          toast({ title: "Couldn't create invite", description: res.error, variant: 'destructive' });
+          return;
+        }
         if (res.emailSent) {
           toast({ title: 'Invite sent', description: `An invite email was sent to ${inviteEmail}.` });
         } else {
@@ -127,6 +131,10 @@ export function TeamMembersSection({
     startTransition(async () => {
       try {
         const res = await addExistingChamaMember(existingIdentifier, invitePerms);
+        if (!res.ok) {
+          toast({ title: "Couldn't add member", description: res.error, variant: 'destructive' });
+          return;
+        }
         toast({ title: 'Member added', description: `${res.memberName} is now on the chama.` });
         setInviteOpen(false);
         setExistingIdentifier('');

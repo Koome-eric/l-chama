@@ -66,7 +66,34 @@ function appUrl() {
   return process.env.NEXT_PUBLIC_APP_URL || 'https://lchama.ludevaplc.co.ke';
 }
 
+// Next.js (production) replaces the message of ANY error thrown out of a
+// server action with a generic "An error occurred in the Server Components
+// render..." text, so a plain `throw new Error('This person is already on
+// the chama.')` reaches the browser as that useless generic message. The
+// invite/add-member actions therefore RETURN their expected failures as
+// { ok: false, error } instead of throwing. Only plain Errors raised by our
+// own validation are echoed back; anything else (Prisma, network, ...) gets
+// a generic message and the real error is logged on the server.
+type ActionResult<T> = ({ ok: true } & T) | { ok: false; error: string };
+
+async function toResult<T extends object>(fn: () => Promise<T>): Promise<ActionResult<T>> {
+  try {
+    return { ok: true, ...(await fn()) };
+  } catch (err: any) {
+    console.error('❌ chama member action failed:', err);
+    const ours = err instanceof Error && err.constructor === Error;
+    return {
+      ok: false,
+      error: ours && err.message ? err.message : 'Something went wrong on our side. Please try again, and contact support if it keeps happening.',
+    };
+  }
+}
+
 export async function inviteChamaMember(email: string, permissions?: Partial<ChamaPermissions>) {
+  return toResult(() => inviteChamaMemberImpl(email, permissions));
+}
+
+async function inviteChamaMemberImpl(email: string, permissions?: Partial<ChamaPermissions>) {
   const user = await getCurrentDbUser();
   const ctx = await getChamaContext(user);
   if (!ctx) throw new Error('You are not part of a chama.');
@@ -153,6 +180,10 @@ export async function inviteChamaMember(email: string, permissions?: Partial<Cha
 // accounts: someone who hasn't signed up at all still needs a real invite,
 // since a User row requires a Clerk identity.
 export async function addExistingChamaMember(identifier: string, permissions?: Partial<ChamaPermissions>) {
+  return toResult(() => addExistingChamaMemberImpl(identifier, permissions));
+}
+
+async function addExistingChamaMemberImpl(identifier: string, permissions?: Partial<ChamaPermissions>) {
   const admin = await getCurrentDbUser();
   const ctx = await getChamaContext(admin);
   if (!ctx) throw new Error('You are not part of a chama.');

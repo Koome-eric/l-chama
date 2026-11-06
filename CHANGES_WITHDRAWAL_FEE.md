@@ -37,3 +37,11 @@ admin badges/notifications, withdraw + campaign + panel calculators, schema comm
   (marked "(unverified)" until verified). Previously only VERIFIED numbers showed, so most rows were blank.
 - Sub-Chamas page: member tables gain Phone + Ludeva No. columns.
 - Still hidden from chama members: ID/passport numbers (admin-only).
+
+---
+# Invite errors now show the real reason
+
+Production Next.js hides the message of any error thrown from a server action ("An error occurred in the Server Components
+render..."). inviteChamaMember / addExistingChamaMember now RETURN { ok:false, error } for expected failures (already on the
+chama, invite already pending, invalid email, no permission, organisation not approved, ...) and TeamMembersSection shows
+that text. Unexpected errors (database etc.) show a generic message and are logged on the server.
