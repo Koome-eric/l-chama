@@ -52,7 +52,12 @@ export function ChamaInviteAcceptClient({
     setError(null);
     startTransition(async () => {
       try {
-        await acceptChamaInvite(token, { idNumber, phone, privacyPolicyAccepted: privacyAccepted });
+        const res = await acceptChamaInvite(token, { idNumber, phone, privacyPolicyAccepted: privacyAccepted });
+        if (!res.ok) {
+          setError(res.error);
+          setAutoAccepting(false);
+          return;
+        }
         toast({ title: 'Welcome to the chama!', description: `You now have access to ${teamName}'s dashboard.` });
         router.replace('/panel');
       } catch (err: any) {

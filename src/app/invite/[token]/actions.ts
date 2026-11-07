@@ -6,8 +6,16 @@ import { revalidatePath } from 'next/cache';
 import { notifyUser } from '@/lib/notifications';
 import { syncChamaToLudeva } from '@/lib/ludeva-sync';
 import { friendlyAccountError } from '@/lib/errors';
+import { toResult } from '@/lib/action-result';
 
 export async function acceptChamaInvite(
+  token: string,
+  profile: { idNumber: string; phone: string; privacyPolicyAccepted: boolean }
+) {
+  return toResult(() => acceptChamaInviteImpl(token, profile));
+}
+
+async function acceptChamaInviteImpl(
   token: string,
   profile: { idNumber: string; phone: string; privacyPolicyAccepted: boolean }
 ) {
@@ -111,11 +119,17 @@ export async function acceptChamaInvite(
     throw friendlyAccountError(err, { clerkId: 'account', email: 'email address', phone: 'phone number' });
   }
 
-  const client = await clerkClient();
-  const existingMetadata = clerkUser.publicMetadata || {};
-  await client.users.updateUser(clerkUser.id, {
-    publicMetadata: { ...existingMetadata, dbId: user.id },
-  });
+  // The membership is already saved at this point, so a hiccup updating
+  // Clerk metadata must not make the person think joining failed.
+  try {
+    const client = await clerkClient();
+    const existingMetadata = clerkUser.publicMetadata || {};
+    await client.users.updateUser(clerkUser.id, {
+      publicMetadata: { ...existingMetadata, dbId: user.id },
+    });
+  } catch (err) {
+    console.error('⚠️ Could not update Clerk metadata after accepting invite:', err);
+  }
 
   await notifyUser(
     invite.invitedById,

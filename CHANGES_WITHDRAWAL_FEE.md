@@ -45,3 +45,10 @@ Production Next.js hides the message of any error thrown from a server action ("
 render..."). inviteChamaMember / addExistingChamaMember now RETURN { ok:false, error } for expected failures (already on the
 chama, invite already pending, invalid email, no permission, organisation not approved, ...) and TeamMembersSection shows
 that text. Unexpected errors (database etc.) show a generic message and are logged on the server.
+
+---
+# Accept-invite errors now readable too
+
+`acceptChamaInvite` (src/app/invite/[token]/actions.ts) returns { ok:false, error } instead of throwing, via the shared
+`src/lib/action-result.ts` helper (the invite/add-member actions now use it as well). The Clerk metadata update after the
+membership is saved is best-effort, so a Clerk hiccup no longer shows "failed" for someone who actually joined.

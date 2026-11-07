@@ -1,6 +1,7 @@
 'use server';
 
 import crypto from 'crypto';
+import { toResult } from '@/lib/action-result';
 import { Resend } from 'resend';
 import { currentUser } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
@@ -64,29 +65,6 @@ async function getCurrentDbUser() {
 
 function appUrl() {
   return process.env.NEXT_PUBLIC_APP_URL || 'https://lchama.ludevaplc.co.ke';
-}
-
-// Next.js (production) replaces the message of ANY error thrown out of a
-// server action with a generic "An error occurred in the Server Components
-// render..." text, so a plain `throw new Error('This person is already on
-// the chama.')` reaches the browser as that useless generic message. The
-// invite/add-member actions therefore RETURN their expected failures as
-// { ok: false, error } instead of throwing. Only plain Errors raised by our
-// own validation are echoed back; anything else (Prisma, network, ...) gets
-// a generic message and the real error is logged on the server.
-type ActionResult<T> = ({ ok: true } & T) | { ok: false; error: string };
-
-async function toResult<T extends object>(fn: () => Promise<T>): Promise<ActionResult<T>> {
-  try {
-    return { ok: true, ...(await fn()) };
-  } catch (err: any) {
-    console.error('❌ chama member action failed:', err);
-    const ours = err instanceof Error && err.constructor === Error;
-    return {
-      ok: false,
-      error: ours && err.message ? err.message : 'Something went wrong on our side. Please try again, and contact support if it keeps happening.',
-    };
-  }
 }
 
 export async function inviteChamaMember(email: string, permissions?: Partial<ChamaPermissions>) {
