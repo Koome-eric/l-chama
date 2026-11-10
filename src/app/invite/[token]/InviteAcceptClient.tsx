@@ -15,7 +15,9 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Users, IdCard, Phone } from 'lucide-react';
+import { Users, IdCard, Phone, MapPin } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { KENYA_COUNTIES } from '@/lib/countries';
 import { acceptChamaInvite } from './actions';
 import { PrivacyConsent } from '@/components/PrivacyConsent';
 import { useToast } from '@/hooks/use-toast';
@@ -27,6 +29,8 @@ export function ChamaInviteAcceptClient({
   email,
   hasIdOnFile = false,
   existingPhone = '',
+  needsCounty = true,
+  needsSubCounty = true,
 }: {
   token: string;
   teamName: string;
@@ -34,6 +38,8 @@ export function ChamaInviteAcceptClient({
   email: string;
   hasIdOnFile?: boolean;
   existingPhone?: string;
+  needsCounty?: boolean;
+  needsSubCounty?: boolean;
 }) {
   const { isSignedIn, isLoaded, user } = useUser();
   const router = useRouter();
@@ -44,15 +50,18 @@ export function ChamaInviteAcceptClient({
   const [phone, setPhone] = useState(existingPhone);
   const [autoAccepting, setAutoAccepting] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [county, setCounty] = useState('');
+  const [residentSubCounty, setResidentSubCounty] = useState('');
 
   const returnUrl = `/invite/${token}`;
-  const canAccept = (hasIdOnFile || idNumber.trim().length >= 4) && phone.trim().length >= 7 && privacyAccepted;
+  const locationOk = (!needsCounty || county.length > 0) && (!needsSubCounty || residentSubCounty.trim().length > 0);
+  const canAccept = (hasIdOnFile || idNumber.trim().length >= 4) && phone.trim().length >= 7 && locationOk && privacyAccepted;
 
   const handleAccept = () => {
     setError(null);
     startTransition(async () => {
       try {
-        const res = await acceptChamaInvite(token, { idNumber, phone, privacyPolicyAccepted: privacyAccepted });
+        const res = await acceptChamaInvite(token, { idNumber, phone, privacyPolicyAccepted: privacyAccepted, county, residentSubCounty });
         if (!res.ok) {
           setError(res.error);
           setAutoAccepting(false);
@@ -76,7 +85,7 @@ export function ChamaInviteAcceptClient({
     if (isSignedIn && user && !autoAccepting && canAccept) {
       const currentEmail = user.primaryEmailAddress?.emailAddress || user.emailAddresses[0]?.emailAddress;
       const emailMatches = currentEmail?.toLowerCase() === email.toLowerCase();
-      if (emailMatches && hasIdOnFile && existingPhone) {
+      if (emailMatches && hasIdOnFile && existingPhone && !needsCounty && !needsSubCounty) {
         setAutoAccepting(true);
         handleAccept();
       }
@@ -144,6 +153,34 @@ export function ChamaInviteAcceptClient({
                   placeholder="07XX XXX XXX"
                 />
               </div>
+              {(needsCounty || needsSubCounty) && (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {needsCounty && (<div>
+                    <Label htmlFor="invite-county" className="flex items-center gap-1.5">
+                      <MapPin className="h-3.5 w-3.5" /> Resident County
+                    </Label>
+                    <Select value={county} onValueChange={setCounty}>
+                      <SelectTrigger id="invite-county">
+                        <SelectValue placeholder="Select county" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {KENYA_COUNTIES.map((c) => (
+                          <SelectItem key={c} value={c}>{c}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>)}
+                  {needsSubCounty && (<div>
+                    <Label htmlFor="invite-subcounty">Sub-county</Label>
+                    <Input
+                      id="invite-subcounty"
+                      value={residentSubCounty}
+                      onChange={(e) => setResidentSubCounty(e.target.value)}
+                      placeholder="e.g. Kikuyu"
+                    />
+                  </div>)}
+                </div>
+              )}
               <PrivacyConsent checked={privacyAccepted} onChange={setPrivacyAccepted} id="invite-privacy-consent" />
               {error && <p className="text-sm text-destructive">{error}</p>}
             </>

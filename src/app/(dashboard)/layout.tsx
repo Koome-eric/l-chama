@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
-import { getChamaContext } from '@/lib/chama';
+import { getChamaContext, listUserChamas, type ChamaSummary } from '@/lib/chama';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
 import { ClerkScope } from '@/components/ClerkScope';
@@ -11,6 +11,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // where there's no chama yet, so a missing user/context just means
   // the Last Respect Cover nav item stays hidden rather than erroring.
   let hasLastRespectCover = false;
+  let chamas: ChamaSummary[] = [];
+  let activeChamaId: string | null = null;
   try {
     const { userId: clerkId } = await auth();
     if (clerkId) {
@@ -18,6 +20,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
       if (user) {
         const ctx = await getChamaContext(user);
         hasLastRespectCover = ctx?.team.hasLastRespectCover ?? false;
+        activeChamaId = ctx?.team.id ?? null;
+        chamas = await listUserChamas(user);
       }
     }
   } catch {
@@ -28,7 +32,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     <ClerkScope>
       <SidebarProvider>
         <Suspense fallback={null}>
-          <AppSidebar hasLastRespectCover={hasLastRespectCover}>{children}</AppSidebar>
+          <AppSidebar hasLastRespectCover={hasLastRespectCover} chamas={chamas} activeChamaId={activeChamaId}>{children}</AppSidebar>
         </Suspense>
       </SidebarProvider>
     </ClerkScope>

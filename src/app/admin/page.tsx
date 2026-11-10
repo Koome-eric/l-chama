@@ -75,6 +75,7 @@ export default async function AdminPage() {
   const data = teams.map((t: (typeof teams)[number]) => ({
     id: t.id,
     name: t.name,
+    ownerLudevaNumber: t.owner.ludevaMemberNumber,
     ownerName: t.owner.fullName || t.owner.email || t.owner.phone || 'Unknown',
     ownerEmail: t.owner.email,
     ownerPhone: t.owner.phone,
@@ -82,6 +83,7 @@ export default async function AdminPage() {
     ownerGender: t.owner.gender,
     ownerCountry: t.owner.country,
     ownerRegion: t.owner.region,
+    ownerResidentSubCounty: t.owner.residentSubCounty,
     ownerJoinedAt: t.createdAt.toISOString(),
     secretaryName: t.secretary ? (t.secretary.fullName || t.secretary.email || t.secretary.phone || 'Unknown') : null,
     treasurerName: t.treasurer ? (t.treasurer.fullName || t.treasurer.email || t.treasurer.phone || 'Unknown') : null,
@@ -110,6 +112,7 @@ export default async function AdminPage() {
       gender: m.user.gender,
       country: m.user.country,
       region: m.user.region,
+      residentSubCounty: m.user.residentSubCounty,
       isSecretary: m.userId === t.secretaryId,
       isTreasurer: m.userId === t.treasurerId,
       joinedAt: m.createdAt.toISOString(),

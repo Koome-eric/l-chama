@@ -15,6 +15,7 @@ export default async function TeamPage() {
   const data = {
     id: ctx.team.id,
     name: ctx.team.name,
+    signatoryUserIds: [ctx.team.secretaryId, ctx.team.treasurerId].filter((x): x is string => !!x),
     isOwner: ctx.isOwner,
     permissions: ctx.permissions,
     owner: {
@@ -66,7 +67,7 @@ export default async function TeamPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-headline text-2xl font-semibold">Team Members</h1>
-        <p className="text-muted-foreground">Everyone in {data.name}, and who owns the chama.</p>
+        <p className="text-muted-foreground">Everyone in {data.name}{data.owner.ludevaNumber ? ` (Admin Ludeva No. ${data.owner.ludevaNumber})` : ''}, and who owns the chama.</p>
       </div>
       <TeamMembersSection team={data} currentUserId={user.id} />
     </div>

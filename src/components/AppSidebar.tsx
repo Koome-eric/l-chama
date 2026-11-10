@@ -34,6 +34,7 @@ import {
 } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { ChamaSwitcher, type SwitcherChama } from '@/components/ChamaSwitcher';
 
 // ─────────────────────────────────────────────
 // Sidebar nav — every item points at a real route in the app. A couple
@@ -66,9 +67,13 @@ const bottomItems = [
 export function AppSidebar({
   children,
   hasLastRespectCover = false,
+  chamas = [],
+  activeChamaId = null,
 }: {
   children: React.ReactNode;
   hasLastRespectCover?: boolean;
+  chamas?: SwitcherChama[];
+  activeChamaId?: string | null;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -137,6 +142,8 @@ export function AppSidebar({
             </span>
           </Link>
         </SidebarHeader>
+
+        <ChamaSwitcher chamas={chamas} activeId={activeChamaId} />
 
         <SidebarContent className="flex flex-col justify-between">
           <SidebarMenu>{items.map(renderItem)}</SidebarMenu>

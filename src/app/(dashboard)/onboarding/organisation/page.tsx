@@ -4,7 +4,12 @@ import { prisma } from '@/lib/prisma';
 import { getChamaContext } from '@/lib/chama';
 import { OrganisationClient } from './OrganisationClient';
 
-export default async function OrganisationPage() {
+export default async function OrganisationPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ new?: string }>;
+}) {
+  const { new: registerAnother } = await searchParams;
   const { userId: clerkId } = await auth();
   if (!clerkId) redirect('/sign-in?redirect_url=/onboarding/organisation');
 
@@ -12,8 +17,10 @@ export default async function OrganisationPage() {
   if (!user) redirect('/onboarding/profile');
   if (!user.profileCompleted) redirect('/onboarding/profile');
 
+  // Someone who already has a chama is sent on to it — unless they came here
+  // on purpose (?new=1, from "Register another chama") to add one more.
   const ctx = await getChamaContext(user);
-  if (ctx) {
+  if (ctx && registerAnother !== '1') {
     redirect('/onboarding/pending');
   }
 

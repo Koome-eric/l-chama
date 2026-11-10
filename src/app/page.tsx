@@ -11,6 +11,7 @@ import { LandingFAQ } from '@/components/LandingFAQ';
 import { getVisitorState } from '@/lib/landing-auth';
 import { PRODUCTS, LOAN_INTEREST, PROCESSING_FEE, WITHDRAWAL_FEE } from '@/lib/landing-content';
 import { RATES_EFFECTIVE } from '@/lib/legal';
+import { LUDEVA_LOGIN_URL } from '@/lib/ludeva-links';
 
 const FEATURES = [
   {
@@ -115,6 +116,20 @@ export default async function LandingPage() {
                         ))}
                       </ul>
                     )}
+                  </HeroRevealItem>
+
+                  <HeroRevealItem className="mt-6">
+                    <p className="text-sm text-muted-foreground">
+                      Already have a Ludeva account?{' '}
+                      <a
+                        href={LUDEVA_LOGIN_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-foreground underline underline-offset-4"
+                      >
+                        Log in to your Ludeva account
+                      </a>
+                    </p>
                   </HeroRevealItem>
 
                   {totalPooled > 0 && (

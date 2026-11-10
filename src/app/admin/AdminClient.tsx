@@ -130,6 +130,7 @@ type TeamMemberRow = {
   gender: string | null;
   country: string | null;
   region: string | null;
+  residentSubCounty: string | null;
   isSecretary: boolean;
   isTreasurer: boolean;
   joinedAt: string;
@@ -149,6 +150,7 @@ type TeamMemberRow = {
 type TeamRow = {
   id: string;
   name: string;
+  ownerLudevaNumber: string | null;
   ownerName: string;
   ownerEmail: string | null;
   ownerPhone: string | null;
@@ -156,6 +158,7 @@ type TeamRow = {
   ownerGender: string | null;
   ownerCountry: string | null;
   ownerRegion: string | null;
+  ownerResidentSubCounty: string | null;
   ownerJoinedAt: string;
   secretaryName: string | null;
   treasurerName: string | null;
@@ -858,6 +861,7 @@ function MembersDialog({ team, onOpenChange }: { team: TeamRow | null; onOpenCha
                   <div><dt className="text-xs text-muted-foreground">ID / Passport No.</dt><dd className="font-medium">{team.ownerIdNumber || '—'}</dd></div>
                   <div><dt className="text-xs text-muted-foreground">Gender</dt><dd className="font-medium">{team.ownerGender || '—'}</dd></div>
                   <div><dt className="text-xs text-muted-foreground">Location</dt><dd className="font-medium">{[team.ownerRegion, team.ownerCountry].filter(Boolean).join(', ') || '—'}</dd></div>
+                  <div><dt className="text-xs text-muted-foreground">Sub-county</dt><dd className="font-medium">{team.ownerResidentSubCounty || '—'}</dd></div>
                   <div className="sm:col-span-2"><dt className="text-xs text-muted-foreground">Account created</dt><dd className="font-medium">{new Date(team.ownerJoinedAt).toLocaleString()}</dd></div>
                 </dl>
               </div>
@@ -889,6 +893,7 @@ function MembersDialog({ team, onOpenChange }: { team: TeamRow | null; onOpenCha
                             <div><dt className="text-xs text-muted-foreground">ID / Passport No.</dt><dd>{m.idNumber || '—'}</dd></div>
                             <div><dt className="text-xs text-muted-foreground">Gender</dt><dd>{m.gender || '—'}</dd></div>
                             <div className="sm:col-span-2"><dt className="text-xs text-muted-foreground">Location</dt><dd>{[m.region, m.country].filter(Boolean).join(', ') || '—'}</dd></div>
+                            <div className="sm:col-span-2"><dt className="text-xs text-muted-foreground">Sub-county</dt><dd>{m.residentSubCounty || '—'}</dd></div>
                             <div className="sm:col-span-2"><dt className="text-xs text-muted-foreground">Joined chama</dt><dd>{new Date(m.joinedAt).toLocaleString()}</dd></div>
                           </dl>
                           <div className="mt-3 border-t border-border/60 pt-3">
@@ -975,7 +980,7 @@ function OrganisationsAdminSection({ teams }: { teams: TeamRow[] }) {
     if (filter !== 'ALL' && t.approvalStatus !== filter) return false;
     if (!query.trim()) return true;
     const q = query.toLowerCase();
-    return t.name.toLowerCase().includes(q) || t.ownerName.toLowerCase().includes(q) || (t.ownerEmail ?? '').toLowerCase().includes(q);
+    return t.name.toLowerCase().includes(q) || (t.ownerLudevaNumber ?? '').toLowerCase().includes(q) || t.ownerName.toLowerCase().includes(q) || (t.ownerEmail ?? '').toLowerCase().includes(q);
   });
 
   const handleApprove = (id: string) => {
@@ -1069,6 +1074,7 @@ function OrganisationsAdminSection({ teams }: { teams: TeamRow[] }) {
                   <div>
                     <CardTitle className="flex flex-wrap items-center gap-2 text-base">
                       {t.name}
+                      {t.ownerLudevaNumber && <Badge variant="outline" className="font-normal">Admin Ludeva No. {t.ownerLudevaNumber}</Badge>}
                       {t.isDiaspora && <Badge variant="secondary">Diaspora Chama</Badge>}
                       {t.isLudevaMember && <Badge className="bg-primary text-primary-foreground">Ludeva Member</Badge>}
                       {t.subTeams.length > 0 && (

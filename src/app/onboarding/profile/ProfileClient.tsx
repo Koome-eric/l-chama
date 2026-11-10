@@ -36,6 +36,7 @@ export function ProfileClient({ defaultEmail }: { defaultEmail?: string }) {
   const [gender, setGender] = useState<'MALE' | 'FEMALE' | 'OTHER' | ''>('');
   const [country, setCountry] = useState('KE');
   const [region, setRegion] = useState('');
+  const [residentSubCounty, setResidentSubCounty] = useState('');
   const [isExistingLudevaMember, setIsExistingLudevaMember] = useState(false);
   const [ludevaMemberNumber, setLudevaMemberNumber] = useState('');
   const [password, setPassword] = useState('');
@@ -53,6 +54,7 @@ export function ProfileClient({ defaultEmail }: { defaultEmail?: string }) {
     !!gender &&
     !!country &&
     region.trim().length > 0 &&
+    (!isKenya || residentSubCounty.trim().length >= 2) &&
     (!isExistingLudevaMember || ludevaMemberNumber.trim().length >= 3) &&
     password.length >= 15 &&
     hasNumber &&
@@ -71,6 +73,7 @@ export function ProfileClient({ defaultEmail }: { defaultEmail?: string }) {
           gender,
           country,
           region,
+          residentSubCounty: residentSubCounty.trim(),
           isExistingLudevaMember,
           ludevaMemberNumber: isExistingLudevaMember ? ludevaMemberNumber : undefined,
           password,
@@ -146,7 +149,7 @@ export function ProfileClient({ defaultEmail }: { defaultEmail?: string }) {
             </Select>
           </div>
           <div>
-            <Label htmlFor="region">Region/County</Label>
+            <Label htmlFor="region">{isKenya ? 'Resident County' : 'Region'}</Label>
             {isKenya ? (
               <Select value={region} onValueChange={setRegion}>
                 <SelectTrigger id="region">
@@ -165,6 +168,20 @@ export function ProfileClient({ defaultEmail }: { defaultEmail?: string }) {
             )}
           </div>
         </div>
+
+        {isKenya && (
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="residentSubCounty">Sub-county</Label>
+            <Input
+              id="residentSubCounty"
+              value={residentSubCounty}
+              onChange={(e) => setResidentSubCounty(e.target.value)}
+              placeholder="e.g. Kikuyu"
+            />
+          </div>
+        </div>
+        )}
 
         <div className="rounded-xl border p-4 space-y-3">
           <label className="flex items-start gap-2.5 text-sm cursor-pointer">

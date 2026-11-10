@@ -6,6 +6,8 @@ import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { CHAMA_LEVELS } from '@/lib/chama-levels';
 import { friendlyAccountError } from '@/lib/errors';
+import { toResult } from '@/lib/action-result';
+import { setActiveChamaCookie } from '@/lib/chama';
 
 const OBJECTIVE_KEYS = ['BUY_ASSETS', 'GET_A_LOAN', 'GET_INTEREST', 'SCHOOL_FEES', 'DECEMBER_HOLIDAY'] as const;
 
@@ -40,6 +42,13 @@ export type OrganisationInput = z.infer<typeof OrganisationSchema>;
 // usable until approvalStatus flips to APPROVED (enforced in
 // panel/actions.ts).
 export async function registerOrganisation(input: OrganisationInput) {
+  // Returned as { ok, error } rather than thrown: Next.js hides the message of
+  // a thrown server-action error in production, and the reasons here ("that
+  // Ludeva Number is already registered", ...) are ones the person must see.
+  return toResult(() => registerOrganisationImpl(input));
+}
+
+async function registerOrganisationImpl(input: OrganisationInput) {
   const { userId: clerkId } = await auth();
   if (!clerkId) throw new Error('You must be signed in.');
 
@@ -60,51 +69,61 @@ export async function registerOrganisation(input: OrganisationInput) {
   if (!user) throw new Error('Complete your profile first.');
   if (!user.profileCompleted) throw new Error('Complete your profile first.');
 
-  const [ownsTeam, isTeamMember] = await Promise.all([
-    prisma.team.findUnique({ where: { ownerId: user.id } }),
-    prisma.teamMembership.findUnique({ where: { userId: user.id } }),
-  ]);
+  const name = d.organisationName.trim();
 
-  if (isTeamMember) {
-    throw new Error("You're already a member of a chama, so you can't also register a new organisation — a member can only belong to one chama at a time. If this looks wrong, contact support.");
+  // One account can own several chamas, so a second registration is fine —
+  // but resubmitting the same form (double-click, refresh) must not create
+  // the same chama twice.
+  const owned = await prisma.team.findMany({ where: { ownerId: user.id } });
+  if (owned.some((t) => t.name.trim().toLowerCase() === name.toLowerCase() && t.businessRegNumber)) {
+    throw new Error(`You've already registered a chama called "${name}". Use a different name for another chama.`);
   }
 
   try {
-    if (!ownsTeam) {
-      const team = await prisma.team.create({
-        data: {
-          name: d.organisationName.trim(),
-          ownerId: user.id,
-          levelKey: level.key,
-          levelName: level.name,
-          monthlyAmount: level.monthlyAmount,
-          groupSize: level.groupSize,
-          businessRegNumber: d.registrationNumber.trim(),
-          numberOfMembers: d.numberOfMembers,
-          totalDirectors: d.totalDirectors,
-          physicalAddress: d.physicalAddress.trim(),
-          additionalComments: d.additionalComments?.trim() || undefined,
-          approvalStatus: 'PENDING_APPROVAL',
-          privacyPolicyAccepted: true,
-          termsAcceptedAt: new Date(),
-          isDiaspora: d.isDiaspora,
-          objectives: d.objectives,
-          membersRunningSME: d.membersRunningSME,
-          membersEmployed: d.membersEmployed,
-          hasLastRespectCover: d.hasLastRespectCover,
-          lastRespectContribution: d.hasLastRespectCover ? d.lastRespectContribution : null,
-        },
-      });
+    const data = {
+      name,
+      levelKey: level.key,
+      levelName: level.name,
+      monthlyAmount: level.monthlyAmount,
+      groupSize: level.groupSize,
+      businessRegNumber: d.registrationNumber.trim(),
+      numberOfMembers: d.numberOfMembers,
+      totalDirectors: d.totalDirectors,
+      physicalAddress: d.physicalAddress.trim(),
+      additionalComments: d.additionalComments?.trim() || undefined,
+      approvalStatus: 'PENDING_APPROVAL' as const,
+      privacyPolicyAccepted: true,
+      termsAcceptedAt: new Date(),
+      isDiaspora: d.isDiaspora,
+      objectives: d.objectives,
+      membersRunningSME: d.membersRunningSME,
+      membersEmployed: d.membersEmployed,
+      hasLastRespectCover: d.hasLastRespectCover,
+      lastRespectContribution: d.hasLastRespectCover ? d.lastRespectContribution : null,
+    };
 
-      if (d.hasLastRespectCover) {
-        await prisma.lastRespectFund.create({ data: { teamId: team.id, balance: 0 } });
-      }
+    // A bare chama created by the older one-step signup has no registration
+    // details yet — complete that one rather than adding a second.
+    const stub = owned.find((t) => !t.businessRegNumber);
+    const team = stub
+      ? await prisma.team.update({ where: { id: stub.id }, data })
+      : await prisma.team.create({ data: { ...data, ownerId: user.id } });
+
+    if (d.hasLastRespectCover) {
+      await prisma.lastRespectFund.upsert({
+        where: { teamId: team.id },
+        update: {},
+        create: { teamId: team.id, balance: 0 },
+      });
     }
 
     await prisma.user.update({
       where: { id: user.id },
       data: { onboardingCompleted: true, privacyPolicyAcceptedAt: new Date() },
     });
+
+    // Show the chama just registered (its pending-approval page) next.
+    await setActiveChamaCookie(team.id);
   } catch (err) {
     throw friendlyAccountError(err, { businessRegNumber: 'registration number' });
   }

@@ -1,5 +1,6 @@
 'use server';
 
+import { buildTeamResolver } from '@/lib/chama-match';
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
 import { upsertSavingsEntries, groupSavingsDuplicates, SAVINGS_SYNC_LOCK, type DupOptions } from '@/lib/savings-upsert';
@@ -618,18 +619,12 @@ export async function syncMemberReportsCsv(csvText: string) {
       .map((u) => [u.email.toLowerCase(), u])
   );
 
-  const memberships = await prisma.teamMembership.findMany({
-    where: { userId: { in: users.map((u) => u.id) } },
-  });
-  const teamIdByUserId = new Map(memberships.map((m) => [m.userId, m.teamId]));
-
-  const owners = await prisma.team.findMany({ where: { ownerId: { in: users.map((u) => u.id) } } });
-  const teamIdByOwnerId = new Map(owners.map((t) => [t.ownerId, t.id]));
+  const resolveTeam = await buildTeamResolver(users.map((u) => u.id));
 
   await prisma.$transaction(
     rows.map((row) => {
       const user = userByEmail.get(row.memberEmail!);
-      const teamId = user ? teamIdByOwnerId.get(user.id) || teamIdByUserId.get(user.id) || null : null;
+      const teamId = resolveTeam(user?.id);
       return prisma.memberReport.create({
         data: { ...row, memberEmail: row.memberEmail!, teamId },
       });
@@ -638,7 +633,7 @@ export async function syncMemberReportsCsv(csvText: string) {
 
   revalidatePath('/admin');
   revalidatePath('/reports');
-  return { success: true, imported: rows.length, matched: rows.filter((r) => teamIdByOwnerId.get(userByEmail.get(r.memberEmail!)?.id || '') || teamIdByUserId.get(userByEmail.get(r.memberEmail!)?.id || '')).length };
+  return { success: true, imported: rows.length, matched: rows.filter((r) => resolveTeam(userByEmail.get(r.memberEmail!)?.id)).length };
 }
 
 export async function deleteMemberReport(reportId: string) {
@@ -698,17 +693,11 @@ async function matchSavingsRowsToTeams(rows: { memberEmail?: string }[]) {
       .map((u) => [u.email.toLowerCase(), u])
   );
 
-  const memberships = await prisma.teamMembership.findMany({
-    where: { userId: { in: users.map((u) => u.id) } },
-  });
-  const teamIdByUserId = new Map(memberships.map((m) => [m.userId, m.teamId]));
-
-  const owners = await prisma.team.findMany({ where: { ownerId: { in: users.map((u) => u.id) } } });
-  const teamIdByOwnerId = new Map(owners.map((t) => [t.ownerId, t.id]));
+  const resolveTeam = await buildTeamResolver(users.map((u) => u.id));
 
   return (email: string) => {
     const user = userByEmail.get(email);
-    return user ? teamIdByOwnerId.get(user.id) || teamIdByUserId.get(user.id) || null : null;
+    return resolveTeam(user?.id);
   };
 }
 

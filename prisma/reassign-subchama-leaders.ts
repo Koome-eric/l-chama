@@ -22,9 +22,11 @@ async function main() {
   for (const st of subTeams) {
     if (st.leaderId === st.team.ownerId) continue;
 
-    // SubTeamMembership.userId is unique platform-wide, so only add the old
-    // leader as a member if they aren't already sitting in a sub-chama.
-    const existing = await prisma.subTeamMembership.findUnique({ where: { userId: st.leaderId } });
+    // A member sits in at most one sub-chama per chama, so only add the old
+    // leader as a member if they aren't already in one of this chama's.
+    const existing = await prisma.subTeamMembership.findFirst({
+      where: { userId: st.leaderId, subTeam: { teamId: st.teamId } },
+    });
     const keepAsMember = !existing;
 
     console.log(
@@ -34,7 +36,7 @@ async function main() {
 
     if (apply) {
       await prisma.$transaction([
-        ...(keepAsMember ? [prisma.subTeamMembership.create({ data: { subTeamId: st.id, userId: st.leaderId } })] : []),
+        ...(keepAsMember ? [prisma.subTeamMembership.create({ data: { subTeamId: st.id, userId: st.leaderId, teamId: st.teamId } })] : []),
         prisma.subTeam.update({ where: { id: st.id }, data: { leaderId: st.team.ownerId } }),
       ]);
     }

@@ -16,6 +16,7 @@ const ProfileSchema = z
     gender: z.enum(['MALE', 'FEMALE', 'OTHER'], { errorMap: () => ({ message: 'Select a gender.' }) }),
     country: z.string().min(1, 'Select a country.'),
     region: z.string().min(1, 'Enter your region/county.'),
+    residentSubCounty: z.string().trim().optional(),
     isExistingLudevaMember: z.boolean().optional(),
     ludevaMemberNumber: z.string().trim().optional(),
     password: z
@@ -23,6 +24,10 @@ const ProfileSchema = z
       .min(15, 'Password must be at least 15 characters.')
       .regex(/[0-9]/, 'Password must contain a number.')
       .regex(/[a-zA-Z]/, 'Password must contain a letter.'),
+  })
+  .refine((d) => d.country !== 'KE' || (d.residentSubCounty && d.residentSubCounty.length >= 2), {
+    message: 'Enter your sub-county.',
+    path: ['residentSubCounty'],
   })
   .refine((d) => !d.isExistingLudevaMember || (d.ludevaMemberNumber && d.ludevaMemberNumber.length >= 3), {
     message: 'Enter your Ludeva membership number.',
@@ -101,6 +106,7 @@ export async function completeProfile(input: ProfileInput): Promise<ProfileResul
           gender: d.gender,
           country: d.country,
           region: d.region.trim(),
+          residentSubCounty: d.residentSubCounty || null,
           profileCompleted: true,
           ...ludevaFields,
         },
@@ -118,6 +124,7 @@ export async function completeProfile(input: ProfileInput): Promise<ProfileResul
           gender: d.gender,
           country: d.country,
           region: d.region.trim(),
+          residentSubCounty: d.residentSubCounty || null,
           profileCompleted: true,
           ...ludevaFields,
         },

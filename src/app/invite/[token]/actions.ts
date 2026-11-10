@@ -5,19 +5,20 @@ import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { notifyUser } from '@/lib/notifications';
 import { syncChamaToLudeva } from '@/lib/ludeva-sync';
+import { setActiveChamaCookie } from '@/lib/chama';
 import { friendlyAccountError } from '@/lib/errors';
 import { toResult } from '@/lib/action-result';
 
 export async function acceptChamaInvite(
   token: string,
-  profile: { idNumber: string; phone: string; privacyPolicyAccepted: boolean }
+  profile: { idNumber: string; phone: string; privacyPolicyAccepted: boolean; county?: string; residentSubCounty?: string }
 ) {
   return toResult(() => acceptChamaInviteImpl(token, profile));
 }
 
 async function acceptChamaInviteImpl(
   token: string,
-  profile: { idNumber: string; phone: string; privacyPolicyAccepted: boolean }
+  profile: { idNumber: string; phone: string; privacyPolicyAccepted: boolean; county?: string; residentSubCounty?: string }
 ) {
   const clerkUser = await currentUser();
   if (!clerkUser) throw new Error('You must be signed in to accept this invite.');
@@ -31,6 +32,8 @@ async function acceptChamaInviteImpl(
   // sent back to the browser); that is re-checked below once the user is loaded.
   if (idNumber && idNumber.length < 4) throw new Error('Enter a valid ID/passport number.');
   if (phone.length < 7) throw new Error('Enter a valid phone number.');
+  const county = profile.county?.trim() || '';
+  const residentSubCounty = profile.residentSubCounty?.trim() || '';
 
   const invite = await prisma.teamInvite.findUnique({
     where: { token },
@@ -63,12 +66,15 @@ async function acceptChamaInviteImpl(
 
     if (!user) {
       if (idNumber.length < 4) throw new Error('Enter a valid ID/passport number.');
+      if (!county || !residentSubCounty) throw new Error('Select your resident county and enter your sub-county.');
       user = await prisma.user.create({
         data: {
           clerkId: clerkUser.id,
           email: clerkEmail,
           phone,
           idNumber,
+          region: county,
+          residentSubCounty: residentSubCounty || undefined,
           fullName: `${clerkUser.firstName ?? ''} ${clerkUser.lastName ?? ''}`.trim() || undefined,
           profileCompleted: true,
           onboardingCompleted: true,
@@ -76,21 +82,31 @@ async function acceptChamaInviteImpl(
         },
       });
     } else {
-      const alreadyOwnsOrBelongs = await prisma.teamMembership.findUnique({ where: { userId: user.id } });
-      if (alreadyOwnsOrBelongs) {
-        throw new Error("You're already a member of a chama, so you can't accept another invite — a member can only belong to one chama at a time.");
-      }
-      const ownsAnother = await prisma.team.findUnique({ where: { ownerId: user.id } });
-      if (ownsAnother) {
-        throw new Error("You already own your own chama, so you can't also join this one as a member.");
+      // One email can be in many chamas — the only thing to refuse is
+      // accepting an invite to a chama this account is already part of.
+      const alreadyOnThisChama =
+        invite.team.ownerId === user.id ||
+        !!(await prisma.teamMembership.findUnique({
+          where: { teamId_userId: { teamId: invite.teamId, userId: user.id } },
+        }));
+      if (alreadyOnThisChama) {
+        throw new Error("You're already part of this chama.");
       }
 
       if (!user.idNumber && idNumber.length < 4) throw new Error('Enter a valid ID/passport number.');
+      // County is the existing `region`; sub-county is only asked of Kenya residents.
+      const needsSubCounty = !user.country || user.country === 'KE';
+      if ((!user.region && !county) || (needsSubCounty && !user.residentSubCounty && !residentSubCounty)) {
+        throw new Error('Select your resident county and enter your sub-county.');
+      }
       user = await prisma.user.update({
         where: { id: user.id },
         data: {
           phone: user.phone || phone,
           idNumber: user.idNumber || idNumber,
+          // Only fill gaps — never overwrite what the member already gave us.
+          region: user.region || county || undefined,
+          residentSubCounty: user.residentSubCounty || residentSubCounty || undefined,
           profileCompleted: true,
           onboardingCompleted: true,
           privacyPolicyAcceptedAt: new Date(),
@@ -138,6 +154,9 @@ async function acceptChamaInviteImpl(
   );
 
   await syncChamaToLudeva(invite.teamId);
+
+  // Take them straight into the chama they just joined.
+  await setActiveChamaCookie(invite.teamId);
 
   revalidatePath('/panel');
   return { success: true };

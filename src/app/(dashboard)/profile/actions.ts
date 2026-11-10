@@ -14,6 +14,10 @@ const UpdateProfileSchema = z.object({
   gender: z.enum(['MALE', 'FEMALE', 'OTHER'], { errorMap: () => ({ message: 'Select a gender.' }) }),
   country: z.string().min(1, 'Select a country.'),
   region: z.string().min(1, 'Enter your region/county.'),
+  residentSubCounty: z.string().trim().optional(),
+}).refine((d) => d.country !== 'KE' || (d.residentSubCounty && d.residentSubCounty.length >= 2), {
+  message: 'Enter your sub-county.',
+  path: ['residentSubCounty'],
 });
 
 export type UpdateProfileInput = z.infer<typeof UpdateProfileSchema>;
@@ -59,6 +63,7 @@ export async function updateProfile(input: UpdateProfileInput) {
       gender: d.gender,
       country: d.country,
       region: d.region.trim(),
+      residentSubCounty: d.residentSubCounty || null,
     },
   });
 

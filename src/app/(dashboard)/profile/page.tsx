@@ -19,6 +19,7 @@ export default async function ProfilePage() {
           gender: user.gender || '',
           country: user.country || 'KE',
           region: user.region || '',
+          residentSubCounty: user.residentSubCounty || '',
         }}
         ludeva={{
           memberNumber: user.ludevaMemberNumber || '',

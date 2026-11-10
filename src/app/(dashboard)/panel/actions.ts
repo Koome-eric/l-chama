@@ -10,6 +10,8 @@ import { notifyUser } from '@/lib/notifications';
 import {
   getChamaContext,
   hasPermission,
+  chamaLabel,
+  listUserChamas,
   permissionsFrom,
   DEFAULT_INVITE_PERMISSIONS,
   type ChamaPermissions,
@@ -188,15 +190,11 @@ async function addExistingChamaMemberImpl(identifier: string, permissions?: Part
   }
   if (target.id === admin.id) throw new Error("You can't add yourself.");
 
-  const alreadyOwnsOrBelongs = await prisma.teamMembership.findUnique({ where: { userId: target.id } });
-  const ownsAnother = await prisma.team.findUnique({ where: { ownerId: target.id } });
-  if (alreadyOwnsOrBelongs || ownsAnother) {
-    const alreadyOnThisOne =
-      ownsAnother?.id === ctx.team.id || alreadyOwnsOrBelongs?.teamId === ctx.team.id;
-    throw new Error(
-      alreadyOnThisOne ? 'This person is already on the chama.' : 'This person already belongs to another chama.'
-    );
-  }
+  // One account can be in several chamas, so the only thing to rule out is
+  // them already being on THIS one.
+  const alreadyOnThisOne =
+    ctx.team.ownerId === target.id || ctx.team.members.some((m) => m.userId === target.id);
+  if (alreadyOnThisOne) throw new Error('This person is already on the chama.');
 
   const grant = permissionsFrom({ ...DEFAULT_INVITE_PERMISSIONS, ...permissions });
 
@@ -284,14 +282,147 @@ export async function updateMemberPermissions(membershipId: string, permissions:
   return { success: true };
 }
 
+// A member leaves the chama they're currently viewing (their other chamas
+// are untouched). The Admin can't just leave — a chama must always have
+// one — so they use transferChamaOwnership() to hand over and exit.
 export async function leaveChama() {
-  const user = await getCurrentDbUser();
-  const membership = await prisma.teamMembership.findUnique({ where: { userId: user.id } });
-  if (!membership) throw new Error('You are not part of a chama.');
+  return toResult(leaveChamaImpl);
+}
 
-  await prisma.teamMembership.delete({ where: { id: membership.id } });
+async function leaveChamaImpl() {
+  const user = await getCurrentDbUser();
+  const ctx = await getChamaContext(user);
+  if (!ctx) throw new Error('You are not part of a chama.');
+  if (ctx.isOwner) {
+    throw new Error(
+      "You're the Admin of this chama. Appoint another member as Admin first (Team Members → Appoint new Admin & exit), then you can leave."
+    );
+  }
+
+  await assertNoOpenLoanObligations(ctx.team.id, user.id);
+
+  await prisma.$transaction([
+    prisma.teamMembership.delete({ where: { id: ctx.membershipId! } }),
+    prisma.subTeamMembership.deleteMany({ where: { userId: user.id, subTeam: { teamId: ctx.team.id } } }),
+  ]);
+
+  await notifyUser(
+    ctx.team.ownerId,
+    'Member left your chama',
+    `${user.fullName || user.email || user.phone} has left ${chamaLabel({ name: ctx.team.name, ludevaNumber: ctx.team.owner.ludevaMemberNumber })}.`
+  );
+
+  await syncChamaToLudeva(ctx.team.id);
+
   revalidatePath('/panel');
-  return { success: true };
+  revalidatePath('/team');
+  const remaining = (await listUserChamas(user)).length;
+  return { success: true, hasOtherChamas: remaining > 0 };
+}
+
+// Someone with an unpaid loan, a loan awaiting a decision, or an active
+// guarantee in this chama can't walk away from it — that would strand the
+// chama's money or leave a loan with no one standing behind it.
+async function assertNoOpenLoanObligations(teamId: string, userId: string) {
+  const OPEN = ['PENDING_GUARANTORS', 'PENDING_ADMIN', 'ACTIVE'] as const;
+  const [ownLoan, guaranteed] = await Promise.all([
+    prisma.loanRequest.findFirst({ where: { teamId, requesterId: userId, status: { in: [...OPEN] } } }),
+    prisma.loanGuarantee.findFirst({
+      where: { guarantorId: userId, loanRequest: { teamId, status: { in: [...OPEN] } } },
+    }),
+  ]);
+  if (ownLoan) {
+    throw new Error("You still have a loan in this chama that isn't fully repaid, so you can't leave yet.");
+  }
+  if (guaranteed) {
+    throw new Error("You're a guarantor on a loan in this chama that isn't fully repaid, so you can't leave yet.");
+  }
+}
+
+// The Admin (owner) exits the chama they created by appointing another
+// member as Admin. In one transaction:
+//   - ownership moves to the chosen member (their member row is dropped —
+//     the owner never has one — and all permissions become implicit);
+//   - the outgoing Admin ends up with NO role in the chama (they've left);
+//   - sub-chama leadership follows the Admin (see CHANGES_SUBCHAMA_LEADER_AND_ID.md);
+//   - withdrawal approvals still waiting on the old Admin move to the new one.
+// Refused while the person taking over is the chama's Secretary or
+// Treasurer (the signatories must stay different people), or while the
+// outgoing Admin has an open loan/guarantee here.
+export async function transferChamaOwnership(newAdminMembershipId: string) {
+  return toResult(() => transferChamaOwnershipImpl(newAdminMembershipId));
+}
+
+async function transferChamaOwnershipImpl(newAdminMembershipId: string) {
+  const user = await getCurrentDbUser();
+  const ctx = await getChamaContext(user);
+  if (!ctx) throw new Error('You are not part of a chama.');
+  if (!ctx.isOwner) throw new Error('Only the chama Admin can hand over the chama.');
+
+  const incoming = ctx.team.members.find((m) => m.id === newAdminMembershipId);
+  if (!incoming) throw new Error('Pick a current member of this chama to take over as Admin.');
+  if (incoming.userId === user.id) throw new Error("You can't appoint yourself.");
+
+  if (ctx.team.secretaryId === incoming.userId || ctx.team.treasurerId === incoming.userId) {
+    throw new Error(
+      `${incoming.user.fullName || incoming.user.email} is currently the chama's Secretary/Treasurer. Assign a different signatory first, then hand over — the Admin and Secretary must be different people.`
+    );
+  }
+
+  await assertNoOpenLoanObligations(ctx.team.id, user.id);
+
+  const teamId = ctx.team.id;
+  const newAdminId = incoming.userId;
+
+  await prisma.$transaction([
+    // The incoming Admin stops being an ordinary member...
+    prisma.teamMembership.delete({ where: { id: incoming.id } }),
+    prisma.subTeamMembership.deleteMany({ where: { userId: newAdminId, subTeam: { teamId } } }),
+    // ...and becomes the owner.
+    prisma.team.update({ where: { id: teamId }, data: { ownerId: newAdminId } }),
+    // The outgoing Admin is out of this chama entirely.
+    prisma.subTeamMembership.deleteMany({ where: { userId: user.id, subTeam: { teamId } } }),
+    // Sub-chamas are always led by the Admin.
+    prisma.subTeam.updateMany({ where: { teamId }, data: { leaderId: newAdminId } }),
+    // Anything still waiting on the old Admin's signature is now the new Admin's.
+    prisma.withdrawalApproval.updateMany({
+      where: {
+        role: 'ADMIN',
+        approverId: user.id,
+        decision: 'PENDING',
+        withdrawalRequest: { teamId, status: 'AWAITING_APPROVALS' },
+      },
+      data: { approverId: newAdminId },
+    }),
+  ]);
+
+  const outgoingName = user.fullName || user.email || user.phone;
+  await notifyUser(
+    newAdminId,
+    "You're now the Admin",
+    `${outgoingName} has appointed you as Admin of ${chamaLabel({ name: ctx.team.name, ludevaNumber: incoming.user.ludevaMemberNumber })}. You now manage members, loans and withdrawals for this chama.`
+  );
+  await Promise.all(
+    ctx.team.members
+      .filter((m) => m.userId !== newAdminId)
+      .map((m) =>
+        notifyUser(
+          m.userId,
+          'New chama Admin',
+          `${incoming.user.fullName || incoming.user.email} is now the Admin of ${chamaLabel({ name: ctx.team.name, ludevaNumber: incoming.user.ludevaMemberNumber })}; ${outgoingName} has stepped down.`
+        )
+      )
+  );
+
+  await syncChamaToLudeva(teamId);
+
+  revalidatePath('/', 'layout');
+  const remaining = (await listUserChamas(user)).length;
+  return {
+    success: true,
+    hasOtherChamas: remaining > 0,
+    newAdminName: incoming.user.fullName || incoming.user.email || 'the new Admin',
+  };
 }
 
 export async function adjustLoanAccountBalance(amount: number) {

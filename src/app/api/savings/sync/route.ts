@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { phoneLookupVariants } from '@/lib/phone';
 import { upsertSavingsEntries } from '@/lib/savings-upsert';
+import { buildTeamResolver } from '@/lib/chama-match';
 
 // Webhook for a Google Sheets Apps Script to push Savings Data rows
 // straight in — same idea as the Investments/MemberReport pipeline
@@ -25,9 +26,14 @@ import { upsertSavingsEntries } from '@/lib/savings-upsert';
 //     { "memberEmail": "member@example.com", "memberPhone": "0712345678",
 //       "memberName": "Jane Doe", "accountNo": "SAV-0012", "date": "2026-08-01",
 //       "openingBalance": "50000", "deposit": "5000", "payout": "0",
-//       "closingBalance": "55000", "periodLabel": "Aug 2026", "notes": "" }
+//       "closingBalance": "55000", "periodLabel": "Aug 2026", "notes": "",
+//       "ludevaNumber": "LB0048", "chamaName": "Umoja Chama" }
 //   ]
 // }
+//
+// "ludevaNumber" / "chamaName" (both optional) say which chama the row is
+// for, since one member can be in several. A member in only one chama needs
+// neither. See src/lib/chama-match.ts for how rows are matched.
 export async function POST(req: NextRequest) {
   const secret = process.env.SAVINGS_SYNC_SECRET;
   if (secret && req.headers.get('x-sync-secret') !== secret) {
@@ -59,6 +65,8 @@ export async function POST(req: NextRequest) {
       closingBalance: r.closingBalance != null ? String(r.closingBalance) : null,
       periodLabel: r.periodLabel != null ? String(r.periodLabel) : null,
       notes: r.notes != null ? String(r.notes) : null,
+      _ludevaNumber: r.ludevaNumber != null ? String(r.ludevaNumber) : null,
+      _chamaName: r.chamaName != null ? String(r.chamaName) : null,
     }))
     // memberEmail used to be required; a row now only needs *an* identifier,
     // so a phone-only sign-up with no email on file can still be synced.
@@ -95,13 +103,7 @@ export async function POST(req: NextRequest) {
     users.filter((u): u is typeof u & { phone: string } => !!u.phone).map((u) => [u.phone, u])
   );
 
-  const memberships = await prisma.teamMembership.findMany({
-    where: { userId: { in: users.map((u) => u.id) } },
-  });
-  const teamIdByUserId = new Map(memberships.map((m) => [m.userId, m.teamId]));
-
-  const owners = await prisma.team.findMany({ where: { ownerId: { in: users.map((u) => u.id) } } });
-  const teamIdByOwnerId = new Map(owners.map((t) => [t.ownerId, t.id]));
+  const resolveTeam = await buildTeamResolver(users.map((u) => u.id));
 
   // Idempotent: a row already stored (same member + account + date + period)
   // is updated in place instead of inserted again, so re-pushing a row — from
@@ -112,8 +114,9 @@ export async function POST(req: NextRequest) {
       ? undefined
       : (phoneVariantsByRow.get(i) || []).map((v) => userByPhone.get(v)).find(Boolean);
     const user = byEmail || byPhone;
-    const teamId = user ? teamIdByOwnerId.get(user.id) || teamIdByUserId.get(user.id) || null : null;
-    return { ...row, teamId };
+    const { _ludevaNumber, _chamaName, ...rest } = row;
+    const teamId = resolveTeam(user?.id, { ludevaNumber: _ludevaNumber, chamaName: _chamaName });
+    return { ...rest, teamId };
   });
   const { created, updated } = await upsertSavingsEntries(withTeam);
 

@@ -10,7 +10,12 @@ import { prisma } from '@/lib/prisma';
 // had actually saved it, a CSV pasted twice) created a duplicate entry.
 //
 // An entry is now identified by:
-//   member (email, else phone) + account no. + date + period label
+//   member (email, else phone) + chama + account no. + date + period label
+// The chama is part of the key because one member can now be in several
+// chamas: two chamas' rows for the same account/date/period are different
+// entries and must not overwrite each other. A row not yet matched to a chama
+// (teamId null) is its own bucket; when the same row is later pushed with a
+// chama, it adopts the unmatched entry instead of duplicating it (see below).
 // A row that matches an existing entry UPDATES it (so corrections in the
 // sheet flow through); otherwise it is created. Re-sending the same data any
 // number of times leaves exactly one entry.
@@ -38,9 +43,9 @@ function identityOf(r: Pick<SavingsRow, 'memberEmail' | 'memberPhone'>) {
 }
 
 export function savingsRowKey(
-  r: Pick<SavingsRow, 'memberEmail' | 'memberPhone' | 'accountNo' | 'date' | 'periodLabel'>
+  r: Pick<SavingsRow, 'memberEmail' | 'memberPhone' | 'accountNo' | 'date' | 'periodLabel'> & { teamId?: string | null }
 ) {
-  return [identityOf(r), norm(r.accountNo) ?? '', norm(r.date) ?? '', norm(r.periodLabel) ?? ''].join('|');
+  return [identityOf(r), norm(r.accountNo) ?? '', norm(r.date) ?? '', norm(r.periodLabel) ?? '', r.teamId ?? ''].join('|');
 }
 
 // Arbitrary constant — serialises concurrent savings syncs so two requests
@@ -65,15 +70,19 @@ export async function upsertSavingsEntries(rows: SavingsRow[]) {
         const date = norm(row.date);
         const periodLabel = norm(row.periodLabel);
 
-        const existing = await tx.savingsEntry.findFirst({
-          where: {
-            ...(row.memberEmail ? { memberEmail: row.memberEmail } : { memberEmail: '', memberPhone: row.memberPhone }),
-            accountNo,
-            date,
-            periodLabel,
-          },
-          orderBy: { uploadedAt: 'asc' },
-        });
+        const identity = row.memberEmail
+          ? { memberEmail: row.memberEmail }
+          : { memberEmail: '', memberPhone: row.memberPhone };
+        const find = (teamId: string | null) =>
+          tx.savingsEntry.findFirst({
+            where: { ...identity, accountNo, date, periodLabel, teamId },
+            orderBy: { uploadedAt: 'asc' },
+          });
+
+        // Same entry in the same chama → update. A row that now knows its chama
+        // may instead be the previously-unmatched copy of itself → adopt it
+        // (the update below sets teamId) rather than create a second entry.
+        const existing = (await find(row.teamId)) ?? (row.teamId ? await find(null) : null);
 
         // memberEmail is a required column; a phone-only member is stored
         // with an empty email and matched by phone (see the lookup above).
@@ -113,6 +122,7 @@ type DupCandidate = {
   closingBalance: string | null;
   periodLabel: string | null;
   notes: string | null;
+  teamId?: string | null;
   updatedAt: Date;
   uploadedAt: Date;
 };
@@ -121,8 +131,8 @@ export type DupMatch = 'name' | 'identity';
 export type DupKeep = 'oldest' | 'newest';
 export type DupOptions = { match?: DupMatch; keep?: DupKeep };
 
-// "name"     → same member name (case/spacing/punctuation-insensitive) + account no. + date + period
-// "identity" → same email (else phone) + account no. + date + period (what the sync itself uses)
+// "name"     → same member name (case/spacing/punctuation-insensitive) + chama + account no. + date + period
+// "identity" → same email (else phone) + chama + account no. + date + period (what the sync itself uses)
 // Either way the account/date/period part keeps a member's entries for DIFFERENT
 // periods apart — only true repeats of the same entry are grouped.
 const normName = (v: string | null | undefined) =>
@@ -138,7 +148,7 @@ export function groupSavingsDuplicates<T extends DupCandidate>(
     if (match === 'name') {
       const n = normName(e.memberName);
       if (!n) continue; // no name to match on
-      key = ['n:' + n, norm(e.accountNo) ?? '', norm(e.date) ?? '', norm(e.periodLabel) ?? ''].join('|');
+      key = ['n:' + n, norm(e.accountNo) ?? '', norm(e.date) ?? '', norm(e.periodLabel) ?? '', e.teamId ?? ''].join('|');
     } else {
       key = savingsRowKey({ ...e, memberEmail: e.memberEmail || null });
       if (key.startsWith('|')) continue; // no email/phone identity

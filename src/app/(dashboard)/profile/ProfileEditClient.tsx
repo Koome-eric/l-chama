@@ -32,6 +32,7 @@ type Defaults = {
   gender: 'MALE' | 'FEMALE' | 'OTHER' | '';
   country: string;
   region: string;
+  residentSubCounty: string;
 };
 
 type LudevaInfo = {
@@ -51,6 +52,7 @@ export function ProfileEditClient({ defaults, ludeva }: { defaults: Defaults; lu
   const [gender, setGender] = useState<'MALE' | 'FEMALE' | 'OTHER' | ''>(defaults.gender);
   const [country, setCountry] = useState(defaults.country || 'KE');
   const [region, setRegion] = useState(defaults.region);
+  const [residentSubCounty, setResidentSubCounty] = useState(defaults.residentSubCounty);
   const [error, setError] = useState<string | null>(null);
 
   const isKenya = country === 'KE';
@@ -60,7 +62,8 @@ export function ProfileEditClient({ defaults, ludeva }: { defaults: Defaults; lu
     (defaults.hasIdOnFile ? idNumber.trim().length === 0 || idNumber.trim().length >= 4 : idNumber.trim().length >= 4) &&
     !!gender &&
     !!country &&
-    region.trim().length > 0;
+    region.trim().length > 0 &&
+    (!isKenya || residentSubCounty.trim().length >= 2);
 
   const handleSubmit = () => {
     if (!gender) return;
@@ -75,6 +78,7 @@ export function ProfileEditClient({ defaults, ludeva }: { defaults: Defaults; lu
           gender,
           country,
           region,
+          residentSubCounty: residentSubCounty.trim(),
         });
         toast({ title: 'Profile updated' });
       } catch (err: any) {
@@ -148,7 +152,7 @@ export function ProfileEditClient({ defaults, ludeva }: { defaults: Defaults; lu
             </Select>
           </div>
           <div>
-            <Label htmlFor="region">Region/County</Label>
+            <Label htmlFor="region">{isKenya ? 'Resident County' : 'Region'}</Label>
             {isKenya ? (
               <Select value={region} onValueChange={setRegion}>
                 <SelectTrigger id="region">
@@ -167,6 +171,20 @@ export function ProfileEditClient({ defaults, ludeva }: { defaults: Defaults; lu
             )}
           </div>
         </div>
+
+        {isKenya && (
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="residentSubCounty">Sub-county</Label>
+            <Input
+              id="residentSubCounty"
+              value={residentSubCounty}
+              onChange={(e) => setResidentSubCounty(e.target.value)}
+              placeholder="e.g. Kikuyu"
+            />
+          </div>
+        </div>
+        )}
 
         {error && <p className="text-sm text-destructive">{error}</p>}
 

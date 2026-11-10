@@ -1,5 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
+import { chamaLabel } from '@/lib/chama-shared';
 import LChamaHeader from '@/components/LChamaHeader';
 import LChamaFooter from '@/components/LChamaFooter';
 import { ChamaInviteAcceptClient } from './InviteAcceptClient';
@@ -15,7 +16,7 @@ export default async function ChamaInvitePage({
 
   const invite = await prisma.teamInvite.findUnique({
     where: { token },
-    include: { team: true, invitedBy: true },
+    include: { team: { include: { owner: true } }, invitedBy: true },
   });
 
   const { userId: clerkId } = await auth();
@@ -36,11 +37,13 @@ export default async function ChamaInvitePage({
         ) : (
           <ChamaInviteAcceptClient
             token={token}
-            teamName={invite.team.name}
+            teamName={chamaLabel({ name: invite.team.name, ludevaNumber: invite.team.owner.ludevaMemberNumber })}
             invitedByName={invite.invitedBy.fullName || invite.invitedBy.email || 'Team leader'}
             email={invite.email}
             hasIdOnFile={!!dbUser?.idNumber}
             existingPhone={dbUser?.phone ?? ''}
+            needsCounty={!dbUser?.region}
+            needsSubCounty={!dbUser?.residentSubCounty && (!dbUser?.country || dbUser.country === 'KE')}
           />
         )}
       </main>

@@ -31,16 +31,18 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Users, UserPlus, Trash2, ShieldCheck, Settings2, MessageCircle } from 'lucide-react';
+import { Users, UserPlus, Trash2, ShieldCheck, Settings2, MessageCircle, LogOut } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   inviteChamaMember,
   addExistingChamaMember,
   revokeChamaInvite,
   removeChamaMember,
   leaveChama,
+  transferChamaOwnership,
   updateMemberPermissions,
 } from '@/app/(dashboard)/panel/actions';
-import { PERMISSION_LABELS, DEFAULT_INVITE_PERMISSIONS, type ChamaPermissions } from '@/lib/chama';
+import { PERMISSION_LABELS, DEFAULT_INVITE_PERMISSIONS, type ChamaPermissions } from '@/lib/chama-shared';
 import type { TeamMembersData, TeamMember } from './team-types';
 
 const PERMISSION_KEYS = Object.keys(PERMISSION_LABELS) as (keyof ChamaPermissions)[];
@@ -94,6 +96,8 @@ export function TeamMembersSection({
   const [invitePerms, setInvitePerms] = useState<ChamaPermissions>(DEFAULT_INVITE_PERMISSIONS);
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
   const [editPerms, setEditPerms] = useState<ChamaPermissions>(DEFAULT_INVITE_PERMISSIONS);
+  const [handoverOpen, setHandoverOpen] = useState(false);
+  const [newAdminMembershipId, setNewAdminMembershipId] = useState('');
 
   const canInvite = team.isOwner || team.permissions.canInvite;
   const canManagePermissions = team.isOwner || team.permissions.canManagePermissions;
@@ -191,12 +195,39 @@ export function TeamMembersSection({
   };
 
   const handleLeave = () => {
-    if (!confirm('Leave this chama? You will lose access to the shared dashboard.')) return;
+    if (!confirm('Leave this chama? You will lose access to its shared dashboard. Your other chamas are not affected.')) return;
     startTransition(async () => {
       try {
-        await leaveChama();
+        const res = await leaveChama();
+        if (!res.ok) {
+          toast({ title: "Couldn't leave the chama", description: res.error, variant: 'destructive' });
+          return;
+        }
         toast({ title: 'You left the chama' });
-        window.location.href = '/';
+        window.location.href = res.hasOtherChamas ? '/panel' : '/';
+      } catch (err: any) {
+        toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      }
+    });
+  };
+
+  // The Admin steps down by appointing another member — see
+  // transferChamaOwnership() for exactly what moves.
+  const handleHandover = () => {
+    const incoming = team.members.find((m) => m.membershipId === newAdminMembershipId);
+    if (!incoming) return;
+    const who = incoming.fullName || incoming.email;
+    if (!confirm(`Appoint ${who} as the new Admin of ${team.name} and leave the chama? You will lose Admin access and this can't be undone by you.`)) return;
+    startTransition(async () => {
+      try {
+        const res = await transferChamaOwnership(newAdminMembershipId);
+        if (!res.ok) {
+          toast({ title: "Couldn't hand over the chama", description: res.error, variant: 'destructive' });
+          return;
+        }
+        toast({ title: 'Chama handed over', description: `${res.newAdminName} is now the Admin.` });
+        setHandoverOpen(false);
+        window.location.href = res.hasOtherChamas ? '/panel' : '/';
       } catch (err: any) {
         toast({ title: 'Error', description: err.message, variant: 'destructive' });
       }
@@ -239,6 +270,9 @@ export function TeamMembersSection({
           <div>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5 text-primary" /> {team.name}
+              {team.owner.ludevaNumber && (
+                <Badge variant="secondary" className="font-normal">Admin Ludeva No. {team.owner.ludevaNumber}</Badge>
+              )}
             </CardTitle>
             <CardDescription>Everyone in your chama, in one place.</CardDescription>
           </div>
@@ -406,6 +440,56 @@ export function TeamMembersSection({
             <Button variant="outline" onClick={handleLeave} disabled={isPending}>
               Leave Chama
             </Button>
+          </CardFooter>
+        )}
+        {team.isOwner && (
+          <CardFooter className="flex-col items-start gap-2 border-t pt-4">
+            <p className="text-sm text-muted-foreground">
+              Want to step away from {team.name}? Appoint another member as Admin and you'll exit the chama.
+            </p>
+            <Dialog open={handoverOpen} onOpenChange={setHandoverOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="gap-2" disabled={team.members.length === 0}>
+                  <LogOut className="h-4 w-4" /> Appoint new Admin &amp; exit
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Hand over {team.name}</DialogTitle>
+                  <DialogDescription>
+                    The member you choose becomes the chama's Admin, with full access. You will leave the chama
+                    and lose all access to it. Withdrawals still waiting on the Admin's sign-off move to them.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-2">
+                  <Label htmlFor="newAdmin">New Admin</Label>
+                  <Select value={newAdminMembershipId} onValueChange={setNewAdminMembershipId}>
+                    <SelectTrigger id="newAdmin">
+                      <SelectValue placeholder="Choose a member" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {team.members.map((m) => {
+                        const isSignatory = team.signatoryUserIds.includes(m.userId);
+                        return (
+                          <SelectItem key={m.membershipId} value={m.membershipId} disabled={isSignatory}>
+                            {m.fullName || m.email}
+                            {isSignatory ? ' — Secretary/Treasurer (reassign first)' : ''}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    You can't hand over while you have an unpaid loan, or a loan you've guaranteed, in this chama.
+                  </p>
+                </div>
+                <DialogFooter>
+                  <Button variant="destructive" onClick={handleHandover} disabled={isPending || !newAdminMembershipId}>
+                    {isPending ? 'Handing over…' : 'Appoint & exit'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </CardFooter>
         )}
       </Card>

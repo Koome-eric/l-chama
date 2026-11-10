@@ -43,6 +43,10 @@ model User {
   gender    Gender?
   country   String?
   region    String?
+  // `region` above is the member's county (shown as "Resident County" for
+  // Kenya). Sub-county is free text because the list is long and changes
+  // with boundary reviews.
+  residentSubCounty String?
 
   role UserRole @default(MEMBER)
 
@@ -60,8 +64,11 @@ model User {
   ludevaMembershipDecidedAt      DateTime?
   ludevaMembershipRejectionReason String?
 
-  ownedTeam      Team?           @relation("TeamOwner")
-  teamMembership TeamMembership? @relation("TeamMembershipUser")
+  // A person can own and/or belong to several chamas with one account.
+  // Which one the dashboard shows is the "active chama" (a cookie — see
+  // src/lib/chama.ts), not a property of the user.
+  ownedTeams      Team[]           @relation("TeamOwner")
+  teamMemberships TeamMembership[] @relation("TeamMembershipUser")
   sentInvites    TeamInvite[]    @relation("TeamInvitesSentBy")
   decidedTeams   Team[]          @relation("TeamDecidedBy")
 
@@ -69,10 +76,10 @@ model User {
   // already belongs to (see SubTeam below). Purely a grouping/leadership
   // layer: money, loans and withdrawals all still live on the parent
   // Team, so a sub-chama membership is a single extra tag, not a second
-  // TeamMembership. One sub-chama at a time, same as one chama at a time. ──
+  // TeamMembership. One sub-chama at a time PER CHAMA. ──
   ledSubTeams       SubTeam[]           @relation("SubTeamLeader")
   subTeamsCreated   SubTeam[]           @relation("SubTeamCreatedBy")
-  subTeamMembership SubTeamMembership?  @relation("SubTeamMember")
+  subTeamMemberships SubTeamMembership[] @relation("SubTeamMember")
 
   loanRequestsMade    LoanRequest[]   @relation("LoanRequester")
   loanRequestsDecided LoanRequest[]   @relation("LoanDecidedBy")
@@ -139,7 +146,7 @@ model Team {
   id      String @id @default(cuid())
   name    String
   photoUrl String?
-  ownerId String @unique
+  ownerId String
   owner   User   @relation("TeamOwner", fields: [ownerId], references: [id])
 
   levelKey      String?
@@ -219,6 +226,7 @@ model Team {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([ownerId])
   @@map("team")
 }
 
@@ -264,13 +272,20 @@ model SubTeamMembership {
   subTeamId String
   subTeam   SubTeam @relation(fields: [subTeamId], references: [id], onDelete: Cascade)
 
-  // Unique, not just per-subTeam: a member can only sit in one sub-chama
-  // at a time, platform-wide, same rule as TeamMembership.userId.
-  userId String @unique
+  userId String
   user   User   @relation("SubTeamMember", fields: [userId], references: [id])
+
+  // Denormalised copy of subTeam.teamId so "one sub-chama per member PER
+  // CHAMA" can be a real unique constraint now that a person can belong to
+  // several chamas. Always set by application code; nullable only so rows
+  // created before this column existed stay valid until
+  // prisma/backfill-subteam-membership-team.ts has been run.
+  teamId String?
 
   createdAt DateTime @default(now())
 
+  @@unique([userId, teamId])
+  @@index([userId])
   @@map("subteammembership")
 }
 
@@ -283,7 +298,7 @@ model SubTeamMembership {
 model TeamMembership {
   id     String @id @default(cuid())
   teamId String
-  userId String @unique
+  userId String
 
   team Team @relation(fields: [teamId], references: [id])
   user User @relation("TeamMembershipUser", fields: [userId], references: [id])
@@ -300,6 +315,9 @@ model TeamMembership {
 
   createdAt DateTime @default(now())
 
+  // A user can be in many chamas, but only once in each.
+  @@unique([teamId, userId])
+  @@index([userId])
   @@map("teammembership")
 }
 

@@ -112,7 +112,11 @@ export async function addSubTeamMember(subTeamId: string, membershipId: string) 
   if (!member) throw new Error('That person is not a member of this chama.');
   if (member.userId === subTeam.leaderId) throw new Error('This member already leads the sub-chama.');
 
-  const existing = await prisma.subTeamMembership.findUnique({ where: { userId: member.userId } });
+  // One sub-chama per member *per chama* — they may sit in a sub-chama of
+  // another chama they also belong to.
+  const existing = await prisma.subTeamMembership.findFirst({
+    where: { userId: member.userId, subTeam: { teamId: ctx.team.id } },
+  });
   if (existing) {
     throw new Error(
       existing.subTeamId === subTeamId
@@ -121,7 +125,7 @@ export async function addSubTeamMember(subTeamId: string, membershipId: string) 
     );
   }
 
-  await prisma.subTeamMembership.create({ data: { subTeamId, userId: member.userId } });
+  await prisma.subTeamMembership.create({ data: { subTeamId, userId: member.userId, teamId: ctx.team.id } });
 
   await notifyUser(
     member.userId,

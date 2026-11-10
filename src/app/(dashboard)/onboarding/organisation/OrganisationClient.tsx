@@ -78,7 +78,7 @@ export function OrganisationClient() {
     setError(null);
     startTransition(async () => {
       try {
-        await registerOrganisation({
+        const res = await registerOrganisation({
           organisationName,
           registrationNumber,
           numberOfMembers: Number(numberOfMembers),
@@ -94,6 +94,10 @@ export function OrganisationClient() {
           lastRespectContribution: hasLastRespectCover ? Number(lastRespectContribution) : undefined,
           privacyPolicyAccepted: true,
         });
+        if (!res.ok) {
+          setError(res.error);
+          return;
+        }
         toast({ title: 'Submitted for approval', description: "We'll notify you once it's reviewed." });
         router.push('/onboarding/pending');
       } catch (err: any) {

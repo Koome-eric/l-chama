@@ -66,16 +66,12 @@ export async function completeOnboarding(input: OnboardingInput) {
       });
     }
 
-    const [ownsTeam, isTeamMember] = await Promise.all([
-      prisma.team.findUnique({ where: { ownerId: user.id } }),
-      prisma.teamMembership.findUnique({ where: { userId: user.id } }),
-    ]);
+    // One account can own several chamas; just don't create the same one twice.
+    const ownsSameName = await prisma.team.findFirst({
+      where: { ownerId: user.id, name: { equals: d.chamaName.trim(), mode: 'insensitive' } },
+    });
 
-    if (isTeamMember) {
-      throw new Error('You are already a member of a chama, so a new one can\'t be created for you. Head to your dashboard instead — if this looks wrong, contact support.');
-    }
-
-    if (!ownsTeam) {
+    if (!ownsSameName) {
       await prisma.team.create({
         data: {
           name: d.chamaName.trim(),
