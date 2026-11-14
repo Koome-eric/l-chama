@@ -42,8 +42,8 @@ async function main() {
     update: {
       name: 'Shares Account',
       type: 'STOCK',
-      description: 'Invest in shares through your chama, with annual returns above 9%.',
-      roi: 9,
+      description: 'Invest in shares through your chama, with annual returns above 13%.',
+      roi: 13,
       roiMax: null,
       isActive: true,
     },
@@ -51,8 +51,8 @@ async function main() {
       id: 'ludeva-shares-account',
       name: 'Shares Account',
       type: 'STOCK',
-      description: 'Invest in shares through your chama, with annual returns above 9%.',
-      roi: 9,
+      description: 'Invest in shares through your chama, with annual returns above 13%.',
+      roi: 13,
       roiMax: null,
       duration: 12,
       minAmount: 1000,
@@ -87,14 +87,14 @@ async function main() {
 
   await prisma.investmentProduct.upsert({
     where: { id: 'ludeva-junior-account' },
-    update: { name: 'Ludeva Junior Account', type: 'JUNIOR', roi: 6, roiMax: null },
+    update: { name: 'Ludeva Junior Account', type: 'JUNIOR', roi: 5, roiMax: null },
     create: {
       id: 'ludeva-junior-account',
       name: 'Ludeva Junior Account',
       type: 'JUNIOR',
       description:
-        "A savings account opened by a parent/guardian on behalf of a child, earning up to 6% p.a. Requires the child's birth certificate and passport photo, plus the guardian's ID/passport, phone number, and KRA PIN — reviewed by an admin before the account is opened.",
-      roi: 6,
+        "A savings account opened by a parent/guardian on behalf of a child, earning up to 5% p.a. Requires the child's birth certificate and passport photo, plus the guardian's ID/passport, phone number, and KRA PIN — reviewed by an admin before the account is opened.",
+      roi: 5,
       roiMax: null,
       duration: 12,
       minAmount: 500,

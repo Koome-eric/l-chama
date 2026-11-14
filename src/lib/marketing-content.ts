@@ -31,7 +31,7 @@ export const FEATURES = [
 export const PRODUCTS = [
   {
     name: 'Junior Account',
-    rate: '6%',
+    rate: '5%',
     description: "High-interest custodial savings designed to secure members' children's future education goals.",
     features: 'Lock-in savings triggers, automatic parent-to-child recurring standing orders, and milestone rewards.',
     target: '/accounts?open=junior',
@@ -39,9 +39,9 @@ export const PRODUCTS = [
   },
   {
     name: 'Shares Account',
-    rate: 'Above 9%',
+    rate: 'Above 13%',
     description: 'Invest your chama’s funds in shares.',
-    features: 'Annual returns above 9%, with holdings tracked from your dashboard.',
+    features: 'Annual returns above 13%, with holdings tracked from your dashboard.',
     target: '/invest?type=STOCK',
     cta: 'Invest now',
   },

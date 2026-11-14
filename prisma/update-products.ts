@@ -17,13 +17,13 @@ async function main() {
       data: {
         name: 'Shares Account',
         type: 'STOCK',
-        description: 'Invest in shares through your chama, with annual returns above 9%.',
-        roi: 9,
+        description: 'Invest in shares through your chama, with annual returns above 13%.',
+        roi: 13,
         roiMax: null,
         isActive: true,
       },
     });
-    console.log('✅ "Shares Account" updated → above 9% p.a.');
+    console.log('✅ "Shares Account" updated → above 13% p.a.');
   } else {
     console.warn(
       '⚠️  No "Shares Account" product found — run `npx prisma db seed` first.'
@@ -50,6 +50,24 @@ async function main() {
     console.warn(
       '⚠️  No "Savings Account" product found — run `npx prisma db seed` first.'
     );
+  }
+
+  const junior = await prisma.investmentProduct.findFirst({
+    where: { id: 'ludeva-junior-account' },
+  });
+  if (junior) {
+    await prisma.investmentProduct.update({
+      where: { id: junior.id },
+      data: {
+        description:
+          "A savings account opened by a parent/guardian on behalf of a child, earning up to 5% p.a. Requires the child's birth certificate and passport photo, plus the guardian's ID/passport, phone number, and KRA PIN — reviewed by an admin before the account is opened.",
+        roi: 5,
+        roiMax: null,
+      },
+    });
+    console.log('✅ "Junior Account" updated → 5% p.a.');
+  } else {
+    console.warn('⚠️  No "Junior Account" product found — run `npx prisma db seed` first.');
   }
 
   await prisma.investmentProduct.upsert({

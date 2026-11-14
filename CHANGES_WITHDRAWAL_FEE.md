@@ -52,3 +52,13 @@ that text. Unexpected errors (database etc.) show a generic message and are logg
 `acceptChamaInvite` (src/app/invite/[token]/actions.ts) returns { ok:false, error } instead of throwing, via the shared
 `src/lib/action-result.ts` helper (the invite/add-member actions now use it as well). The Clerk metadata update after the
 membership is saved is best-effort, so a Clerk hiccup no longer shows "failed" for someone who actually joined.
+
+---
+# Product rates aligned: Savings 5%, Shares above 13%, Junior 5%
+
+- Landing page + /products (src/lib/landing-content.ts): Savings "5% – 7%" -> "5%" (note now just "per year"; "Tiered interest" bullet
+  reworded), Shares "Above 9%" -> "Above 13%", Junior "6%" -> "5%".
+- src/lib/marketing-content.ts: Junior 5%, Shares above 13%.
+- prisma/seed.ts + prisma/update-products.ts: Shares roi 13, Junior roi 5, descriptions updated.
+- LIVE DATABASE: run `npx tsx prisma/update-products.ts` so the Accounts page descriptions (Savings said "up to 7%", Junior "up to 6%")
+  match the Return column (Savings 5%, Junior 5%).
