@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { currentUser } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
+import { adoptUserByVerifiedEmail } from '@/lib/adopt-user';
 import { getChamaContext } from '@/lib/chama';
 
 const NO_STORE = { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0' };
@@ -43,7 +44,8 @@ export async function GET() {
     }
   }
 
-  const user = await prisma.user.findUnique({ where: { clerkId: clerkUser.id } });
+  const user =
+    (await prisma.user.findUnique({ where: { clerkId: clerkUser.id } })) ?? (await adoptUserByVerifiedEmail(clerkUser));
 
   if (!user) {
     return NextResponse.json(

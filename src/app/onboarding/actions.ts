@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import { currentUser } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
+import { adoptUserByVerifiedEmail } from '@/lib/adopt-user';
 import { revalidatePath } from 'next/cache';
 import { CHAMA_LEVELS } from '@/lib/chama-levels';
 import { friendlyAccountError } from '@/lib/errors';
@@ -43,7 +44,8 @@ export async function completeOnboarding(input: OnboardingInput) {
   if (!email) throw new Error('Your account has no email on file.');
 
   try {
-    let user = await prisma.user.findUnique({ where: { clerkId: clerkUser.id } });
+    let user =
+      (await prisma.user.findUnique({ where: { clerkId: clerkUser.id } })) ?? (await adoptUserByVerifiedEmail(clerkUser));
 
     if (!user) {
       user = await prisma.user.create({

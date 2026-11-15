@@ -76,3 +76,13 @@ Vercel build failed in next/font/google ("Cannot read properties of null (readin
 Google font URL to end in .woff2/.ttf/..., and Google now serves some without an extension. The same code is still in the latest
 Next 15.5.x, so upgrading does not help. Inter and Plus Jakarta Sans are now self-hosted with next/font/local
 (src/app/fonts/*.woff2, latin variable fonts, SIL OFL licences alongside). Same CSS variables, so Tailwind is unchanged.
+
+---
+# Fix: "This email address is already linked to an L-CHAMA account" for people signing up for the first time
+
+Cause: the database already had a User row for that email under an OLD clerkId (earlier sign-up, a Clerk account deleted and
+recreated, or a dev-vs-production Clerk instance). A brand-new Clerk account has a new clerkId, so the app looked up by clerkId,
+found nothing, tried to create a second row, and hit the unique email.
+Fix: src/lib/adopt-user.ts — if the Clerk email is VERIFIED and a row with that email exists, point it at the new clerkId and carry
+on (profile + chamas preserved). Used in accept-invite, onboarding (both steps), /api/auth/check-user and requirePanelAccess.
+Never done for an unverified email.

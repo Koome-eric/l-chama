@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
+import { adoptUserByVerifiedEmail } from '@/lib/adopt-user';
 import { getChamaContext, type ChamaContext } from '@/lib/chama';
 import type { User } from '@prisma/client';
 
@@ -21,7 +22,11 @@ export async function requirePanelAccess(
   const { userId: clerkId } = await auth();
   if (!clerkId) redirect(`/sign-in?redirect_url=${currentPath}`);
 
-  const user = await prisma.user.findUnique({ where: { clerkId } });
+  let user = await prisma.user.findUnique({ where: { clerkId } });
+  if (!user) {
+    const signedIn = await currentUser();
+    if (signedIn) user = await adoptUserByVerifiedEmail(signedIn);
+  }
 
   if (!user || !user.profileCompleted) {
     const clerkUser = await currentUser();

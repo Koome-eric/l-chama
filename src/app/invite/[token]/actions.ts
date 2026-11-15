@@ -8,6 +8,7 @@ import { syncChamaToLudeva } from '@/lib/ludeva-sync';
 import { setActiveChamaCookie } from '@/lib/chama';
 import { friendlyAccountError } from '@/lib/errors';
 import { toResult } from '@/lib/action-result';
+import { adoptUserByVerifiedEmail } from '@/lib/adopt-user';
 
 export async function acceptChamaInvite(
   token: string,
@@ -63,6 +64,9 @@ async function acceptChamaInviteImpl(
   let user;
   try {
     user = await prisma.user.findUnique({ where: { clerkId: clerkUser.id } });
+    // An older account row for this verified email (different clerkId) is the
+    // same person — reuse it instead of failing on the unique email.
+    if (!user) user = await adoptUserByVerifiedEmail(clerkUser);
 
     if (!user) {
       if (idNumber.length < 4) throw new Error('Enter a valid ID/passport number.');

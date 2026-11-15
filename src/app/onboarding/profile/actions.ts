@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 import { auth, clerkClient } from '@clerk/nextjs/server';
+import { adoptUserByVerifiedEmail } from '@/lib/adopt-user';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
@@ -86,7 +87,8 @@ export async function completeProfile(input: ProfileInput): Promise<ProfileResul
     ? { ludevaMemberNumber: d.ludevaMemberNumber!.trim(), ludevaMembershipStatus: 'PENDING' as const }
     : {};
 
-  const existing = await prisma.user.findUnique({ where: { clerkId } });
+  const existing =
+    (await prisma.user.findUnique({ where: { clerkId } })) ?? (await adoptUserByVerifiedEmail(clerkUser));
 
   // email and phone are unique on User — surface a clear message instead
   // of letting an unhandled Prisma error crash the render (which is all
