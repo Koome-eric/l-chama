@@ -62,3 +62,17 @@ membership is saved is best-effort, so a Clerk hiccup no longer shows "failed" f
 - prisma/seed.ts + prisma/update-products.ts: Shares roi 13, Junior roi 5, descriptions updated.
 - LIVE DATABASE: run `npx tsx prisma/update-products.ts` so the Accounts page descriptions (Savings said "up to 7%", Junior "up to 6%")
   match the Return column (Savings 5%, Junior 5%).
+
+---
+# Invite / contact emails: refused sends are no longer reported as "sent"
+
+resend v6 returns { error } instead of throwing when Resend refuses a message (unverified domain, bad from address, ...).
+panel/actions.ts (invite) and contact/actions.ts now check it, so the real reason is shown/logged instead of "Invite sent".
+
+---
+# Build fix: fonts are now bundled (no Google Fonts fetch at build time)
+
+Vercel build failed in next/font/google ("Cannot read properties of null (reading '1')", loader.js:122): the loader expects every
+Google font URL to end in .woff2/.ttf/..., and Google now serves some without an extension. The same code is still in the latest
+Next 15.5.x, so upgrading does not help. Inter and Plus Jakarta Sans are now self-hosted with next/font/local
+(src/app/fonts/*.woff2, latin variable fonts, SIL OFL licences alongside). Same CSS variables, so Tailwind is unchanged.

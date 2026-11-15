@@ -129,7 +129,10 @@ async function inviteChamaMemberImpl(email: string, permissions?: Partial<ChamaP
     emailError = 'Email sending is not configured on this server (missing RESEND_API_KEY).';
   } else {
     try {
-      await resend.emails.send({
+      // Resend's SDK does NOT throw when the API refuses a message (unverified
+      // domain, bad from-address, invalid key...) — it returns { error }. If
+      // that isn't checked, a refused email is reported as "sent".
+      const { error: sendError } = await resend.emails.send({
         from: INVITE_FROM_ADDRESS,
         to: [cleanEmail],
         subject: `You're invited to join ${ctx.team.name} on L-CHAMA`,
@@ -141,7 +144,12 @@ async function inviteChamaMemberImpl(email: string, permissions?: Partial<ChamaP
           <p style="color:#888;font-size:12px;">This invite expires in ${INVITE_EXPIRY_DAYS} days.</p>
         `,
       });
-      emailSent = true;
+      if (sendError) {
+        console.error('❌ Resend refused the chama invite email:', sendError);
+        emailError = sendError.message || 'The email service rejected the message.';
+      } else {
+        emailSent = true;
+      }
     } catch (err: any) {
       console.error('❌ Failed to send chama invite email:', err);
       emailError = err?.message || 'The email service rejected the message.';

@@ -36,7 +36,8 @@ export async function sendContactMessage(input: ContactInput) {
   }
 
   try {
-    await resend.emails.send({
+    // The Resend SDK returns { error } instead of throwing when a message is refused.
+    const { error: sendError } = await resend.emails.send({
       from: CONTACT_FROM_ADDRESS,
       to: [CONTACT_TO_ADDRESS],
       replyTo: d.email,
@@ -50,6 +51,7 @@ export async function sendContactMessage(input: ContactInput) {
         <p style="white-space:pre-line;">${d.message}</p>
       `,
     });
+    if (sendError) throw new Error(sendError.message);
   } catch (err: any) {
     console.error('❌ Failed to send contact message:', err);
     throw new Error('Could not send your message right now. Please email lchama@ludevaplc.co.ke directly.');

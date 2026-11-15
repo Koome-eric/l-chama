@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Plus_Jakarta_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
@@ -14,11 +14,22 @@ const THEME_BOOT_SCRIPT = `(function(){try{var s=localStorage.getItem('lchama-th
 // letterforms common in modern fintech. Inter stays for body copy and figures
 // (excellent tabular numerals for money). The two are loaded as CSS variables
 // and mapped to Tailwind's font-headline / font-sans in tailwind.config.ts.
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
-const jakarta = Plus_Jakarta_Sans({
-  subsets: ["latin"],
+//
+// Both are SELF-HOSTED (variable woff2, latin subset, in ./fonts) rather than
+// fetched from Google at build time: next/font/google broke production
+// builds when Google started serving font URLs without a file extension
+// ("TypeError: Cannot read properties of null (reading '1')" in the font
+// loader). Bundled files need no network, so the build can't fail on it.
+const inter = localFont({
+  src: "./fonts/inter-latin-wght-normal.woff2",
+  variable: "--font-inter",
+  weight: "100 900",
+  display: "swap",
+});
+const jakarta = localFont({
+  src: "./fonts/plus-jakarta-sans-latin-wght-normal.woff2",
   variable: "--font-jakarta",
-  weight: ["500", "600", "700", "800"],
+  weight: "200 800",
   display: "swap",
 });
 
