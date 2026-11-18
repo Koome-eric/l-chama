@@ -71,6 +71,8 @@ import { ImageUploadField } from '@/components/uploads/ImageUploadField';
 import { cn } from '@/lib/utils';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { CountUp } from '@/components/motion/CountUp';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { LOAN_PURPOSES, labelFor } from '@/lib/group-profile';
 import type { ChamaPermissions } from '@/lib/chama';
 
 type Member = {
@@ -96,6 +98,7 @@ type LoanRequestData = {
   requesterName: string;
   amount: number;
   purpose: string | null;
+  purposeCategory: string | null;
   status: 'PENDING_GUARANTORS' | 'PENDING_ADMIN' | 'REJECTED' | 'ACTIVE' | 'REPAID';
   months: number | null;
   repaymentWeeks: number | null;
@@ -979,6 +982,7 @@ function LoanRequestsTab({ team, currentUserId }: { team: TeamData; currentUserI
   const [amount, setAmount] = useState('');
   const [months, setMonths] = useState('3');
   const [purpose, setPurpose] = useState('');
+  const [purposeCategory, setPurposeCategory] = useState('');
   const [signDialogFor, setSignDialogFor] = useState<string | null>(null);
   const [signatureName, setSignatureName] = useState('');
   const [signAgreed, setSignAgreed] = useState(false);
@@ -992,12 +996,13 @@ function LoanRequestsTab({ team, currentUserId }: { team: TeamData; currentUserI
     const monthsValue = Number(months);
     startTransition(async () => {
       try {
-        await requestLoan({ amount: value, purpose, months: monthsValue });
+        await requestLoan({ amount: value, purpose, purposeCategory, months: monthsValue });
         toast({ title: 'Loan request submitted', description: 'It needs 2 guarantors before the Team Leader can review it.' });
         setRequestOpen(false);
         setAmount('');
         setMonths('3');
         setPurpose('');
+        setPurposeCategory('');
         window.location.reload();
       } catch (err: any) {
         toast({ title: 'Error', description: err.message, variant: 'destructive' });
@@ -1121,12 +1126,27 @@ function LoanRequestsTab({ team, currentUserId }: { team: TeamData; currentUserI
                     />
                   </div>
                   <div>
-                    <Label htmlFor="purpose">Purpose (optional)</Label>
+                    <Label htmlFor="purposeCategory">What is the loan for?</Label>
+                    <Select value={purposeCategory} onValueChange={setPurposeCategory}>
+                      <SelectTrigger id="purposeCategory">
+                        <SelectValue placeholder="Choose a purpose" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {LOAN_PURPOSES.map((p) => (
+                          <SelectItem key={p.value} value={p.value}>
+                            {p.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="purpose">More detail (optional)</Label>
                     <Textarea
                       id="purpose"
                       value={purpose}
                       onChange={(e) => setPurpose(e.target.value)}
-                      placeholder="What's this loan for?"
+                      placeholder="Anything else the guarantors and Team Leader should know?"
                     />
                   </div>
                   {amountNum > 0 && (
@@ -1140,7 +1160,7 @@ function LoanRequestsTab({ team, currentUserId }: { team: TeamData; currentUserI
                   )}
                 </div>
                 <DialogFooter>
-                  <Button onClick={handleRequest} disabled={isPending || !amount}>
+                  <Button onClick={handleRequest} disabled={isPending || !amount || !purposeCategory}>
                     {isPending ? 'Submitting...' : 'Submit Request'}
                   </Button>
                 </DialogFooter>
@@ -1172,6 +1192,7 @@ function LoanRequestsTab({ team, currentUserId }: { team: TeamData; currentUserI
                 </CardTitle>
                 <CardDescription>
                   Requested by {req.requesterName} on {new Date(req.createdAt).toLocaleDateString()}
+                  {req.purposeCategory ? ` · ${labelFor(LOAN_PURPOSES, req.purposeCategory)}` : ''}
                   {req.purpose ? ` · ${req.purpose}` : ''}
                   {req.months ? ` · ${req.months} month term` : ''}
                   {(req.status === 'ACTIVE' || req.status === 'REPAID') && (

@@ -8,6 +8,7 @@ import { CHAMA_LEVELS } from '@/lib/chama-levels';
 import { friendlyAccountError } from '@/lib/errors';
 import { toResult } from '@/lib/action-result';
 import { setActiveChamaCookie } from '@/lib/chama';
+import { groupProfileSchema, groupProfileData } from '@/lib/group-profile';
 
 const OBJECTIVE_KEYS = ['BUY_ASSETS', 'GET_A_LOAN', 'GET_INTEREST', 'SCHOOL_FEES', 'DECEMBER_HOLIDAY'] as const;
 
@@ -28,6 +29,8 @@ const OrganisationSchema = z.object({
   membersEmployed: z.coerce.number().int().min(0, 'Enter a number of members (0 or more).'),
   hasLastRespectCover: z.boolean().default(false),
   lastRespectContribution: z.coerce.number().min(0).optional(),
+  // Group market profile (group KYC) — see lib/group-profile.ts.
+  groupProfile: groupProfileSchema,
   privacyPolicyAccepted: z.literal(true, {
     errorMap: () => ({ message: 'Please tick "I Agree" to the Privacy Policy to continue.' }),
   }),
@@ -100,6 +103,7 @@ async function registerOrganisationImpl(input: OrganisationInput) {
       membersEmployed: d.membersEmployed,
       hasLastRespectCover: d.hasLastRespectCover,
       lastRespectContribution: d.hasLastRespectCover ? d.lastRespectContribution : null,
+      ...groupProfileData(d.groupProfile),
     };
 
     // A bare chama created by the older one-step signup has no registration

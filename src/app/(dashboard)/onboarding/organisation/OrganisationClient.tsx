@@ -11,6 +11,9 @@ import { useToast } from '@/hooks/use-toast';
 import { CHAMA_LEVELS, formatKES, type ChamaLevelKey } from '@/lib/chama-levels';
 import { registerOrganisation } from './actions';
 import { PrivacyConsent } from '@/components/PrivacyConsent';
+import { GroupProfileFields } from '@/components/GroupProfileFields';
+import { EMPTY_GROUP_PROFILE, isGroupProfileDraftComplete, type GroupProfileDraft } from '@/lib/group-profile';
+import { premiumInput, premiumTextarea } from '@/components/premium-form';
 import { CheckCircle2, Globe, HeartHandshake } from 'lucide-react';
 
 const OBJECTIVES: { key: string; label: string }[] = [
@@ -48,6 +51,9 @@ export function OrganisationClient() {
   const [hasLastRespectCover, setHasLastRespectCover] = useState(false);
   const [lastRespectContribution, setLastRespectContribution] = useState('');
 
+  // Group market profile (group KYC)
+  const [groupProfile, setGroupProfile] = useState<GroupProfileDraft>(EMPTY_GROUP_PROFILE);
+
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
@@ -67,6 +73,7 @@ export function OrganisationClient() {
     membersRunningSME !== '' &&
     membersEmployed !== '' &&
     (!hasLastRespectCover || Number(lastRespectContribution) > 0) &&
+    isGroupProfileDraftComplete(groupProfile) &&
     privacyAccepted;
 
   const handleSubmit = () => {
@@ -92,6 +99,7 @@ export function OrganisationClient() {
           membersEmployed: Number(membersEmployed),
           hasLastRespectCover,
           lastRespectContribution: hasLastRespectCover ? Number(lastRespectContribution) : undefined,
+          groupProfile: groupProfile as any,
           privacyPolicyAccepted: true,
         });
         if (!res.ok) {
@@ -114,6 +122,7 @@ export function OrganisationClient() {
             <Label htmlFor="organisationName">Organisation Name/Your Full Name</Label>
             <Input
               id="organisationName"
+              className={premiumInput}
               value={organisationName}
               onChange={(e) => setOrganisationName(e.target.value)}
             />
@@ -122,6 +131,7 @@ export function OrganisationClient() {
             <Label htmlFor="registrationNumber">Business Registration Number/National ID</Label>
             <Input
               id="registrationNumber"
+              className={premiumInput}
               value={registrationNumber}
               onChange={(e) => setRegistrationNumber(e.target.value)}
             />
@@ -131,6 +141,7 @@ export function OrganisationClient() {
               <Label htmlFor="numberOfMembers">Number of Members</Label>
               <Input
                 id="numberOfMembers"
+                className={premiumInput}
                 type="number"
                 min={1}
                 value={numberOfMembers}
@@ -141,6 +152,7 @@ export function OrganisationClient() {
               <Label htmlFor="totalDirectors">Total Directors</Label>
               <Input
                 id="totalDirectors"
+                className={premiumInput}
                 type="number"
                 min={1}
                 value={totalDirectors}
@@ -152,6 +164,7 @@ export function OrganisationClient() {
             <Label htmlFor="physicalAddress">Physical Address</Label>
             <Input
               id="physicalAddress"
+              className={premiumInput}
               value={physicalAddress}
               onChange={(e) => setPhysicalAddress(e.target.value)}
             />
@@ -160,6 +173,7 @@ export function OrganisationClient() {
             <Label htmlFor="additionalComments">Additional Comments (Optional)</Label>
             <Textarea
               id="additionalComments"
+              className={premiumTextarea}
               value={additionalComments}
               onChange={(e) => setAdditionalComments(e.target.value)}
             />
@@ -223,6 +237,7 @@ export function OrganisationClient() {
               <Label htmlFor="membersRunningSME">Running SMEs (number of members)</Label>
               <Input
                 id="membersRunningSME"
+                className={premiumInput}
                 type="number"
                 min={0}
                 value={membersRunningSME}
@@ -233,6 +248,7 @@ export function OrganisationClient() {
               <Label htmlFor="membersEmployed">Employed (number of members)</Label>
               <Input
                 id="membersEmployed"
+                className={premiumInput}
                 type="number"
                 min={0}
                 value={membersEmployed}
@@ -267,6 +283,7 @@ export function OrganisationClient() {
               <Label htmlFor="lastRespectContribution">Contribution per member (KES)</Label>
               <Input
                 id="lastRespectContribution"
+                className={premiumInput}
                 type="number"
                 min={1}
                 value={lastRespectContribution}
@@ -274,6 +291,18 @@ export function OrganisationClient() {
               />
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-2xl shadow-sm">
+        <CardContent className="space-y-5 p-6">
+          <div>
+            <h2 className="font-headline font-semibold text-lg">Group profile (KYC)</h2>
+            <p className="text-sm text-muted-foreground">
+              A few facts about how your group saves and borrows. Your Team Leader can update these later.
+            </p>
+          </div>
+          <GroupProfileFields value={groupProfile} onChange={(patch) => setGroupProfile((d) => ({ ...d, ...patch }))} />
         </CardContent>
       </Card>
 

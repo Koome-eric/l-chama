@@ -86,3 +86,24 @@ found nothing, tried to create a second row, and hit the unique email.
 Fix: src/lib/adopt-user.ts — if the Clerk email is VERIFIED and a row with that email exists, point it at the new clerkId and carry
 on (profile + chamas preserved). Used in accept-invite, onboarding (both steps), /api/auth/check-user and requirePanelAccess.
 Never done for an unverified email.
+
+---
+# 1) Group market profile (group KYC) + loan purpose   2) County picker + premium onboarding forms
+
+## Group market profile
+Serviceable-market facts Ludeva needs from verified group records: county, group type, member count (existing
+numberOfMembers), contribution regularity, business activity, smartphone/payment access, current credit source, loan purpose,
+consent, willingness to pay.
+- Group-level answers = group KYC on the Team: asked at chama registration (required) and editable by the Team Leader in the new
+  "Group profile (KYC)" card on /team. New Team columns + enums in prisma/schema.prisma; options/validation in src/lib/group-profile.ts.
+- Loan-specific answer = loan request form: "What is the loan for?" (required, structured) + the old free-text as "More detail".
+  New LoanRequest.purposeCategory.
+- Admin > Organisations shows each chama's profile and whether consent was given.
+- DEPLOY: `npx prisma db push` (adds columns/enums; nothing is dropped). Existing chamas show "Needs your input" until the Team Leader
+  completes the card.
+
+## County picker
+All 47 counties were already in the list, but it was unsorted and opened as a small clipped dropdown on phones, so the last ones
+(Kirinyaga, Narok, Nyamira, Bomet, Vihiga, Tharaka Nithi...) were hard to reach. KENYA_COUNTIES is now A-Z and every county field
+(onboarding, invite acceptance, profile edit) uses the new searchable bottom-sheet picker (src/components/ui/option-picker.tsx).
+Forms restyled with shared tokens in src/components/premium-form.tsx.

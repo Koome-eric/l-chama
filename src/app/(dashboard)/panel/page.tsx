@@ -187,6 +187,7 @@ export default async function ChamaPanelPage({
       requesterName: r.requester.fullName || r.requester.email || 'Unknown member',
       amount: r.amount,
       purpose: r.purpose,
+      purposeCategory: r.purposeCategory,
       status: r.status,
       months: r.months,
       repaymentWeeks: r.repaymentWeeks,

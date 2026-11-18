@@ -26,17 +26,15 @@ export const COUNTRIES: CountryOption[] = [
   { code: 'AU', name: 'Australia', flag: '🇦🇺', dialCode: '+61' },
 ];
 
-// Regions/counties — only Kenya's 47 counties are needed for the
-// onboarding form per the mockup; other countries fall back to a free
-// text field for "Region/County".
+// All 47 counties of Kenya, A–Z (the order people scan a list in). Other
+// countries fall back to a free text field for "Region/County".
 export const KENYA_COUNTIES: string[] = [
-  'Nairobi', 'Mombasa', 'Kisumu', 'Nakuru', 'Uasin Gishu', 'Kiambu', 'Machakos',
-  'Kajiado', 'Kilifi', 'Nyeri', 'Meru', 'Kakamega', 'Kisii', 'Bungoma', 'Kericho',
-  'Embu', 'Laikipia', 'Garissa', 'Turkana', 'Migori', 'Homa Bay', 'Siaya', 'Busia',
-  'Trans Nzoia', 'Nandi', 'Baringo', 'Elgeyo Marakwet', 'West Pokot', 'Samburu',
-  'Isiolo', 'Marsabit', 'Wajir', 'Mandera', 'Tana River', 'Lamu', 'Taita Taveta',
-  'Kwale', 'Kitui', 'Makueni', 'Nyandarua', "Murang'a", 'Kirinyaga', 'Tharaka Nithi',
-  'Nyamira', 'Bomet', 'Narok', 'Vihiga',
+  'Baringo', 'Bomet', 'Bungoma', 'Busia', 'Elgeyo Marakwet', 'Embu', 'Garissa', 'Homa Bay',
+  'Isiolo', 'Kajiado', 'Kakamega', 'Kericho', 'Kiambu', 'Kilifi', 'Kirinyaga', 'Kisii',
+  'Kisumu', 'Kitui', 'Kwale', 'Laikipia', 'Lamu', 'Machakos', 'Makueni', 'Mandera',
+  'Marsabit', 'Meru', 'Migori', 'Mombasa', "Murang'a", 'Nairobi', 'Nakuru', 'Nandi',
+  'Narok', 'Nyamira', 'Nyandarua', 'Nyeri', 'Samburu', 'Siaya', 'Taita Taveta', 'Tana River',
+  'Tharaka Nithi', 'Trans Nzoia', 'Turkana', 'Uasin Gishu', 'Vihiga', 'Wajir', 'West Pokot',
 ];
 
 export function getCountry(code: string | null | undefined): CountryOption | null {

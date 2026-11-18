@@ -2,6 +2,7 @@
 
 import crypto from 'crypto';
 import { toResult } from '@/lib/action-result';
+import { LOAN_PURPOSES } from '@/lib/group-profile';
 import { Resend } from 'resend';
 import { currentUser } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
@@ -452,7 +453,7 @@ export async function adjustLoanAccountBalance(amount: number) {
   return { success: true };
 }
 
-export async function requestLoan(input: { amount: number; purpose?: string; months: number }) {
+export async function requestLoan(input: { amount: number; purpose?: string; purposeCategory?: string; months: number }) {
   const user = await getCurrentDbUser();
   const ctx = await getChamaContext(user);
   if (!ctx) throw new Error('You are not part of a chama.');
@@ -463,6 +464,10 @@ export async function requestLoan(input: { amount: number; purpose?: string; mon
     throw new Error(`Loan term must be between 1 and ${MAX_LOAN_MONTHS} months.`);
   }
 
+  // The structured purpose feeds Ludeva's market assessment, so it is required.
+  const purposeCategory = LOAN_PURPOSES.find((p) => p.value === input.purposeCategory)?.value;
+  if (!purposeCategory) throw new Error('Choose what the loan is for.');
+
   const terms = computeLoanTerms(input.amount, input.months);
 
   await prisma.loanRequest.create({
@@ -471,6 +476,7 @@ export async function requestLoan(input: { amount: number; purpose?: string; mon
       requesterId: user.id,
       amount: input.amount,
       purpose: input.purpose?.trim() || undefined,
+      purposeCategory,
       months: terms.term,
       interestRate: terms.interestRate,
       repaymentWeeks: terms.weeks,

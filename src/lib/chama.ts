@@ -55,6 +55,17 @@ export type ChamaContext = {
     membersEmployed: number | null;
     hasLastRespectCover: boolean;
     lastRespectContribution: number | null;
+    // Group market profile (group KYC) — see lib/group-profile.ts.
+    county: string | null;
+    groupType: string | null;
+    contributionFrequency: string | null;
+    businessActivity: string | null;
+    smartphoneShare: string | null;
+    paymentAccess: string[];
+    creditSources: string[];
+    typicalLoanPurposes: string[];
+    willingnessToPay: string | null;
+    marketConsentAt: Date | null;
     members: Array<{ id: string; userId: string; user: User } & ChamaPermissions>;
     invites: Array<
       { id: string; email: string; token: string; status: string; expiresAt: Date; createdAt: Date } & ChamaPermissions

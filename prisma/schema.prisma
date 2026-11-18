@@ -187,6 +187,23 @@ model Team {
   membersRunningSME Int?
   membersEmployed   Int?
 
+  // ── Group market profile (group KYC) ──
+  // Verified, group-level facts Ludeva uses to size its serviceable market
+  // (see lib/group-profile.ts). Asked once at registration and editable by the
+  // Team Leader afterwards; loan-specific facts (purpose) live on LoanRequest.
+  // Member count is the existing numberOfMembers above.
+  county                 String? // county the group mainly operates in, or "Outside Kenya (diaspora)"
+  groupType              GroupType?
+  contributionFrequency  ContributionFrequency?
+  businessActivity       String? // what the members/group do for income
+  smartphoneShare        SmartphoneShare?
+  paymentAccess          PaymentAccess[] @default([])
+  creditSources          CreditSource[]  @default([])
+  typicalLoanPurposes    LoanPurpose[]   @default([])
+  willingnessToPay       WillingnessToPay?
+  marketConsentAt        DateTime? // consent to use these answers for market assessment
+  marketProfileUpdatedAt DateTime?
+
   // ── Last Respect Cover — an opt-in bereavement/last-expense benefit
   // funded by its own pool, separate from the loan account. ──
   hasLastRespectCover     Boolean @default(false)
@@ -388,6 +405,9 @@ model LoanRequest {
 
   amount  Float
   purpose String?
+  // Structured loan purpose, asked on the request form (the free-text
+  // `purpose` above stays for extra detail).
+  purposeCategory LoanPurpose?
   status  LoanRequestStatus @default(PENDING_GUARANTORS)
 
   // Fixed chama loan formula (not admin-chosen): 2.5% per month of the
@@ -1032,4 +1052,75 @@ model AdminAuditLog {
   @@index([createdAt])
   @@index([actorEmail, action, outcome, createdAt])
   @@map("admin_audit_log")
+}
+
+// ── Group market profile options ──
+enum GroupType {
+  SAVINGS_CHAMA
+  TABLE_BANKING
+  MERRY_GO_ROUND
+  INVESTMENT_CLUB
+  WELFARE_GROUP
+  BUSINESS_GROUP
+  YOUTH_GROUP
+  WOMEN_GROUP
+  FAMILY_GROUP
+  CHURCH_COMMUNITY
+  OTHER
+}
+
+enum ContributionFrequency {
+  WEEKLY
+  FORTNIGHTLY
+  MONTHLY
+  QUARTERLY
+  IRREGULAR
+}
+
+enum SmartphoneShare {
+  ALL
+  MOST
+  ABOUT_HALF
+  FEW
+  NONE
+}
+
+enum PaymentAccess {
+  MPESA
+  BANK_ACCOUNT
+  MOBILE_BANKING
+  CARD
+  CASH_ONLY
+}
+
+enum CreditSource {
+  NONE
+  BANK
+  SACCO
+  MICROFINANCE
+  MOBILE_LOANS
+  INTERNAL_LENDING
+  FRIENDS_FAMILY
+  INFORMAL_LENDERS
+  OTHER
+}
+
+enum LoanPurpose {
+  BUSINESS_CAPITAL
+  BUSINESS_ASSETS
+  FARMING
+  EDUCATION
+  MEDICAL_EMERGENCY
+  HOUSING
+  DEBT_REFINANCING
+  PERSONAL
+  OTHER
+}
+
+enum WillingnessToPay {
+  YES_PER_LOAN_FEE
+  YES_MONTHLY_SUBSCRIPTION
+  ONLY_IF_CHEAPER
+  NOT_SURE
+  NO
 }

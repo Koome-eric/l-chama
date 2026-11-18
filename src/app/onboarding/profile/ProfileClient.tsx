@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, MapPin } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,8 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { COUNTRIES, KENYA_COUNTIES } from '@/lib/countries';
+import { OptionPicker } from '@/components/ui/option-picker';
+import { FieldLabel, premiumInput, premiumSelectTrigger } from '@/components/premium-form';
 import { completeProfile } from './actions';
 
 const GENDERS = [
@@ -94,32 +96,32 @@ export function ProfileClient({ defaultEmail }: { defaultEmail?: string }) {
 
   return (
     <Card className="rounded-2xl shadow-sm">
-      <CardContent className="p-6 space-y-4">
+      <CardContent className="space-y-5 p-6 sm:p-8">
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="firstName">First Name</Label>
-            <Input id="firstName" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+            <FieldLabel htmlFor="firstName">First Name</FieldLabel>
+            <Input placeholder="e.g. Wanjiru" className={premiumInput} id="firstName" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
           </div>
           <div>
-            <Label htmlFor="lastName">Last Name</Label>
-            <Input id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+            <FieldLabel htmlFor="lastName">Last Name</FieldLabel>
+            <Input placeholder="e.g. Kamau" className={premiumInput} id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} />
           </div>
         </div>
 
         <div>
-          <Label htmlFor="idNumber">ID/Passport Number</Label>
-          <Input id="idNumber" value={idNumber} onChange={(e) => setIdNumber(e.target.value)} />
+          <FieldLabel htmlFor="idNumber">ID/Passport Number</FieldLabel>
+          <Input placeholder="e.g. 30112233" className={premiumInput} id="idNumber" value={idNumber} onChange={(e) => setIdNumber(e.target.value)} />
         </div>
 
         <div>
-          <Label htmlFor="email">Email (Optional)</Label>
-          <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <FieldLabel htmlFor="email">Email (Optional)</FieldLabel>
+          <Input placeholder="you@example.com" className={premiumInput} id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
 
         <div>
-          <Label htmlFor="gender">Gender</Label>
+          <FieldLabel htmlFor="gender">Gender</FieldLabel>
           <Select value={gender} onValueChange={(v) => setGender(v as typeof gender)}>
-            <SelectTrigger id="gender">
+            <SelectTrigger id="gender" className={premiumSelectTrigger}>
               <SelectValue placeholder="Select gender" />
             </SelectTrigger>
             <SelectContent>
@@ -134,9 +136,9 @@ export function ProfileClient({ defaultEmail }: { defaultEmail?: string }) {
 
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="country">Country</Label>
+            <FieldLabel htmlFor="country">Country</FieldLabel>
             <Select value={country} onValueChange={(v) => { setCountry(v); setRegion(''); }}>
-              <SelectTrigger id="country">
+              <SelectTrigger id="country" className={premiumSelectTrigger}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -149,22 +151,22 @@ export function ProfileClient({ defaultEmail }: { defaultEmail?: string }) {
             </Select>
           </div>
           <div>
-            <Label htmlFor="region">{isKenya ? 'Resident County' : 'Region'}</Label>
+            <FieldLabel htmlFor="region" icon={<MapPin />}>{isKenya ? 'Resident County' : 'Region'}</FieldLabel>
             {isKenya ? (
-              <Select value={region} onValueChange={setRegion}>
-                <SelectTrigger id="region">
-                  <SelectValue placeholder="Select county" />
-                </SelectTrigger>
-                <SelectContent>
-                  {KENYA_COUNTIES.map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {c}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <OptionPicker
+                id="region"
+                value={region}
+                onValueChange={setRegion}
+                options={KENYA_COUNTIES}
+                title="Resident county"
+                description="Select the county you currently live in. All 47 counties are listed."
+                placeholder="Select your county"
+                searchPlaceholder="Search counties…"
+                noun="county"
+                icon={<MapPin className="h-4 w-4" />}
+              />
             ) : (
-              <Input id="region" value={region} onChange={(e) => setRegion(e.target.value)} placeholder="Region" />
+              <Input className={premiumInput} id="region" value={region} onChange={(e) => setRegion(e.target.value)} placeholder="Region / state" />
             )}
           </div>
         </div>
@@ -172,8 +174,8 @@ export function ProfileClient({ defaultEmail }: { defaultEmail?: string }) {
         {isKenya && (
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="residentSubCounty">Sub-county</Label>
-            <Input
+            <FieldLabel htmlFor="residentSubCounty">Sub-county</FieldLabel>
+            <Input className={premiumInput}
               id="residentSubCounty"
               value={residentSubCounty}
               onChange={(e) => setResidentSubCounty(e.target.value)}
@@ -200,8 +202,8 @@ export function ProfileClient({ defaultEmail }: { defaultEmail?: string }) {
           </label>
           {isExistingLudevaMember && (
             <div>
-              <Label htmlFor="ludevaMemberNumber">Ludeva Membership Number</Label>
-              <Input
+              <FieldLabel htmlFor="ludevaMemberNumber">Ludeva Membership Number</FieldLabel>
+              <Input className={premiumInput}
                 id="ludevaMemberNumber"
                 value={ludevaMemberNumber}
                 onChange={(e) => setLudevaMemberNumber(e.target.value)}
@@ -215,14 +217,15 @@ export function ProfileClient({ defaultEmail }: { defaultEmail?: string }) {
         </div>
 
         <div>
-          <Label htmlFor="password">Password</Label>
+          <FieldLabel htmlFor="password">Password</FieldLabel>
           <div className="relative">
             <Input
               id="password"
               type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="pr-10"
+              placeholder="Create a strong password"
+              className={`${premiumInput} pr-12`}
             />
             <button
               type="button"
@@ -249,7 +252,7 @@ export function ProfileClient({ defaultEmail }: { defaultEmail?: string }) {
 
         {error && <p className="text-sm text-destructive">{error}</p>}
 
-        <Button size="lg" className="w-full" disabled={!canSubmit || isPending} onClick={handleSubmit}>
+        <Button size="lg" className="h-12 w-full rounded-xl text-base shadow-sm" disabled={!canSubmit || isPending} onClick={handleSubmit}>
           {isPending ? 'Saving…' : 'Continue'}
         </Button>
       </CardContent>

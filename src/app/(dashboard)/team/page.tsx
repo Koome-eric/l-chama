@@ -1,5 +1,7 @@
 import { requirePanelAccess } from '@/lib/require-panel-access';
 import { TeamMembersSection } from '@/components/panel/TeamMembersSection';
+import { GroupProfileCard } from '@/components/panel/GroupProfileCard';
+import { EMPTY_GROUP_PROFILE, isTeamGroupProfileComplete, OUTSIDE_KENYA, type GroupProfileDraft } from '@/lib/group-profile';
 import type { User } from '@prisma/client';
 
 // Team-facing pages never receive anyone's ID/passport number. What other
@@ -70,6 +72,26 @@ export default async function TeamPage() {
         <p className="text-muted-foreground">Everyone in {data.name}{data.owner.ludevaNumber ? ` (Admin Ludeva No. ${data.owner.ludevaNumber})` : ''}, and who owns the chama.</p>
       </div>
       <TeamMembersSection team={data} currentUserId={user.id} />
+      {ctx.isOwner && (
+        <GroupProfileCard
+          // Remount when the chama changes so the form shows that chama's answers.
+          key={ctx.team.id}
+          complete={isTeamGroupProfileComplete(ctx.team as any)}
+          initial={{
+            ...EMPTY_GROUP_PROFILE,
+            county: ctx.team.county ?? '',
+            groupType: ctx.team.groupType ?? '',
+            contributionFrequency: ctx.team.contributionFrequency ?? '',
+            businessActivity: ctx.team.businessActivity ?? '',
+            smartphoneShare: ctx.team.smartphoneShare ?? '',
+            paymentAccess: ctx.team.paymentAccess ?? [],
+            creditSources: ctx.team.creditSources ?? [],
+            typicalLoanPurposes: ctx.team.typicalLoanPurposes ?? [],
+            willingnessToPay: ctx.team.willingnessToPay ?? '',
+            marketConsent: !!ctx.team.marketConsentAt,
+          } satisfies GroupProfileDraft}
+        />
+      )}
     </div>
   );
 }

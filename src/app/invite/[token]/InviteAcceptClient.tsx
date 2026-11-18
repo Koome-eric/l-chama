@@ -16,7 +16,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Users, IdCard, Phone, MapPin } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { OptionPicker } from '@/components/ui/option-picker';
+import { FieldLabel, premiumInput } from '@/components/premium-form';
 import { KENYA_COUNTIES } from '@/lib/countries';
 import { acceptChamaInvite } from './actions';
 import { PrivacyConsent } from '@/components/PrivacyConsent';
@@ -118,7 +119,7 @@ export function ChamaInviteAcceptClient({
             you'll get access to the shared dashboard and loan account.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-5">
           {emailMismatch ? (
             <p className="text-sm text-destructive">
               This invite was sent to <strong>{email}</strong>, but you're signed in as {currentEmail}.
@@ -131,10 +132,8 @@ export function ChamaInviteAcceptClient({
               </p>
               {!hasIdOnFile && (
               <div>
-                <Label htmlFor="invite-idNumber" className="flex items-center gap-1.5">
-                  <IdCard className="h-3.5 w-3.5" /> ID / Passport Number
-                </Label>
-                <Input
+                <FieldLabel htmlFor="invite-idNumber" icon={<IdCard />}>ID / Passport Number</FieldLabel>
+                <Input className={premiumInput}
                   id="invite-idNumber"
                   value={idNumber}
                   onChange={(e) => setIdNumber(e.target.value)}
@@ -143,10 +142,8 @@ export function ChamaInviteAcceptClient({
               </div>
               )}
               <div>
-                <Label htmlFor="invite-phone" className="flex items-center gap-1.5">
-                  <Phone className="h-3.5 w-3.5" /> Phone Number
-                </Label>
-                <Input
+                <FieldLabel htmlFor="invite-phone" icon={<Phone />}>Phone Number</FieldLabel>
+                <Input className={premiumInput}
                   id="invite-phone"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
@@ -156,23 +153,23 @@ export function ChamaInviteAcceptClient({
               {(needsCounty || needsSubCounty) && (
                 <div className="grid gap-4 sm:grid-cols-2">
                   {needsCounty && (<div>
-                    <Label htmlFor="invite-county" className="flex items-center gap-1.5">
-                      <MapPin className="h-3.5 w-3.5" /> Resident County
-                    </Label>
-                    <Select value={county} onValueChange={setCounty}>
-                      <SelectTrigger id="invite-county">
-                        <SelectValue placeholder="Select county" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {KENYA_COUNTIES.map((c) => (
-                          <SelectItem key={c} value={c}>{c}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FieldLabel htmlFor="invite-county" icon={<MapPin />}>Resident County</FieldLabel>
+                    <OptionPicker
+                      id="invite-county"
+                      value={county}
+                      onValueChange={setCounty}
+                      options={KENYA_COUNTIES}
+                      title="Resident county"
+                      description="Select the county you currently live in. All 47 counties are listed."
+                      placeholder="Select your county"
+                      searchPlaceholder="Search counties…"
+                      noun="county"
+                      icon={<MapPin className="h-4 w-4" />}
+                    />
                   </div>)}
                   {needsSubCounty && (<div>
-                    <Label htmlFor="invite-subcounty">Sub-county</Label>
-                    <Input
+                    <FieldLabel htmlFor="invite-subcounty" icon={<MapPin />}>Sub-county</FieldLabel>
+                    <Input className={premiumInput}
                       id="invite-subcounty"
                       value={residentSubCounty}
                       onChange={(e) => setResidentSubCounty(e.target.value)}
@@ -188,7 +185,7 @@ export function ChamaInviteAcceptClient({
         </CardContent>
         <CardFooter className="flex gap-2">
           {!emailMismatch && (
-            <Button onClick={handleAccept} disabled={isPending || !canAccept} className="w-full">
+            <Button onClick={handleAccept} disabled={isPending || !canAccept} className="h-12 w-full rounded-xl text-base shadow-sm">
               {isPending ? 'Joining...' : 'Accept & Join Chama'}
             </Button>
           )}
