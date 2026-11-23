@@ -25,8 +25,8 @@ const OrganisationSchema = z.object({
   ),
   isDiaspora: z.boolean().default(false),
   objectives: z.array(z.enum(OBJECTIVE_KEYS)).min(1, "Select at least one of your chama's objectives."),
-  membersRunningSME: z.coerce.number().int().min(0, 'Enter a number of members (0 or more).'),
-  membersEmployed: z.coerce.number().int().min(0, 'Enter a number of members (0 or more).'),
+  // Member background (civil servants / SMEs / unemployed / other employed) is part of
+  // groupProfile below and saved by groupProfileData().
   hasLastRespectCover: z.boolean().default(false),
   lastRespectContribution: z.coerce.number().min(0).optional(),
   // Group market profile (group KYC) — see lib/group-profile.ts.
@@ -90,7 +90,6 @@ async function registerOrganisationImpl(input: OrganisationInput) {
       monthlyAmount: level.monthlyAmount,
       groupSize: level.groupSize,
       businessRegNumber: d.registrationNumber.trim(),
-      numberOfMembers: d.numberOfMembers,
       totalDirectors: d.totalDirectors,
       physicalAddress: d.physicalAddress.trim(),
       additionalComments: d.additionalComments?.trim() || undefined,
@@ -99,8 +98,6 @@ async function registerOrganisationImpl(input: OrganisationInput) {
       termsAcceptedAt: new Date(),
       isDiaspora: d.isDiaspora,
       objectives: d.objectives,
-      membersRunningSME: d.membersRunningSME,
-      membersEmployed: d.membersEmployed,
       hasLastRespectCover: d.hasLastRespectCover,
       lastRespectContribution: d.hasLastRespectCover ? d.lastRespectContribution : null,
       ...groupProfileData(d.groupProfile),

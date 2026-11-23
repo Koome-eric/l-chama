@@ -184,8 +184,12 @@ model Team {
   objectives ChamaObjective[] @default([])
   // "What is the background of half your members?" — a rough split the
   // Team Leader estimates at signup, not a running member-by-member tally.
+  // Member background (group KYC). membersRunningSME = entrepreneurs with SMEs;
+  // membersEmployed = employed outside the civil service (private sector etc.).
   membersRunningSME Int?
   membersEmployed   Int?
+  membersCivilServants Int?
+  membersUnemployed    Int?
 
   // ── Group market profile (group KYC) ──
   // Verified, group-level facts Ludeva uses to size its serviceable market
@@ -193,9 +197,19 @@ model Team {
   // Team Leader afterwards; loan-specific facts (purpose) live on LoanRequest.
   // Member count is the existing numberOfMembers above.
   county                 String? // county the group mainly operates in, or "Outside Kenya (diaspora)"
+  subcounty              String?
+  ward                   String?
+  meetingPlace           String? // where the group physically meets (venue + area)
+  // How many members have a smartphone / can pay digitally, and how many are
+  // listed with a credit reference bureau (CRB). Counts, not categories.
+  membersWithSmartphone    Int?
+  membersWithPaymentAccess Int?
+  membersInCrb             Int?
   groupType              GroupType?
   contributionFrequency  ContributionFrequency?
   businessActivity       String? // what the members/group do for income
+  // smartphoneShare / paymentAccess: superseded by the member counts above; kept so
+  // earlier answers are not lost. No longer asked or shown.
   smartphoneShare        SmartphoneShare?
   paymentAccess          PaymentAccess[] @default([])
   creditSources          CreditSource[]  @default([])
@@ -1056,6 +1070,8 @@ model AdminAuditLog {
 
 // ── Group market profile options ──
 enum GroupType {
+  BODABODA
+  WORKMATES
   SAVINGS_CHAMA
   TABLE_BANKING
   MERRY_GO_ROUND
@@ -1070,6 +1086,7 @@ enum GroupType {
 }
 
 enum ContributionFrequency {
+  DAILY
   WEEKLY
   FORTNIGHTLY
   MONTHLY

@@ -80,7 +80,7 @@ import {
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { useToast } from '@/hooks/use-toast';
 import {
-  CONTRIBUTION_FREQUENCIES, CREDIT_SOURCES, GROUP_TYPES, LOAN_PURPOSES, PAYMENT_ACCESS, SMARTPHONE_SHARES, WILLINGNESS_TO_PAY, labelFor,
+  ALL_CONTRIBUTION_FREQUENCIES, ALL_GROUP_TYPES, CREDIT_SOURCES, LOAN_PURPOSES, WILLINGNESS_TO_PAY, labelFor,
 } from '@/lib/group-profile';
 import { formatKES } from '@/lib/chama-levels';
 import { cn } from '@/lib/utils';
@@ -185,8 +185,14 @@ type TeamRow = {
   groupType: string | null;
   contributionFrequency: string | null;
   businessActivity: string | null;
-  smartphoneShare: string | null;
-  paymentAccess: string[];
+  subcounty: string | null;
+  ward: string | null;
+  meetingPlace: string | null;
+  membersCivilServants: number | null;
+  membersUnemployed: number | null;
+  membersWithSmartphone: number | null;
+  membersWithPaymentAccess: number | null;
+  membersInCrb: number | null;
   creditSources: string[];
   typicalLoanPurposes: string[];
   willingnessToPay: string | null;
@@ -1136,17 +1142,24 @@ function OrganisationsAdminSection({ teams }: { teams: TeamRow[] }) {
                   <dt className="text-muted-foreground">Chama Objectives</dt>
                   <dd>{t.objectives.length > 0 ? t.objectives.map((o) => OBJECTIVE_LABELS[o] || o).join(', ') : '—'}</dd>
                 </div>
-                <div><dt className="text-muted-foreground">Members Running SMEs</dt><dd>{t.membersRunningSME ?? '—'}</dd></div>
-                <div><dt className="text-muted-foreground">Members Employed</dt><dd>{t.membersEmployed ?? '—'}</dd></div>
                 <div className="sm:col-span-2 border-t border-border/60 pt-3">
                   <dt className="font-medium">Group profile (KYC){t.marketConsentAt ? '' : ' — not completed'}</dt>
                 </div>
                 <div><dt className="text-muted-foreground">County</dt><dd>{t.county || '—'}</dd></div>
-                <div><dt className="text-muted-foreground">Group type</dt><dd>{labelFor(GROUP_TYPES, t.groupType)}</dd></div>
-                <div><dt className="text-muted-foreground">Contributions</dt><dd>{labelFor(CONTRIBUTION_FREQUENCIES, t.contributionFrequency)}</dd></div>
-                <div><dt className="text-muted-foreground">Business activity</dt><dd>{t.businessActivity || '—'}</dd></div>
-                <div><dt className="text-muted-foreground">Members with smartphones</dt><dd>{labelFor(SMARTPHONE_SHARES, t.smartphoneShare)}</dd></div>
-                <div><dt className="text-muted-foreground">Payment access</dt><dd>{t.paymentAccess.length ? t.paymentAccess.map((v) => labelFor(PAYMENT_ACCESS, v)).join(', ') : '—'}</dd></div>
+                <div><dt className="text-muted-foreground">Sub-county</dt><dd>{t.subcounty || '—'}</dd></div>
+                <div><dt className="text-muted-foreground">Ward</dt><dd>{t.ward || '—'}</dd></div>
+                <div><dt className="text-muted-foreground">Meeting place</dt><dd>{t.meetingPlace || '—'}</dd></div>
+                <div><dt className="text-muted-foreground">Group type</dt><dd>{labelFor(ALL_GROUP_TYPES, t.groupType)}</dd></div>
+                <div><dt className="text-muted-foreground">Members</dt><dd>{t.numberOfMembers ?? '—'}</dd></div>
+                <div><dt className="text-muted-foreground">Civil servants</dt><dd>{t.membersCivilServants ?? '—'}</dd></div>
+                <div><dt className="text-muted-foreground">Entrepreneurs with SMEs</dt><dd>{t.membersRunningSME ?? '—'}</dd></div>
+                <div><dt className="text-muted-foreground">Unemployed</dt><dd>{t.membersUnemployed ?? '—'}</dd></div>
+                <div><dt className="text-muted-foreground">Other employed</dt><dd>{t.membersEmployed ?? '—'}</dd></div>
+                <div><dt className="text-muted-foreground">Income activities</dt><dd>{t.businessActivity || '—'}</dd></div>
+                <div><dt className="text-muted-foreground">Contributions</dt><dd>{labelFor(ALL_CONTRIBUTION_FREQUENCIES, t.contributionFrequency)}</dd></div>
+                <div><dt className="text-muted-foreground">Members with smartphones</dt><dd>{t.membersWithSmartphone ?? '—'}</dd></div>
+                <div><dt className="text-muted-foreground">Members who can pay digitally</dt><dd>{t.membersWithPaymentAccess ?? '—'}</dd></div>
+                <div><dt className="text-muted-foreground">Members listed with a CRB</dt><dd>{t.membersInCrb ?? '—'}</dd></div>
                 <div><dt className="text-muted-foreground">Current credit sources</dt><dd>{t.creditSources.length ? t.creditSources.map((v) => labelFor(CREDIT_SOURCES, v)).join(', ') : '—'}</dd></div>
                 <div><dt className="text-muted-foreground">Usual loan purposes</dt><dd>{t.typicalLoanPurposes.length ? t.typicalLoanPurposes.map((v) => labelFor(LOAN_PURPOSES, v)).join(', ') : '—'}</dd></div>
                 <div><dt className="text-muted-foreground">Willingness to pay</dt><dd>{labelFor(WILLINGNESS_TO_PAY, t.willingnessToPay)}</dd></div>

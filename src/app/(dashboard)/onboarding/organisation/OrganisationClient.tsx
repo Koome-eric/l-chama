@@ -44,8 +44,6 @@ export function OrganisationClient() {
   const [objectives, setObjectives] = useState<string[]>([]);
 
   // Member background split
-  const [membersRunningSME, setMembersRunningSME] = useState('');
-  const [membersEmployed, setMembersEmployed] = useState('');
 
   // Last Respect Cover
   const [hasLastRespectCover, setHasLastRespectCover] = useState(false);
@@ -62,6 +60,10 @@ export function OrganisationClient() {
     setObjectives((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
   };
 
+  // The member count is asked in the organisation details above, so the group
+  // profile reuses it instead of asking again.
+  const profileDraft: GroupProfileDraft = { ...groupProfile, memberCount: numberOfMembers };
+
   const canSubmit =
     organisationName.trim().length >= 2 &&
     registrationNumber.trim().length >= 2 &&
@@ -70,10 +72,8 @@ export function OrganisationClient() {
     physicalAddress.trim().length >= 3 &&
     !!levelKey &&
     objectives.length >= 1 &&
-    membersRunningSME !== '' &&
-    membersEmployed !== '' &&
     (!hasLastRespectCover || Number(lastRespectContribution) > 0) &&
-    isGroupProfileDraftComplete(groupProfile) &&
+    isGroupProfileDraftComplete(profileDraft) &&
     privacyAccepted;
 
   const handleSubmit = () => {
@@ -95,11 +95,9 @@ export function OrganisationClient() {
           levelKey,
           isDiaspora,
           objectives: objectives as any,
-          membersRunningSME: Number(membersRunningSME),
-          membersEmployed: Number(membersEmployed),
           hasLastRespectCover,
           lastRespectContribution: hasLastRespectCover ? Number(lastRespectContribution) : undefined,
-          groupProfile: groupProfile as any,
+          groupProfile: profileDraft as any,
           privacyPolicyAccepted: true,
         });
         if (!res.ok) {
@@ -226,41 +224,6 @@ export function OrganisationClient() {
 
       <Card className="rounded-2xl shadow-sm">
         <CardContent className="p-6 space-y-4">
-          <h2 className="font-headline font-semibold text-lg">
-            What is the background of your members?
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Roughly how many of your members fall into each group?
-          </p>
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="membersRunningSME">Running SMEs (number of members)</Label>
-              <Input
-                id="membersRunningSME"
-                className={premiumInput}
-                type="number"
-                min={0}
-                value={membersRunningSME}
-                onChange={(e) => setMembersRunningSME(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="membersEmployed">Employed (number of members)</Label>
-              <Input
-                id="membersEmployed"
-                className={premiumInput}
-                type="number"
-                min={0}
-                value={membersEmployed}
-                onChange={(e) => setMembersEmployed(e.target.value)}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="rounded-2xl shadow-sm">
-        <CardContent className="p-6 space-y-4">
           <label className="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
@@ -299,10 +262,14 @@ export function OrganisationClient() {
           <div>
             <h2 className="font-headline font-semibold text-lg">Group profile (KYC)</h2>
             <p className="text-sm text-muted-foreground">
-              A few facts about how your group saves and borrows. Your Team Leader can update these later.
+              Where your group is, who its members are, and how it saves and borrows. You can update these later from the Team page.
             </p>
           </div>
-          <GroupProfileFields value={groupProfile} onChange={(patch) => setGroupProfile((d) => ({ ...d, ...patch }))} />
+          <GroupProfileFields
+            value={profileDraft}
+            showMemberCount={false}
+            onChange={(patch) => setGroupProfile((d) => ({ ...d, ...patch }))}
+          />
         </CardContent>
       </Card>
 

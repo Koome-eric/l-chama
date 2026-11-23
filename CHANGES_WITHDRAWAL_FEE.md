@@ -107,3 +107,22 @@ All 47 counties were already in the list, but it was unsorted and opened as a sm
 (Kirinyaga, Narok, Nyamira, Bomet, Vihiga, Tharaka Nithi...) were hard to reach. KENYA_COUNTIES is now A-Z and every county field
 (onboarding, invite acceptance, profile edit) uses the new searchable bottom-sheet picker (src/components/ui/option-picker.tsx).
 Forms restyled with shared tokens in src/components/premium-form.tsx.
+
+---
+# Group KYC expanded
+
+New questions (group profile on registration + Team page card; admin sees them on each organisation):
+1. Where: county, sub-county, ward, meeting place.
+2. Group type: Table banking, Welfare, Business club, Bodaboda, Family group, Women group, Youth group, Workmates, Others.
+3. Member count (asked once in the registration form; editable in the Team page card).
+4. Member background: civil servants, entrepreneurs with SMEs, unemployed, other employed (must not add up to more than the member count).
+5. Contribution regularity: Daily, Weekly, Monthly (+ Irregular).
+6. Members with a smartphone; members who can pay digitally (counts).
+7. Current credit source(s); usual loan purposes (per-loan purpose is still asked on the loan form).
+8. Members listed with a CRB.
+The old "What is the background of your members?" card on registration is folded into this (same Team columns:
+membersRunningSME = entrepreneurs, membersEmployed = other employed).
+
+DEPLOY: `npx prisma db push` first (adds 8 Team columns and enum values BODABODA, WORKMATES, DAILY; nothing is dropped; the old
+smartphoneShare / paymentAccess columns are kept but no longer asked). Chamas that already completed the earlier version will show
+"Needs your input" until their Team Leader answers the new questions.
